@@ -485,40 +485,6 @@ input[type="range"]::-moz-range-thumb {
     to { opacity: 1; }
 }
 
-.wall-break-intro {
-    text-align: center;
-    margin-bottom: 10px;
-    font-size: 0.9rem;
-}
-
-/* Breakable wall styles */
-.breakable-wall {
-    position: absolute;
-    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: transform 0.1s;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
-.breakable-wall:hover {
-    transform: scale(1.02);
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-}
-
-.breakable-wall.red { background-color: rgba(231, 76, 60, 0.6); }
-.breakable-wall.blue { background-color: rgba(52, 152, 219, 0.6); }
-.breakable-wall.green { background-color: rgba(46, 204, 113, 0.6); }
-.breakable-wall.purple { background-color: rgba(155, 89, 182, 0.6); }
-.breakable-wall.yellow { background-color: rgba(241, 196, 15, 0.6); }
-
-.wall-fragment {
-    position: absolute;
-    border-radius: 2px;
-    pointer-events: none;
-    z-index: 5;
-}
-
 @media (max-width: 768px) {
     .controls {
         max-width: 250px;
@@ -531,63 +497,5 @@ input[type="range"]::-moz-range-thumb {
     
     .logo {
         font-size: 2rem;
-    }
-}
-
-/* Wall Cracking Effect Styles */
-.background-wall {
-    cursor: pointer;
-    background-color: #e74c3c;
-    transition: background-color 0.5s;
-    pointer-events: auto;
-}
-
-.wall-layer {
-    cursor: pointer;
-    transition: background-color 0.5s;
-    pointer-events: auto;
-}
-
-.wall-crack {
-    position: fixed;
-    background-color: rgba(0, 0, 0, 0.8);
-    border-radius: 50%;
-    clip-path: polygon(
-        50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 
-        50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%
-    );
-    z-index: 3;
-    pointer-events: none;
-    box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.8);
-    animation: crackAppear 0.3s forwards;
-}
-
-.crack-particle {
-    position: fixed;
-    border-radius: 50%;
-    z-index: 4;
-    pointer-events: none;
-}
-
-.wall-shockwave {
-    position: fixed;
-    border-radius: 50%;
-    z-index: 5;
-    pointer-events: none;
-    opacity: 0.7;
-    transition: all 0.2s ease-out;
-}
-
-@keyframes crackAppear {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 0.9;
     }
 }

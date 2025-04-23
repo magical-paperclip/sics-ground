@@ -14,30 +14,21 @@ const {
     Vertices
 } = Matter;
 
-// set up globuls we'll use throughout
+// Global variables
 let currentMode = 'playground';
-let breakableWalls = [];
-let wallStrength = 3;
-let breakSize = 2;
-
-// Background wall system variables
-let backgroundWall = null;
-let crackPoints = [];
-let wallLayers = [];
-currentWallLayer = 0;
-maxWallLayers = 10;
-isWallActive = false;
-lastClickTime = 0;
-
-// Wall layer colors
-const wallLayerColors = [
-    'rgba(255, 100, 100, 0.7)',
-    'rgba(100, 255, 100, 0.7)',
-    'rgba(100, 100, 255, 0.7)',
-    'rgba(255, 255, 100, 0.7)',
-    'rgba(255, 100, 255, 0.7)',
-    'rgba(100, 255, 255, 0.7)'
-];
+let lastMousePos = { x: 0, y: 0 };
+let windForce = 0;
+let windDirection = 1;
+let isWindActive = false;
+let windInterval;
+let gravity = 1;
+let attractorRadius = 100;
+let attractorStrength = 0.001;
+let isAttractorActive = false;
+let attractor = null;
+let isDarkMode = false;
+let lastClickTime = 0;
+let doubleClickThreshold = 300; // 300ms for double-click detection
 
 // Theming variables
 let currentTheme = 'default';
@@ -73,160 +64,395 @@ let sandParticles = [];
 let lastFrameTime = null;
 let frameRateHistory = Array(30).fill(60);
 
-// fire up da physics engien
-const engine = Engine.create();
-engine.world.gravity.y = 1;
-engine.timing.timeScale = 0.9;
-// performance tweeks
-const enableSleeping = true;
-engine.enableSleeping = enableSleeping;
+// Engine variables
+let engine, render, runner, mouse, mouseConstraint, canvas;
+let draggedBody = null;
+let ground, leftWall, rightWall, ceiling;
 
-// set up our canvus
-const canvas = document.getElementById('physics-canvas');
-const render = Render.create({
-    canvas: canvas,
-    engine: engine,
-    options: {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        wireframes: false,
-        background: 'transparent',
-        pixelRatio: Math.min(window.devicePixelRatio, 2),        
-        showSleeping: false
+// Wait for DOM to be fully loaded before initializing
+document.addEventListener('DOMContentLoaded', function() {
+    initPhysics();
+    setupEventListeners();
+    addDecorativeElements();
+    
+    // Populate with some initial shapes
+    for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+            addCircle();
+            addSquare();
+            addTriangle();
+            addStar();
+        }, i * 200);
     }
 });
 
-// get things runnin
-const runner = Runner.create();
-Runner.run(runner, engine);
-Render.run(render);
+// Initialize physics engine and environment
+function initPhysics() {
+    // fire up da physics engien
+    engine = Engine.create();
+    engine.world.gravity.y = 1;
+    engine.timing.timeScale = 0.9;
+    // performance tweeks
+    engine.enableSleeping = true;
 
-// debounce functoin for smoother window resize
-function debounce(func, wait) {
-    let timeout;
-    return function() {
-        const context = this;
-        const args = arguments;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), wait);
-    };
+    // set up our canvus
+    canvas = document.getElementById('physics-canvas');
+    render = Render.create({
+        canvas: canvas,
+        engine: engine,
+        options: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            wireframes: false,
+            background: 'transparent',
+            pixelRatio: Math.min(window.devicePixelRatio, 2),        
+            showSleeping: false
+        }
+    });
+
+    // get things runnin
+    runner = Runner.create();
+    Runner.run(runner, engine);
+    Render.run(render);
+
+    // Set up mouse control
+    setupMouseControl();
+    
+    // Create boundaries
+    createBoundaries();
+    
+    // Set up collision event handling
+    setupCollisionEvents();
+    
+    // Set up update loop
+    setupUpdateLoop();
 }
 
-// set up mouse control wit bettr feel
-const mouse = Mouse.create(render.canvas);
-const mouseConstraint = MouseConstraint.create(engine, {
-    mouse: mouse,
-    constraint: {
-        stiffness: 0.4,        
-        damping: 0.2,        
-        render: {
-            visible: true,
-            lineWidth: 1,
-            strokeStyle: 'rgba(255, 255, 255, 0.5)', 
-            type: 'line'
+// Set up mouse control
+function setupMouseControl() {
+    // set up mouse control wit bettr feel
+    mouse = Mouse.create(render.canvas);
+    mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+            stiffness: 0.4,        
+            damping: 0.2,        
+            render: {
+                visible: true,
+                lineWidth: 1,
+                strokeStyle: 'rgba(255, 255, 255, 0.5)', 
+                type: 'line'
+            }
+        },
+        collisionFilter: {
+            category: 0x0001,
+            mask: 0xFFFFFFFF
         }
-    },
-    collisionFilter: {
-        category: 0x0001,
-        mask: 0xFFFFFFFF
-    }
-});
+    });
 
-// keep trakc of what were dragin
-let draggedBody = null;
-
-// lite up what we're draggin
-Events.on(mouseConstraint, 'startdrag', function(event) {
-    draggedBody = event.body;
-    if (draggedBody) {
-        draggedBody.render.lineWidth = 2;
-        draggedBody.render.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    }
-});
-
-// back to normal when we drop it
-Events.on(mouseConstraint, 'enddrag', function(event) {
-    if (draggedBody) {
-        draggedBody.render.lineWidth = 1;
-        draggedBody.render.strokeStyle = draggedBody.originalStrokeStyle || 'rgba(255, 255, 255, 0.2)';
-        draggedBody = null;
-    }
-});
-
-// Add mouse constraint to the world
-Composite.add(engine.world, mouseConstraint);
-
-// Ensure mouse events aren't interpreted by the browser
-render.canvas.addEventListener('mousewheel', function(event) {
-    event.preventDefault();
-});
-
-// Create static ground, walls, and ceiling
-const wallThickness = 50;
-const ground = Bodies.rectangle(
-    window.innerWidth / 2, 
-    window.innerHeight, 
-    window.innerWidth, 
-    wallThickness, 
-    { 
-        isStatic: true,
-        render: {
-            fillStyle: 'transparent',
-            strokeStyle: 'rgba(255, 255, 255, 0.2)',
-            lineWidth: 1
+    // lite up what we're draggin
+    Events.on(mouseConstraint, 'startdrag', function(event) {
+        draggedBody = event.body;
+        if (draggedBody) {
+            draggedBody.render.lineWidth = 2;
+            draggedBody.render.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         }
-    }
-);
+    });
 
-const leftWall = Bodies.rectangle(
-    0, 
-    window.innerHeight / 2, 
-    wallThickness, 
-    window.innerHeight, 
-    { 
-        isStatic: true,
-        render: {
-            fillStyle: 'transparent',
-            strokeStyle: 'rgba(255, 255, 255, 0.2)',
-            lineWidth: 1
+    // back to normal when we drop it
+    Events.on(mouseConstraint, 'enddrag', function(event) {
+        if (draggedBody) {
+            draggedBody.render.lineWidth = 1;
+            draggedBody.render.strokeStyle = draggedBody.originalStrokeStyle || 'rgba(255, 255, 255, 0.2)';
+            draggedBody = null;
         }
-    }
-);
+    });
 
-const rightWall = Bodies.rectangle(
-    window.innerWidth, 
-    window.innerHeight / 2, 
-    wallThickness, 
-    window.innerHeight, 
-    { 
-        isStatic: true,
-        render: {
-            fillStyle: 'transparent',
-            strokeStyle: 'rgba(255, 255, 255, 0.2)',
-            lineWidth: 1
+    // Add mouse constraint to the world
+    Composite.add(engine.world, mouseConstraint);
+
+    // Ensure mouse events aren't interpreted by the browser
+    render.canvas.addEventListener('mousewheel', function(event) {
+        event.preventDefault();
+    });
+    
+    // Listen for clicks on the canvas to place attractors
+    canvas.addEventListener('click', function(event) {
+        if (attractorMode) {
+            createAttractor(event.clientX, event.clientY);
         }
-    }
-);
-
-const ceiling = Bodies.rectangle(
-    window.innerWidth / 2, 
-    0, 
-    window.innerWidth, 
-    wallThickness, 
-    { 
-        isStatic: true,
-        render: {
-            fillStyle: 'transparent',
-            strokeStyle: 'rgba(255, 255, 255, 0.2)',
-            lineWidth: 1
+        
+        // Double-click to remove an attractor
+        const currentTime = new Date().getTime();
+        if (currentTime - lastClickTime < doubleClickThreshold) {
+            // Look for attractors near the click
+            attractors.forEach(attractor => {
+                const distance = Math.sqrt(
+                    Math.pow(event.clientX - attractor.position.x, 2) + 
+                    Math.pow(event.clientY - attractor.position.y, 2)
+                );
+                
+                if (distance < 100) {
+                    removeAttractor(attractor);
+                }
+            });
         }
-    }
-);
+        
+        lastClickTime = currentTime;
+    });
+}
 
-// Add all static bodies to the world
-Composite.add(engine.world, [ground, leftWall, rightWall, ceiling]);
+// Create boundaries (ground, walls, ceiling)
+function createBoundaries() {
+    const wallThickness = 50;
+    ground = Bodies.rectangle(
+        window.innerWidth / 2, 
+        window.innerHeight, 
+        window.innerWidth, 
+        wallThickness, 
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: 'transparent',
+                strokeStyle: 'rgba(255, 255, 255, 0.2)',
+                lineWidth: 1
+            }
+        }
+    );
 
-// Shape creation functions
+    leftWall = Bodies.rectangle(
+        0, 
+        window.innerHeight / 2, 
+        wallThickness, 
+        window.innerHeight, 
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: 'transparent',
+                strokeStyle: 'rgba(255, 255, 255, 0.2)',
+                lineWidth: 1
+            }
+        }
+    );
+
+    rightWall = Bodies.rectangle(
+        window.innerWidth, 
+        window.innerHeight / 2, 
+        wallThickness, 
+        window.innerHeight, 
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: 'transparent',
+                strokeStyle: 'rgba(255, 255, 255, 0.2)',
+                lineWidth: 1
+            }
+        }
+    );
+
+    ceiling = Bodies.rectangle(
+        window.innerWidth / 2, 
+        0, 
+        window.innerWidth, 
+        wallThickness, 
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: 'transparent',
+                strokeStyle: 'rgba(255, 255, 255, 0.2)',
+                lineWidth: 1
+            }
+        }
+    );
+
+    // Add all static bodies to the world
+    Composite.add(engine.world, [ground, leftWall, rightWall, ceiling]);
+}
+
+// Set up all event listeners
+function setupEventListeners() {
+    // Set up our event listeners
+    document.getElementById('add-circle').addEventListener('click', () => addCircle());
+    document.getElementById('add-square').addEventListener('click', () => addSquare());
+    document.getElementById('add-triangle').addEventListener('click', () => addTriangle());
+    document.getElementById('add-star').addEventListener('click', () => addStar());
+    document.getElementById('add-sand').addEventListener('click', () => {
+        for (let i = 0; i < 20; i++) {
+            addSandParticle();
+        }
+    });
+
+    document.getElementById('toggle-wind').addEventListener('click', function() {
+        windEnabled = !windEnabled;
+        this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
+    });
+
+    document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
+        collisionEffectsEnabled = !collisionEffectsEnabled;
+        this.textContent = collisionEffectsEnabled ? 'Disable Effects' : 'Collision Effects';
+    });
+
+    document.getElementById('add-attractor').addEventListener('click', function() {
+        // Toggle attractor mode
+        attractorMode = !attractorMode;
+        this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
+        
+        // Show info modal for attractor mode
+        if (attractorMode) {
+            document.getElementById('info-modal').style.display = 'flex';
+        }
+    });
+
+    document.getElementById('clear').addEventListener('click', clearNonStaticBodies);
+    document.getElementById('save-state').addEventListener('click', savePlaygroundState);
+    document.getElementById('load-state').addEventListener('click', loadPlaygroundState);
+
+    // Close modal button
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        document.getElementById('info-modal').style.display = 'none';
+    });
+
+    // Handle tab switching
+    document.querySelectorAll('.tab-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            // Toggle active tab button
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Toggle tab content
+            const tabId = this.getAttribute('data-tab');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabId + '-tab').classList.add('active');
+            
+            // Set current mode
+            currentMode = tabId;
+            
+            // Reset attractorMode when switching tabs
+            attractorMode = false;
+            document.getElementById('add-attractor').textContent = 'Add Attractor';
+        });
+    });
+
+    // Initialize the theme from select
+    const themeSelect = document.getElementById('theme-select');
+    themeSelect.addEventListener('change', function() {
+        setTheme(this.value);
+    });
+
+    // Gravity control
+    document.getElementById('gravity-slider').addEventListener('input', function() {
+        engine.world.gravity.y = parseFloat(this.value);
+    });
+
+    // Wind strength control
+    document.getElementById('wind-slider').addEventListener('input', function() {
+        windStrength = parseFloat(this.value);
+    });
+
+    // Bounciness control
+    document.getElementById('bounce-slider').addEventListener('input', function() {
+        defaultBounciness = parseFloat(this.value);
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', debounce(function() {
+        // Update canvas size
+        render.options.width = window.innerWidth;
+        render.options.height = window.innerHeight;
+        render.canvas.width = window.innerWidth;
+        render.canvas.height = window.innerHeight;
+        
+        // Update wall positions
+        Body.setPosition(ground, { x: window.innerWidth / 2, y: window.innerHeight });
+        Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
+        Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
+        Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
+    }, 250));
+}
+
+// Setup collision events
+function setupCollisionEvents() {
+    Events.on(engine, 'collisionStart', function(event) {
+        if (!collisionEffectsEnabled) return;
+        
+        const pairs = event.pairs;
+        
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i];
+            
+            // Skip collisions with walls and static objects
+            if (pair.bodyA.isStatic || pair.bodyB.isStatic) continue;
+            
+            // Calculate collision velocity magnitude
+            const velA = pair.bodyA.velocity;
+            const velB = pair.bodyB.velocity;
+            const relativeVelocity = Math.sqrt(
+                Math.pow(velA.x - velB.x, 2) + 
+                Math.pow(velA.y - velB.y, 2)
+            );
+            
+            // Skip low-energy collisions
+            if (relativeVelocity < 3) continue;
+            
+            // Calculate collision point
+            const collision = pair.collision;
+            const pos = collision.supports[0] || { 
+                x: (pair.bodyA.position.x + pair.bodyB.position.x) / 2,
+                y: (pair.bodyA.position.y + pair.bodyB.position.y) / 2
+            };
+            
+            // Create visual effect at collision point
+            const sparkCount = Math.min(10, Math.floor(relativeVelocity / 2));
+            
+            // Random color from theme
+            const sparkColors = boutiqueColors.sparkColors;
+            const sparkColor = sparkColors[Math.floor(Math.random() * sparkColors.length)];
+            
+            // Create collision particles
+            for (let j = 0; j < sparkCount; j++) {
+                createCollisionParticle(pos, relativeVelocity / 2, sparkColor);
+            }
+        }
+    });
+}
+
+// Set up the main render/update loop
+function setupUpdateLoop() {
+    Events.on(engine, 'beforeUpdate', function() {
+        // Track current time
+        const now = performance.now();
+        
+        // Calculate frame rate
+        if (lastFrameTime) {
+            const fps = 1000 / (now - lastFrameTime);
+            frameRateHistory.push(fps);
+            frameRateHistory.shift();
+        }
+        lastFrameTime = now;
+        
+        // Apply wind if enabled
+        if (windEnabled) {
+            applyWind();
+        }
+        
+        // Apply attractor forces
+        applyAttractorForces();
+        
+        // Clean up sand particles if there are too many (performance optimization)
+        if (sandParticles.length > 500) {
+            const toRemove = sandParticles.splice(0, 100);
+            toRemove.forEach(particle => {
+                Composite.remove(engine.world, particle);
+            });
+        }
+    });
+}
+
+// SHAPE CREATION FUNCTIONS
 function addCircle() {
     const radius = 20 + Math.random() * 30;
     const circle = Bodies.circle(
@@ -755,570 +981,16 @@ function clearNonStaticBodies() {
     sandParticles = [];
 }
 
-// Set up our event listeners
-document.getElementById('add-circle').addEventListener('click', () => addCircle());
-document.getElementById('add-square').addEventListener('click', () => addSquare());
-document.getElementById('add-triangle').addEventListener('click', () => addTriangle());
-document.getElementById('add-star').addEventListener('click', () => addStar());
-document.getElementById('add-sand').addEventListener('click', () => {
-    for (let i = 0; i < 20; i++) {
-        addSandParticle();
-    }
-});
-
-document.getElementById('toggle-wind').addEventListener('click', function() {
-    windEnabled = !windEnabled;
-    this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
-});
-
-document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
-    collisionEffectsEnabled = !collisionEffectsEnabled;
-    this.textContent = collisionEffectsEnabled ? 'Disable Effects' : 'Collision Effects';
-});
-
-document.getElementById('add-attractor').addEventListener('click', function() {
-    // Toggle attractor mode
-    attractorMode = !attractorMode;
-    this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
-    
-    // Show info modal for attractor mode
-    if (attractorMode) {
-        document.getElementById('info-modal').style.display = 'flex';
-    }
-});
-
-document.getElementById('add-walls').addEventListener('click', addBreakableWalls);
-document.getElementById('clear-walls').addEventListener('click', clearBreakableWalls);
-document.getElementById('toggle-background-wall').addEventListener('click', toggleBackgroundWall);
-
-document.getElementById('clear').addEventListener('click', clearNonStaticBodies);
-document.getElementById('save-state').addEventListener('click', savePlaygroundState);
-document.getElementById('load-state').addEventListener('click', loadPlaygroundState);
-
-// Close modal button
-document.querySelector('.close-modal').addEventListener('click', function() {
-    document.getElementById('info-modal').style.display = 'none';
-});
-
-// Listen for clicks on the canvas to place attractors
-canvas.addEventListener('click', function(event) {
-    if (attractorMode) {
-        createAttractor(event.clientX, event.clientY);
-    }
-    
-    // Double-click to remove an attractor
-    const currentTime = new Date().getTime();
-    if (currentTime - lastClickTime < doubleClickThreshold) {
-        // Look for attractors near the click
-        attractors.forEach(attractor => {
-            const distance = Math.sqrt(
-                Math.pow(event.clientX - attractor.position.x, 2) + 
-                Math.pow(event.clientY - attractor.position.y, 2)
-            );
-            
-            if (distance < 100) {
-                removeAttractor(attractor);
-            }
-        });
-    }
-    
-    lastClickTime = currentTime;
-});
-
-// Breakable walls functions
-function addBreakableWalls() {
-    // Add some breakable walls at random positions
-    for (let i = 0; i < 5; i++) {
-        addBreakableWall();
-    }
-}
-
-function addBreakableWall() {
-    // Size and position
-    const width = Common.random(50, 150);
-    const height = Common.random(50, 150);
-    const x = Common.random(width/2 + 50, window.innerWidth - width/2 - 50);
-    const y = Common.random(height/2 + 50, window.innerHeight - height/2 - 50);
-    
-    // Create a breakable wall
-    const wallOptions = {
-        isStatic: true,
-        render: {
-            fillStyle: 'rgba(255, 255, 255, 0.7)',
-            strokeStyle: 'rgba(255, 255, 255, 0.9)',
-            lineWidth: 2
-        },
-        collisionFilter: {
-            category: 0x0002
-        }
+// debounce functoin for smoother window resize
+function debounce(func, wait) {
+    let timeout;
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
     };
-    
-    const wall = Bodies.rectangle(x, y, width, height, wallOptions);
-    
-    // Assign strength property
-    wall.wallStrength = wallStrength;
-    wall.isBreakable = true;
-    
-    breakableWalls.push(wall);
-    Composite.add(engine.world, wall);
-    
-    // Add DOM element for the wall
-    const wallElement = document.createElement('div');
-    wallElement.className = 'breakable-wall';
-    wallElement.style.width = width + 'px';
-    wallElement.style.height = height + 'px';
-    wallElement.style.left = (x - width/2) + 'px';
-    wallElement.style.top = (y - height/2) + 'px';
-    
-    // Random color
-    const colors = ['red', 'blue', 'green', 'purple', 'yellow'];
-    const colorClass = colors[Math.floor(Math.random() * colors.length)];
-    wallElement.classList.add(colorClass);
-    
-    document.body.appendChild(wallElement);
-    
-    // Store reference to DOM element
-    wall.element = wallElement;
-    
-    // Add click event to break wall
-    wallElement.addEventListener('click', () => breakWall(wall));
-    
-    return wall;
 }
-
-function clearBreakableWalls() {
-    // Remove all breakable walls
-    breakableWalls.forEach(wall => {
-        // Remove DOM element
-        if (wall.element && wall.element.parentNode) {
-            wall.element.parentNode.removeChild(wall.element);
-        }
-        
-        // Remove from world
-        Composite.remove(engine.world, wall);
-    });
-    
-    breakableWalls = [];
-}
-
-function breakWall(wall, force = 1) {
-    if (!wall || !wall.isBreakable) return;
-    
-    // Reduce wall strength
-    wall.wallStrength -= force;
-    
-    if (wall.wallStrength <= 0) {
-        // Create fragments
-        createWallFragments(wall);
-        
-        // Remove wall from array
-        const index = breakableWalls.indexOf(wall);
-        if (index !== -1) {
-            breakableWalls.splice(index, 1);
-        }
-        
-        // Remove DOM element
-        if (wall.element && wall.element.parentNode) {
-            wall.element.parentNode.removeChild(wall.element);
-        }
-        
-        // Remove from world
-        Composite.remove(engine.world, wall);
-    } else {
-        // Visual feedback for hit
-        if (wall.element) {
-            wall.element.style.opacity = wall.wallStrength / wallStrength;
-            
-            // Show hit animation
-            wall.element.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                if (wall.element) {
-                    wall.element.style.transform = 'scale(1)';
-                }
-            }, 100);
-        }
-    }
-}
-
-function createWallFragments(wall) {
-    const fragments = 10 + Math.floor(Math.random() * 10);
-    const fragmentSize = 10 + Math.random() * 10;
-    
-    const centerX = wall.position.x;
-    const centerY = wall.position.y;
-    const width = wall.bounds.max.x - wall.bounds.min.x;
-    const height = wall.bounds.max.y - wall.bounds.min.y;
-    
-    // Create fragments
-    for (let i = 0; i < fragments; i++) {
-        createWallFragment(
-            centerX + (Math.random() - 0.5) * width * 0.8,
-            centerY + (Math.random() - 0.5) * height * 0.8,
-            fragmentSize * (0.5 + Math.random() * 0.5),
-            wall.render.fillStyle
-        );
-    }
-    
-    // Create explosion effect
-    createExplosion(centerX, centerY);
-}
-
-function createWallFragment(x, y, size, color) {
-    // Create DOM element for fragment
-    const fragment = document.createElement('div');
-    fragment.className = 'wall-fragment';
-    fragment.style.width = size + 'px';
-    fragment.style.height = size + 'px';
-    fragment.style.left = x + 'px';
-    fragment.style.top = y + 'px';
-    fragment.style.backgroundColor = color || 'rgba(255, 255, 255, 0.8)';
-    document.body.appendChild(fragment);
-    
-    // Random movement
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 5 + Math.random() * 10;
-    const vx = Math.cos(angle) * speed;
-    const vy = Math.sin(angle) * speed - 5; // Slight upward bias
-    
-    let opacity = 1;
-    let posX = x;
-    let posY = y;
-    let rotation = 0;
-    const rotationSpeed = (Math.random() - 0.5) * 20;
-    
-    function animateFragment() {
-        opacity -= 0.02;
-        posX += vx;
-        posY += vy;
-        vy += 0.2; // Gravity
-        rotation += rotationSpeed;
-        
-        fragment.style.opacity = opacity;
-        fragment.style.left = posX + 'px';
-        fragment.style.top = posY + 'px';
-        fragment.style.transform = `rotate(${rotation}deg)`;
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animateFragment);
-        } else {
-            fragment.remove();
-        }
-    }
-    
-    requestAnimationFrame(animateFragment);
-}
-
-function createExplosion(x, y) {
-    // Create shockwave
-    const shockwave = document.createElement('div');
-    shockwave.className = 'wall-shockwave';
-    shockwave.style.left = (x - 50) + 'px';
-    shockwave.style.top = (y - 50) + 'px';
-    shockwave.style.width = '100px';
-    shockwave.style.height = '100px';
-    shockwave.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)';
-    document.body.appendChild(shockwave);
-    
-    // Animate shockwave
-    let size = 100;
-    let opacity = 0.8;
-    
-    function animateShockwave() {
-        size += 15;
-        opacity -= 0.05;
-        
-        shockwave.style.width = size + 'px';
-        shockwave.style.height = size + 'px';
-        shockwave.style.left = (x - size/2) + 'px';
-        shockwave.style.top = (y - size/2) + 'px';
-        shockwave.style.opacity = opacity;
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animateShockwave);
-        } else {
-            shockwave.remove();
-        }
-    }
-    
-    requestAnimationFrame(animateShockwave);
-    
-    // Create particles
-    const particleCount = 20 + Math.floor(Math.random() * 30);
-    
-    for (let i = 0; i < particleCount; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'crack-particle';
-        particle.style.width = (2 + Math.random() * 4) + 'px';
-        particle.style.height = (2 + Math.random() * 4) + 'px';
-        particle.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        document.body.appendChild(particle);
-        
-        // Random movement
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 5 + Math.random() * 15;
-        const vx = Math.cos(angle) * speed;
-        const vy = Math.sin(angle) * speed;
-        
-        let particleOpacity = 1;
-        let posX = x;
-        let posY = y;
-        
-        function animateParticle() {
-            particleOpacity -= 0.03;
-            posX += vx;
-            posY += vy;
-            
-            particle.style.opacity = particleOpacity;
-            particle.style.left = posX + 'px';
-            particle.style.top = posY + 'px';
-            
-            if (particleOpacity > 0) {
-                requestAnimationFrame(animateParticle);
-            } else {
-                particle.remove();
-            }
-        }
-        
-        requestAnimationFrame(animateParticle);
-    }
-}
-
-// Background wall functions
-function toggleBackgroundWall() {
-    isWallActive = !isWallActive;
-    
-    if (isWallActive) {
-        createBackgroundWall();
-        document.getElementById('toggle-background-wall').textContent = 'Remove Crackable Wall';
-    } else {
-        removeBackgroundWall();
-        document.getElementById('toggle-background-wall').textContent = 'Toggle Crackable Wall';
-    }
-}
-
-function createBackgroundWall() {
-    removeBackgroundWall(); // Clear existing wall
-    
-    // Get max layers setting
-    maxWallLayers = parseInt(document.getElementById('wall-layers-slider').value);
-    currentWallLayer = 0;
-    
-    // Create a full screen wall covering the canvas
-    backgroundWall = Bodies.rectangle(
-        window.innerWidth / 2,
-        window.innerHeight / 2,
-        window.innerWidth,
-        window.innerHeight,
-        {
-            isStatic: true,
-            isSensor: true,
-            render: {
-                visible: false
-            }
-        }
-    );
-    
-    Composite.add(engine.world, backgroundWall);
-    
-    // Create wall layers
-    wallLayers = [];
-    crackPoints = [];
-    
-    for (let i = 0; i < maxWallLayers; i++) {
-        createWallLayer(i);
-    }
-}
-
-function createWallLayer(layerIndex) {
-    // Create a div for this layer
-    const layer = document.createElement('div');
-    layer.className = 'wall-layer';
-    layer.style.position = 'fixed';
-    layer.style.top = '0';
-    layer.style.left = '0';
-    layer.style.width = '100%';
-    layer.style.height = '100%';
-    layer.style.backgroundColor = wallLayerColors[layerIndex % wallLayerColors.length];
-    layer.style.opacity = '0.9';
-    layer.style.zIndex = '2';
-    layer.dataset.layer = layerIndex;
-    
-    // Add it to the DOM and store in array
-    document.body.appendChild(layer);
-    wallLayers.push(layer);
-    
-    // Add click listener to create cracks
-    layer.addEventListener('click', (event) => {
-        if (layerIndex === currentWallLayer) {
-            createCrack(event.clientX, event.clientY);
-        }
-    });
-}
-
-function createCrack(x, y) {
-    // Get current layer
-    const currentLayer = wallLayers[currentWallLayer];
-    if (!currentLayer) return;
-    
-    // Store crack point
-    crackPoints.push({ x, y });
-    
-    // Create crack element
-    const crack = document.createElement('div');
-    crack.className = 'wall-crack';
-    
-    // Size based on slider
-    const crackSize = parseInt(document.getElementById('break-size-slider').value) * 15;
-    crack.style.width = crackSize + 'px';
-    crack.style.height = crackSize + 'px';
-    
-    // Position
-    crack.style.left = (x - crackSize/2) + 'px';
-    crack.style.top = (y - crackSize/2) + 'px';
-    
-    // Add to the current layer
-    currentLayer.appendChild(crack);
-    
-    // Create crack particles
-    createCrackParticles(x, y);
-    
-    // Check if we should move to next layer
-    if (crackPoints.length >= 3) {
-        // Remove current layer
-        setTimeout(() => {
-            // Shatter effect
-            shatterLayer(currentLayer);
-            
-            // Move to next layer
-            currentWallLayer++;
-            crackPoints = [];
-            
-            // Check if we've broken through all layers
-            if (currentWallLayer >= maxWallLayers) {
-                // All layers broken
-                setTimeout(removeBackgroundWall, 1000);
-            }
-        }, 300);
-    }
-}
-
-function createCrackParticles(x, y) {
-    const particleCount = 10 + Math.floor(Math.random() * 10);
-    
-    for (let i = 0; i < particleCount; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'crack-particle';
-        particle.style.width = (1 + Math.random() * 3) + 'px';
-        particle.style.height = (1 + Math.random() * 3) + 'px';
-        particle.style.backgroundColor = '#fff';
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        document.body.appendChild(particle);
-        
-        // Random movement
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 3 + Math.random() * 7;
-        const vx = Math.cos(angle) * speed;
-        const vy = Math.sin(angle) * speed;
-        
-        let opacity = 1;
-        let posX = x;
-        let posY = y;
-        
-        function animateParticle() {
-            opacity -= 0.05;
-            posX += vx;
-            posY += vy;
-            
-            particle.style.opacity = opacity;
-            particle.style.left = posX + 'px';
-            particle.style.top = posY + 'px';
-            
-            if (opacity > 0) {
-                requestAnimationFrame(animateParticle);
-            } else {
-                particle.remove();
-            }
-        }
-        
-        requestAnimationFrame(animateParticle);
-    }
-}
-
-function shatterLayer(layer) {
-    // Create a shatter effect
-    const fragments = 25 + Math.floor(Math.random() * 25);
-    const fragmentSize = window.innerWidth / 10;
-    
-    // Create fragments
-    for (let i = 0; i < fragments; i++) {
-        const x = Math.random() * window.innerWidth;
-        const y = Math.random() * window.innerHeight;
-        createWallFragment(
-            x, 
-            y, 
-            fragmentSize * (0.5 + Math.random() * 0.5), 
-            layer.style.backgroundColor
-        );
-    }
-    
-    // Remove the layer
-    layer.style.opacity = '0';
-    setTimeout(() => {
-        if (layer.parentNode) {
-            layer.parentNode.removeChild(layer);
-        }
-    }, 500);
-}
-
-function removeBackgroundWall() {
-    // Remove the physics body
-    if (backgroundWall) {
-        Composite.remove(engine.world, backgroundWall);
-        backgroundWall = null;
-    }
-    
-    // Remove all wall layers
-    wallLayers.forEach(layer => {
-        if (layer.parentNode) {
-            layer.parentNode.removeChild(layer);
-        }
-    });
-    
-    wallLayers = [];
-    crackPoints = [];
-    currentWallLayer = 0;
-    isWallActive = false;
-    
-    document.getElementById('toggle-background-wall').textContent = 'Toggle Crackable Wall';
-}
-
-// Handle tab switching
-document.querySelectorAll('.tab-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        // Toggle active tab button
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Toggle tab content
-        const tabId = this.getAttribute('data-tab');
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(tabId + '-tab').classList.add('active');
-        
-        // Set current mode
-        currentMode = tabId;
-        
-        // Reset attractorMode when switching tabs
-        attractorMode = false;
-        document.getElementById('add-attractor').textContent = 'Add Attractor';
-    });
-});
 
 // Function to set the theme
 function setTheme(theme) {
@@ -1331,152 +1003,4 @@ function setTheme(theme) {
     
     // Save theme
     currentTheme = theme;
-}
-
-// Initialize the theme from select
-const themeSelect = document.getElementById('theme-select');
-themeSelect.addEventListener('change', function() {
-    setTheme(this.value);
-});
-
-// Gravity control
-document.getElementById('gravity-slider').addEventListener('input', function() {
-    engine.world.gravity.y = parseFloat(this.value);
-});
-
-// Wind strength control
-document.getElementById('wind-slider').addEventListener('input', function() {
-    windStrength = parseFloat(this.value);
-});
-
-// Bounciness control
-document.getElementById('bounce-slider').addEventListener('input', function() {
-    defaultBounciness = parseFloat(this.value);
-});
-
-// Wall strength control
-document.getElementById('wall-strength-slider').addEventListener('input', function() {
-    wallStrength = parseInt(this.value);
-});
-
-// Break size control
-document.getElementById('break-size-slider').addEventListener('input', function() {
-    breakSize = parseFloat(this.value);
-});
-
-// Wall layers control
-document.getElementById('wall-layers-slider').addEventListener('input', function() {
-    maxWallLayers = parseInt(this.value);
-    
-    // Update current wall if active
-    if (isWallActive) {
-        createBackgroundWall();
-    }
-});
-
-// Handle window resize
-window.addEventListener('resize', debounce(function() {
-    // Update canvas size
-    render.options.width = window.innerWidth;
-    render.options.height = window.innerHeight;
-    render.canvas.width = window.innerWidth;
-    render.canvas.height = window.innerHeight;
-    
-    // Update wall positions
-    Body.setPosition(ground, { x: window.innerWidth / 2, y: window.innerHeight });
-    Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
-    Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
-    Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
-    
-    // Update background wall if active
-    if (isWallActive) {
-        createBackgroundWall();
-    }
-}, 250));
-
-// Add collision event listener
-Events.on(engine, 'collisionStart', function(event) {
-    if (!collisionEffectsEnabled) return;
-    
-    const pairs = event.pairs;
-    
-    for (let i = 0; i < pairs.length; i++) {
-        const pair = pairs[i];
-        
-        // Skip collisions with walls and static objects
-        if (pair.bodyA.isStatic || pair.bodyB.isStatic) continue;
-        
-        // Calculate collision velocity magnitude
-        const velA = pair.bodyA.velocity;
-        const velB = pair.bodyB.velocity;
-        const relativeVelocity = Math.sqrt(
-            Math.pow(velA.x - velB.x, 2) + 
-            Math.pow(velA.y - velB.y, 2)
-        );
-        
-        // Skip low-energy collisions
-        if (relativeVelocity < 3) continue;
-        
-        // Calculate collision point
-        const collision = pair.collision;
-        const pos = collision.supports[0] || { 
-            x: (pair.bodyA.position.x + pair.bodyB.position.x) / 2,
-            y: (pair.bodyA.position.y + pair.bodyB.position.y) / 2
-        };
-        
-        // Create visual effect at collision point
-        const sparkCount = Math.min(10, Math.floor(relativeVelocity / 2));
-        
-        // Random color from theme
-        const sparkColors = boutiqueColors.sparkColors;
-        const sparkColor = sparkColors[Math.floor(Math.random() * sparkColors.length)];
-        
-        // Create collision particles
-        for (let j = 0; j < sparkCount; j++) {
-            createCollisionParticle(pos, relativeVelocity / 2, sparkColor);
-        }
-    }
-});
-
-// Main render/update loop
-Events.on(engine, 'beforeUpdate', function() {
-    // Track current time
-    const now = performance.now();
-    
-    // Calculate frame rate
-    if (lastFrameTime) {
-        const fps = 1000 / (now - lastFrameTime);
-        frameRateHistory.push(fps);
-        frameRateHistory.shift();
-    }
-    lastFrameTime = now;
-    
-    // Apply wind if enabled
-    if (windEnabled) {
-        applyWind();
-    }
-    
-    // Apply attractor forces
-    applyAttractorForces();
-    
-    // Clean up sand particles if there are too many (performance optimization)
-    if (sandParticles.length > 500) {
-        const toRemove = sandParticles.splice(0, 100);
-        toRemove.forEach(particle => {
-            Composite.remove(engine.world, particle);
-        });
-    }
-});
-
-// Initialize with decorative elements
-addDecorativeElements();
-
-// Populate with some initial shapes
-for (let i = 0; i < 5; i++) {
-    setTimeout(() => {
-        addCircle();
-        addSquare();
-        addTriangle();
-        addStar();
-    }, i * 200);
 }

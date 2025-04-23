@@ -16,7 +16,6 @@
         <!-- Tab navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="playground">Playground</button>
-            <button class="tab-btn" data-tab="wall-break">Wall Smash</button>
         </div>
         
         <!-- Playground Tab Content -->
@@ -64,34 +63,6 @@
             <div class="save-controls">
                 <button id="save-state">Save Scene</button>
                 <button id="load-state">Load Scene</button>
-            </div>
-        </div>
-        
-        <!-- Wall Break Tab Content -->
-        <div class="tab-content" id="wall-break-tab">
-            <div class="wall-break-intro">
-                <p>Click on walls to smash them! 💥</p>
-            </div>
-            
-            <div class="buttons">
-                <button id="add-walls">Add Walls</button>
-                <button id="clear-walls">Clear Walls</button>
-                <button id="toggle-background-wall">Toggle Crackable Wall</button>
-            </div>
-            
-            <div class="sliders">
-                <label>
-                    Wall Strength
-                    <input type="range" id="wall-strength-slider" min="1" max="10" step="1" value="3">
-                </label>
-                <label>
-                    Break Size
-                    <input type="range" id="break-size-slider" min="1" max="5" step="0.5" value="2">
-                </label>
-                <label>
-                    Wall Layers
-                    <input type="range" id="wall-layers-slider" min="3" max="15" step="1" value="10">
-                </label>
             </div>
         </div>
     </div>

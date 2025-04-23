@@ -32,6 +32,7 @@ let doubleClickThreshold = 300; // 300ms for double-click detection
 let isPaused = false; // Track if simulation is paused
 let timeScale = 1.0; // For slow-motion effects
 let collisionEffectType = 0; // Track current collision effect type
+let explosionMode = false; // Track if explosion mode is enabled
 
 // Theming variables
 let currentTheme = 'default';
@@ -408,8 +409,12 @@ function setupEventListeners() {
 
     // Explosion button
     document.getElementById('create-explosion').addEventListener('click', function() {
-        createExplosion(lastMousePos);
-        showFloatingMessage('Boom!');
+        // Toggle explosion mode
+        explosionMode = !explosionMode;
+        this.textContent = explosionMode ? 'Disable Explosion' : 'Enable Explosion';
+        
+        // Show message about current state
+        showFloatingMessage(explosionMode ? 'Explosion mode enabled - click anywhere to create explosions' : 'Explosion mode disabled');
     });
     
     // Pause button

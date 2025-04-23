@@ -179,10 +179,38 @@ function setupMouseControl() {
         event.preventDefault();
     });
     
-    // Listen for clicks on the canvas to place attractors
+    // Listen for clicks on the canvas to place objects or attractors
     canvas.addEventListener('click', function(event) {
+        // Update mouse position
+        lastMousePos.x = event.clientX;
+        lastMousePos.y = event.clientY;
+        
         if (attractorMode) {
             createAttractor(event.clientX, event.clientY);
+        } else {
+            // If we're in normal mode, place the current shape
+            // Check if any of the creation buttons are active
+            const activeButtonId = document.querySelector('.shape-button.active')?.id;
+            
+            if (activeButtonId) {
+                switch(activeButtonId) {
+                    case 'add-circle': addCircle(); break;
+                    case 'add-square': addSquare(); break;
+                    case 'add-triangle': addTriangle(); break;
+                    case 'add-star': addStar(); break;
+                    case 'add-sand': 
+                        for (let i = 0; i < 20; i++) {
+                            addSandParticle();
+                        }
+                        break;
+                    case 'add-text':
+                        const text = prompt('Enter text:', 'Hello');
+                        if (text) {
+                            createTextObject(text, {x: event.clientX, y: event.clientY});
+                        }
+                        break;
+                }
+            }
         }
         
         // Double-click to remove an attractor
@@ -279,21 +307,32 @@ function createBoundaries() {
 
 // Set up all event listeners
 function setupEventListeners() {
-    // Set up our event listeners
-    document.getElementById('add-circle').addEventListener('click', () => addCircle());
-    document.getElementById('add-square').addEventListener('click', () => addSquare());
-    document.getElementById('add-triangle').addEventListener('click', () => addTriangle());
-    document.getElementById('add-star').addEventListener('click', () => addStar());
-    document.getElementById('add-sand').addEventListener('click', () => {
-        for (let i = 0; i < 20; i++) {
-            addSandParticle();
-        }
-    });
-    document.getElementById('add-text').addEventListener('click', () => {
-        const text = prompt('Enter text:', 'Hello');
-        if (text) {
-            createTextObject(text);
-        }
+    // Set up our shape button listeners to toggle active state
+    const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
+    
+    shapeButtons.forEach(buttonId => {
+        const button = document.getElementById(buttonId);
+        // Add shape-button class to all shape buttons
+        button.classList.add('shape-button');
+        
+        button.addEventListener('click', () => {
+            // If already active, deactivate it
+            if (button.classList.contains('active')) {
+                button.classList.remove('active');
+                return;
+            }
+            
+            // Deactivate all other shape buttons
+            shapeButtons.forEach(id => {
+                document.getElementById(id).classList.remove('active');
+            });
+            
+            // Activate this button
+            button.classList.add('active');
+            
+            // Show message about what to do
+            showFloatingMessage(`Now click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
+        });
     });
 
     // Add keyboard shortcuts
@@ -302,14 +341,20 @@ function setupEventListeners() {
         if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
         
         switch(event.key.toLowerCase()) {
-            case 'c': addCircle(); break;
-            case 's': addSquare(); break;
-            case 't': addTriangle(); break;
-            case 'a': addStar(); break;
+            case 'c': 
+                document.getElementById('add-circle').click();
+                break;
+            case 's': 
+                document.getElementById('add-square').click();
+                break;
+            case 't': 
+                document.getElementById('add-triangle').click();
+                break;
+            case 'a': 
+                document.getElementById('add-star').click();
+                break;
             case 'd': 
-                for (let i = 0; i < 20; i++) {
-                    addSandParticle();
-                }
+                document.getElementById('add-sand').click();
                 break;
             case 'w': 
                 document.getElementById('toggle-wind').click();
@@ -327,10 +372,13 @@ function setupEventListeners() {
                 createExplosion(lastMousePos);
                 break;
             case 'enter':
-                const text = prompt('Enter text:', 'Hello');
-                if (text) {
-                    createTextObject(text);
-                }
+                document.getElementById('add-text').click();
+                break;
+            case 'escape':
+                // Deactivate all shape buttons when pressing Escape
+                document.querySelectorAll('.shape-button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
                 break;
         }
     });

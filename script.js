@@ -516,6 +516,11 @@ function setupEventListeners() {
             document.getElementById('info-modal').style.display = 'flex';
         }
     });
+    
+    // Add event listener for the modal close button
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        document.getElementById('info-modal').style.display = 'none';
+    });
 }
 
 // Setup collision events

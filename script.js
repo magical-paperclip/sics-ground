@@ -29,6 +29,9 @@ let attractor = null;
 let isDarkMode = false;
 let lastClickTime = 0;
 let doubleClickThreshold = 300; // 300ms for double-click detection
+let isPaused = false; // Track if simulation is paused
+let timeScale = 1.0; // For slow-motion effects
+let collisionEffectType = 0; // Track current collision effect type
 
 // Theming variables
 let currentTheme = 'default';
@@ -286,36 +289,60 @@ function setupEventListeners() {
             addSandParticle();
         }
     });
-
-    document.getElementById('toggle-wind').addEventListener('click', function() {
-        windEnabled = !windEnabled;
-        this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
-    });
-
-    document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
-        collisionEffectsEnabled = !collisionEffectsEnabled;
-        this.textContent = collisionEffectsEnabled ? 'Disable Effects' : 'Collision Effects';
-    });
-
-    document.getElementById('add-attractor').addEventListener('click', function() {
-        // Toggle attractor mode
-        attractorMode = !attractorMode;
-        this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
-        
-        // Show info modal for attractor mode
-        if (attractorMode) {
-            document.getElementById('info-modal').style.display = 'flex';
+    document.getElementById('add-text').addEventListener('click', () => {
+        const text = prompt('Enter text:', 'Hello');
+        if (text) {
+            createTextObject(text);
         }
     });
 
-    document.getElementById('clear').addEventListener('click', clearNonStaticBodies);
-    document.getElementById('save-state').addEventListener('click', savePlaygroundState);
-    document.getElementById('load-state').addEventListener('click', loadPlaygroundState);
-
-    // Close modal button
-    document.querySelector('.close-modal').addEventListener('click', function() {
-        document.getElementById('info-modal').style.display = 'none';
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(event) {
+        // Only respond to keyboard shortcuts if not typing in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+        
+        switch(event.key.toLowerCase()) {
+            case 'c': addCircle(); break;
+            case 's': addSquare(); break;
+            case 't': addTriangle(); break;
+            case 'a': addStar(); break;
+            case 'd': 
+                for (let i = 0; i < 20; i++) {
+                    addSandParticle();
+                }
+                break;
+            case 'w': 
+                document.getElementById('toggle-wind').click();
+                break;
+            case 'e': 
+                document.getElementById('toggle-collision-sparks').click();
+                break;
+            case 'x': 
+                clearNonStaticBodies();
+                break;
+            case 'p':
+                togglePause();
+                break;
+            case ' ': // Space key for explosion
+                createExplosion(lastMousePos);
+                break;
+            case 'enter':
+                const text = prompt('Enter text:', 'Hello');
+                if (text) {
+                    createTextObject(text);
+                }
+                break;
+        }
     });
+
+    // Explosion button
+    document.getElementById('create-explosion').addEventListener('click', function() {
+        createExplosion(lastMousePos);
+        showFloatingMessage('Boom!');
+    });
+    
+    // Pause button
+    document.getElementById('toggle-pause').addEventListener('click', togglePause);
 
     // Handle tab switching
     document.querySelectorAll('.tab-btn').forEach(button => {
@@ -377,6 +404,37 @@ function setupEventListeners() {
         Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
         Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
     }, 250));
+
+    document.getElementById('toggle-wind').addEventListener('click', function() {
+        windEnabled = !windEnabled;
+        this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
+    });
+
+    document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
+        if (!collisionEffectsEnabled) {
+            // If effects were off, turn them on with current type
+            collisionEffectsEnabled = true;
+        } else {
+            // Cycle through effect types
+            collisionEffectType = (collisionEffectType + 1) % 5;
+        }
+        
+        // Show what effect is active now
+        const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
+        this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
+        showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
+    });
+
+    document.getElementById('add-attractor').addEventListener('click', function() {
+        // Toggle attractor mode
+        attractorMode = !attractorMode;
+        this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
+        
+        // Show info modal for attractor mode
+        if (attractorMode) {
+            document.getElementById('info-modal').style.display = 'flex';
+        }
+    });
 }
 
 // Setup collision events
@@ -427,6 +485,39 @@ function setupCollisionEvents() {
 
 // Set up the main render/update loop
 function setupUpdateLoop() {
+    // Override the standard render function to add text rendering
+    const originalRender = render.render;
+    render.render = function() {
+        originalRender.apply(this, arguments);
+        
+        // Get the rendering context
+        const context = render.context;
+        const bodies = Composite.allBodies(engine.world);
+        
+        context.font = '20px Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        
+        // Render text for text objects
+        bodies.forEach(body => {
+            if (body.isTextObject) {
+                // Save the current transform
+                context.save();
+                
+                // Translate and rotate to match the body
+                context.translate(body.position.x, body.position.y);
+                context.rotate(body.angle);
+                
+                // Draw the text
+                context.fillStyle = body.fontColor || '#FFFFFF';
+                context.fillText(body.textContent, 0, 0);
+                
+                // Restore the transform
+                context.restore();
+            }
+        });
+    };
+
     Events.on(engine, 'beforeUpdate', function() {
         // Track current time
         const now = performance.now();
@@ -704,6 +795,28 @@ function applyAttractorForces() {
 
 // Create particle for collision effects
 function createCollisionParticle(position, size, color) {
+    // Different effect types based on current collisionEffectType
+    switch (collisionEffectType) {
+        case 0: // Standard circle particles
+            createCircleParticle(position, size, color);
+            break;
+        case 1: // Star burst effect
+            createStarBurstParticle(position, size, color);
+            break;
+        case 2: // Trail effect
+            createTrailParticle(position, size, color);
+            break;
+        case 3: // Glow effect
+            createGlowParticle(position, size, color);
+            break;
+        case 4: // Ripple effect
+            createRippleEffect(position, size, color);
+            break;
+    }
+}
+
+// Standard circle particles
+function createCircleParticle(position, size, color) {
     const particle = document.createElement('div');
     particle.className = 'collision-particle';
     particle.style.position = 'absolute';
@@ -753,6 +866,206 @@ function createCollisionParticle(position, size, color) {
     }
     
     requestAnimationFrame(animateParticle);
+}
+
+// Star burst particles
+function createStarBurstParticle(position, size, color) {
+    const particle = document.createElement('div');
+    particle.className = 'collision-particle star-particle';
+    particle.style.position = 'absolute';
+    particle.style.left = position.x + 'px';
+    particle.style.top = position.y + 'px';
+    particle.style.width = (size * 2) + 'px';
+    particle.style.height = (size * 2) + 'px';
+    particle.style.background = color || '#fff';
+    particle.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+    particle.style.transform = 'translate(-50%, -50%)';
+    particle.style.zIndex = '5';
+    particle.style.pointerEvents = 'none';
+    document.body.appendChild(particle);
+    
+    // Random direction
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3;
+    const velocity = {
+        x: Math.cos(angle) * speed,
+        y: Math.sin(angle) * speed
+    };
+    
+    // Initial position
+    let x = position.x;
+    let y = position.y;
+    let opacity = 1;
+    let currentSize = size;
+    let rotation = 0;
+    
+    // Animate the particle
+    function animateParticle() {
+        x += velocity.x;
+        y += velocity.y;
+        opacity -= 0.03;
+        currentSize *= 1.01; // Grow slightly
+        rotation += 5; // Rotate
+        
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.opacity = opacity;
+        particle.style.width = (currentSize * 2) + 'px';
+        particle.style.height = (currentSize * 2) + 'px';
+        particle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        
+        if (opacity > 0) {
+            requestAnimationFrame(animateParticle);
+        } else {
+            particle.remove();
+        }
+    }
+    
+    requestAnimationFrame(animateParticle);
+}
+
+// Trail particles
+function createTrailParticle(position, size, color) {
+    // Create multiple smaller particles that follow a path
+    for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+            const particle = document.createElement('div');
+            particle.className = 'collision-particle trail-particle';
+            particle.style.position = 'absolute';
+            particle.style.left = position.x + 'px';
+            particle.style.top = position.y + 'px';
+            particle.style.width = (size * 0.8) + 'px';
+            particle.style.height = (size * 0.8) + 'px';
+            particle.style.backgroundColor = color || '#fff';
+            particle.style.borderRadius = '50%';
+            particle.style.transform = 'translate(-50%, -50%)';
+            particle.style.zIndex = '5';
+            particle.style.pointerEvents = 'none';
+            particle.style.boxShadow = `0 0 ${size/2}px ${color || '#fff'}`;
+            document.body.appendChild(particle);
+            
+            // Create a curved path
+            const baseAngle = Math.random() * Math.PI * 2;
+            const curveFactor = Math.random() * 0.1 - 0.05;
+            let curX = position.x;
+            let curY = position.y;
+            let t = 0;
+            let opacity = 0.7;
+            
+            function animateTrail() {
+                t += 0.05;
+                const angle = baseAngle + curveFactor * t;
+                curX += Math.cos(angle) * 2;
+                curY += Math.sin(angle) * 2;
+                opacity -= 0.01;
+                
+                particle.style.left = curX + 'px';
+                particle.style.top = curY + 'px';
+                particle.style.opacity = opacity;
+                
+                if (opacity > 0 && t < 20) {
+                    requestAnimationFrame(animateTrail);
+                } else {
+                    particle.remove();
+                }
+            }
+            
+            requestAnimationFrame(animateTrail);
+        }, i * 50); // Staggered start
+    }
+}
+
+// Glow particles
+function createGlowParticle(position, size, color) {
+    const particle = document.createElement('div');
+    particle.className = 'collision-particle glow-particle';
+    particle.style.position = 'absolute';
+    particle.style.left = position.x + 'px';
+    particle.style.top = position.y + 'px';
+    particle.style.width = (size * 2) + 'px';
+    particle.style.height = (size * 2) + 'px';
+    particle.style.background = 'transparent';
+    particle.style.borderRadius = '50%';
+    particle.style.boxShadow = `0 0 ${size*2}px ${color || '#fff'}, 0 0 ${size}px #fff`;
+    particle.style.transform = 'translate(-50%, -50%)';
+    particle.style.zIndex = '5';
+    particle.style.pointerEvents = 'none';
+    document.body.appendChild(particle);
+    
+    // Random direction, slower than normal particles
+    const angle = Math.random() * Math.PI * 2;
+    const velocity = {
+        x: Math.cos(angle) * (0.5 + Math.random()),
+        y: Math.sin(angle) * (0.5 + Math.random()) - 0.5
+    };
+    
+    // Initial position
+    let x = position.x;
+    let y = position.y;
+    let opacity = 1;
+    let currentSize = size;
+    
+    // Animate the particle
+    function animateParticle() {
+        x += velocity.x;
+        y += velocity.y;
+        velocity.y += 0.02; // Reduced gravity
+        opacity -= 0.015;
+        currentSize *= 1.02; // Grow
+        
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.opacity = opacity;
+        particle.style.width = (currentSize * 2) + 'px';
+        particle.style.height = (currentSize * 2) + 'px';
+        particle.style.boxShadow = `0 0 ${currentSize*2}px ${color || '#fff'}, 0 0 ${currentSize}px #fff`;
+        
+        if (opacity > 0) {
+            requestAnimationFrame(animateParticle);
+        } else {
+            particle.remove();
+        }
+    }
+    
+    requestAnimationFrame(animateParticle);
+}
+
+// Ripple effect
+function createRippleEffect(position, size, color) {
+    const ripple = document.createElement('div');
+    ripple.className = 'collision-particle ripple-effect';
+    ripple.style.position = 'absolute';
+    ripple.style.left = position.x + 'px';
+    ripple.style.top = position.y + 'px';
+    ripple.style.width = (size * 2) + 'px';
+    ripple.style.height = (size * 2) + 'px';
+    ripple.style.borderRadius = '50%';
+    ripple.style.border = `2px solid ${color || '#fff'}`;
+    ripple.style.transform = 'translate(-50%, -50%)';
+    ripple.style.zIndex = '5';
+    ripple.style.pointerEvents = 'none';
+    document.body.appendChild(ripple);
+    
+    // Start small and expand
+    let currentSize = size;
+    let opacity = 1;
+    
+    function animateRipple() {
+        currentSize *= 1.05;
+        opacity -= 0.02;
+        
+        ripple.style.width = (currentSize * 2) + 'px';
+        ripple.style.height = (currentSize * 2) + 'px';
+        ripple.style.opacity = opacity;
+        
+        if (opacity > 0) {
+            requestAnimationFrame(animateRipple);
+        } else {
+            ripple.remove();
+        }
+    }
+    
+    requestAnimationFrame(animateRipple);
 }
 
 // Apply wind force to all bodies
@@ -1008,4 +1321,202 @@ function setTheme(theme) {
     
     // Save theme
     currentTheme = theme;
+}
+
+// Function to toggle pause state
+function togglePause() {
+    isPaused = !isPaused;
+    
+    if (isPaused) {
+        // Pause the simulation
+        Runner.stop(runner);
+        
+        // Create a pause indicator
+        const pauseIndicator = document.createElement('div');
+        pauseIndicator.id = 'pause-indicator';
+        pauseIndicator.textContent = 'PAUSED';
+        pauseIndicator.style.position = 'absolute';
+        pauseIndicator.style.top = '50%';
+        pauseIndicator.style.left = '50%';
+        pauseIndicator.style.transform = 'translate(-50%, -50%)';
+        pauseIndicator.style.color = 'rgba(255, 255, 255, 0.8)';
+        pauseIndicator.style.fontSize = '3rem';
+        pauseIndicator.style.fontWeight = 'bold';
+        pauseIndicator.style.zIndex = '100';
+        pauseIndicator.style.pointerEvents = 'none';
+        pauseIndicator.style.textShadow = '0 0 10px rgba(0, 0, 0, 0.5)';
+        document.body.appendChild(pauseIndicator);
+    } else {
+        // Resume the simulation
+        Runner.start(runner, engine);
+        
+        // Remove pause indicator
+        const pauseIndicator = document.getElementById('pause-indicator');
+        if (pauseIndicator) {
+            pauseIndicator.remove();
+        }
+    }
+    
+    // Show message
+    showFloatingMessage(isPaused ? 'Paused (P to resume)' : 'Resumed');
+}
+
+// Function for showing temporary floating messages
+function showFloatingMessage(text) {
+    const message = document.createElement('div');
+    message.style.position = 'absolute';
+    message.style.top = '80px';
+    message.style.left = '50%';
+    message.style.transform = 'translateX(-50%)';
+    message.style.background = 'rgba(0, 0, 0, 0.7)';
+    message.style.color = 'white';
+    message.style.padding = '10px 20px';
+    message.style.borderRadius = '20px';
+    message.style.zIndex = '100';
+    message.style.fontWeight = '500';
+    message.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+    message.textContent = text;
+    document.body.appendChild(message);
+    
+    // Fade out and remove
+    setTimeout(() => {
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => message.remove(), 500);
+    }, 1500);
+}
+
+// Function to create an explosion effect at a given position
+function createExplosion(position, radius = 200, strength = 0.05) {
+    // Visual effect
+    const explosion = document.createElement('div');
+    explosion.className = 'explosion';
+    explosion.style.position = 'absolute';
+    explosion.style.left = position.x + 'px';
+    explosion.style.top = position.y + 'px';
+    explosion.style.width = radius * 2 + 'px';
+    explosion.style.height = radius * 2 + 'px';
+    explosion.style.transform = 'translate(-50%, -50%)';
+    explosion.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,200,100,0.4) 40%, rgba(255,100,50,0) 70%)';
+    explosion.style.borderRadius = '50%';
+    explosion.style.zIndex = '10';
+    explosion.style.pointerEvents = 'none';
+    document.body.appendChild(explosion);
+    
+    // Animate explosion
+    let scale = 0;
+    const animate = () => {
+        scale += 0.1;
+        explosion.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        explosion.style.opacity = 1 - scale/2;
+        
+        if (scale < 2) {
+            requestAnimationFrame(animate);
+        } else {
+            explosion.remove();
+        }
+    };
+    animate();
+    
+    // Apply forces to nearby bodies
+    const bodies = Composite.allBodies(engine.world);
+    
+    bodies.forEach(body => {
+        if (body.isStatic) return;
+        
+        const dx = body.position.x - position.x;
+        const dy = body.position.y - position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < radius) {
+            // Calculate force inversely proportional to distance
+            const forceMagnitude = strength * (1 - distance / radius) * body.mass;
+            const angle = Math.atan2(dy, dx);
+            
+            Body.applyForce(body, body.position, {
+                x: Math.cos(angle) * forceMagnitude,
+                y: Math.sin(angle) * forceMagnitude
+            });
+            
+            // Create explosion particles
+            const sparkCount = Math.floor(Math.random() * 3) + 1;
+            for (let i = 0; i < sparkCount; i++) {
+                createCollisionParticle(
+                    { x: position.x + dx/2, y: position.y + dy/2 },
+                    5 + Math.random() * 5,
+                    getRandomColorFromTheme()
+                );
+            }
+        }
+    });
+    
+    // Create additional explosion particles
+    for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * radius * 0.7;
+        createCollisionParticle(
+            { 
+                x: position.x + Math.cos(angle) * dist, 
+                y: position.y + Math.sin(angle) * dist 
+            },
+            5 + Math.random() * 10,
+            getRandomColorFromTheme()
+        );
+    }
+    
+    // Play explosion sound effect (optional)
+    // const audio = new Audio('explosion.mp3');
+    // audio.volume = 0.3;
+    // audio.play();
+}
+
+// Function to create a text object that behaves as a physics body
+function createTextObject(text = "Hello", position = lastMousePos) {
+    // Create a DOM element to measure text dimensions
+    const measureElement = document.createElement('div');
+    measureElement.style.position = 'absolute';
+    measureElement.style.visibility = 'hidden';
+    measureElement.style.fontSize = '20px';
+    measureElement.style.fontFamily = 'Arial, sans-serif';
+    measureElement.style.fontWeight = 'bold';
+    measureElement.style.padding = '5px';
+    measureElement.textContent = text;
+    document.body.appendChild(measureElement);
+    
+    // Measure the text dimensions
+    const width = measureElement.offsetWidth;
+    const height = measureElement.offsetHeight;
+    
+    // Remove measurement element
+    measureElement.remove();
+    
+    // Create the physics body (rectangle with text dimensions)
+    const textBody = Bodies.rectangle(
+        position.x,
+        position.y,
+        width,
+        height,
+        {
+            restitution: defaultBounciness,
+            friction: 0.2,
+            frictionAir: 0.01,
+            render: {
+                fillStyle: getRandomColorFromTheme(),
+                strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                lineWidth: 1
+            }
+        }
+    );
+    
+    // Store the text content for rendering
+    textBody.textContent = text;
+    textBody.isTextObject = true;
+    textBody.fontSize = 20;
+    textBody.fontColor = '#FFFFFF';
+    textBody.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
+    
+    // Add to world
+    Composite.add(engine.world, textBody);
+    
+    return textBody;
 }

@@ -1498,6 +1498,11 @@ function showFloatingMessage(text) {
 
 // Function to create an explosion effect at a given position
 function createExplosion(position, radius = 200, strength = 0.05) {
+    // Ensure we have a valid position
+    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+        position = lastMousePos; // Fallback to last known mouse position
+    }
+
     // Visual effect with improved animation
     const explosion = document.createElement('div');
     explosion.className = 'explosion';
@@ -1511,7 +1516,6 @@ function createExplosion(position, radius = 200, strength = 0.05) {
     explosion.style.borderRadius = '50%';
     explosion.style.zIndex = '10';
     explosion.style.pointerEvents = 'none';
-    explosion.style.transition = 'transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.6s ease-out';
     document.body.appendChild(explosion);
     
     // Additional central glow
@@ -1527,17 +1531,18 @@ function createExplosion(position, radius = 200, strength = 0.05) {
     centralGlow.style.boxShadow = '0 0 30px 10px rgba(255, 220, 150, 0.8)';
     centralGlow.style.zIndex = '11';
     centralGlow.style.pointerEvents = 'none';
-    centralGlow.style.transition = 'transform 0.2s ease-out, opacity 0.4s ease-out';
     document.body.appendChild(centralGlow);
     
     // Use requestAnimationFrame for smoother animation
     requestAnimationFrame(() => {
         // Animate central glow
+        centralGlow.style.transition = 'transform 0.2s ease-out, opacity 0.4s ease-out';
         centralGlow.style.transform = 'translate(-50%, -50%) scale(1)';
         centralGlow.style.opacity = '1';
         
         // Animate main explosion with slight delay
         setTimeout(() => {
+            explosion.style.transition = 'transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.6s ease-out';
             explosion.style.transform = 'translate(-50%, -50%) scale(1)';
             explosion.style.opacity = '1';
         }, 50);
@@ -1615,28 +1620,6 @@ function createExplosion(position, radius = 200, strength = 0.05) {
         }, delay);
     }
     
-    // Show cursor effect at explosion point
-    if (cursorFollower) {
-        cursorFollower.style.left = position.x + 'px';
-        cursorFollower.style.top = position.y + 'px';
-        cursorFollower.classList.add('active');
-        
-        // Make it bigger briefly
-        cursorFollower.style.width = '80px';
-        cursorFollower.style.height = '80px';
-        
-        // After a moment, reduce size
-        setTimeout(() => {
-            cursorFollower.style.width = '30px';
-            cursorFollower.style.height = '30px';
-            
-            // Eventually hide
-            setTimeout(() => {
-                cursorFollower.classList.remove('active');
-            }, 1000);
-        }, 300);
-    }
-    
     // Create shock wave ring
     const shockwave = document.createElement('div');
     shockwave.style.position = 'absolute';
@@ -1649,11 +1632,11 @@ function createExplosion(position, radius = 200, strength = 0.05) {
     shockwave.style.transform = 'translate(-50%, -50%) scale(0)';
     shockwave.style.zIndex = '9';
     shockwave.style.pointerEvents = 'none';
-    shockwave.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
     document.body.appendChild(shockwave);
     
     // Animate shockwave
     requestAnimationFrame(() => {
+        shockwave.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
         shockwave.style.transform = `translate(-50%, -50%) scale(${radius/10})`;
         shockwave.style.opacity = '0';
         shockwave.style.borderWidth = '1px';

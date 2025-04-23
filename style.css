@@ -670,6 +670,7 @@ input[type="range"]::-moz-range-thumb {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     border: none;
     z-index: 1;
+    animation: gradientShift 5s ease infinite;
 }
 
 /* Add shine effect to all buttons */
@@ -706,90 +707,88 @@ input[type="range"]::-moz-range-thumb {
     background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-square { 
-    background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+    background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-triangle { 
-    background: linear-gradient(120deg, #d4fc79 0%, #96e6a1 100%);
+    background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-star { 
     background: linear-gradient(45deg, #ff4e50 0%, #f9d423 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-sand { 
     background: linear-gradient(to right, #f6d365 0%, #fda085 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-text { 
     background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #toggle-wind { 
     background: linear-gradient(45deg, #00c6ff 0%, #0072ff 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #add-attractor { 
     background: linear-gradient(45deg, #fc00ff 0%, #00dbde 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #toggle-collision-sparks { 
     background: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #create-explosion { 
     background: linear-gradient(45deg, #ff416c 0%, #ff4b2b 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #toggle-pause { 
     background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    animation: gradientShift 5s ease infinite;
 }
 
 #clear { 
     background: linear-gradient(to right, #e0c3fc 0%, #8ec5fc 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #save-state { 
     background: linear-gradient(45deg, #5ee7df 0%, #b490ca 100%);
     color: #2c3e50 !important;
-    animation: gradientShift 5s ease infinite;
 }
 
 #load-state { 
     background: linear-gradient(45deg, #c471f5 0%, #fa71cd 100%);
     color: white !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Tab button gets its own gradient too */
+.tab-btn.active {
+    background: linear-gradient(45deg, #6e45e2 0%, #88d3ce 100%);
+    color: white;
+    opacity: 1;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    background-size: 200% 200%;
     animation: gradientShift 5s ease infinite;
 }

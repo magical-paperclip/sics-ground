@@ -202,6 +202,11 @@ function setupMouseControl() {
     });
 }
 
+// Track mouse position continuously
+document.addEventListener('mousemove', function(event) {
+    lastMousePos = { x: event.clientX, y: event.clientY };
+});
+
 // Create boundaries (ground, walls, ceiling)
 function createBoundaries() {
     const wallThickness = 50;
@@ -456,8 +461,8 @@ function setupUpdateLoop() {
 function addCircle() {
     const radius = 20 + Math.random() * 30;
     const circle = Bodies.circle(
-        Math.random() * (window.innerWidth - radius * 2) + radius,
-        Math.random() * 200,
+        lastMousePos.x,
+        lastMousePos.y,
         radius,
         {
             restitution: defaultBounciness,
@@ -480,8 +485,8 @@ function addCircle() {
 function addSquare() {
     const size = 20 + Math.random() * 40;
     const square = Bodies.rectangle(
-        Math.random() * (window.innerWidth - size * 2) + size,
-        Math.random() * 200,
+        lastMousePos.x,
+        lastMousePos.y,
         size,
         size,
         {
@@ -513,8 +518,8 @@ function addTriangle() {
     ];
     
     const triangle = Bodies.fromVertices(
-        Math.random() * (window.innerWidth - size) + size / 2,
-        Math.random() * 200,
+        lastMousePos.x,
+        lastMousePos.y,
         [vertices],
         {
             restitution: defaultBounciness,
@@ -549,8 +554,8 @@ function addStar() {
     }
     
     const star = Bodies.fromVertices(
-        Math.random() * (window.innerWidth - outerRadius * 2) + outerRadius,
-        Math.random() * 200,
+        lastMousePos.x,
+        lastMousePos.y,
         [vertices],
         {
             restitution: defaultBounciness,
@@ -572,8 +577,8 @@ function addStar() {
 
 function addSandParticle() {
     const size = 5 + Math.random() * 5;
-    const x = mouse.position.x + (Math.random() - 0.5) * 30;
-    const y = mouse.position.y + (Math.random() - 0.5) * 30;
+    const x = lastMousePos.x + (Math.random() - 0.5) * 30;
+    const y = lastMousePos.y + (Math.random() - 0.5) * 30;
     
     const particle = Bodies.circle(
         x, y, size,

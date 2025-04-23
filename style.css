@@ -44,7 +44,29 @@ body.minimal-theme {
     flex-direction: column;
     gap: 15px;
     max-width: 300px;
+    max-height: 90vh; /* Limit height to 90% of the viewport */
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden; /* Hide horizontal scrollbar */
     transition: all 0.3s ease;
+}
+
+/* Custom scrollbar for the controls panel */
+.controls::-webkit-scrollbar {
+    width: 6px;
+}
+
+.controls::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.controls::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.controls::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .neon-theme .controls {
@@ -512,9 +534,14 @@ input[type="range"]::-moz-range-thumb {
     transition: all 0.2s ease;
 }
 
-/* Special styling for buttons with darker backgrounds */
+/* Override for specific buttons with darker backgrounds */
 #add-circle, #toggle-wind, #add-star, #add-attractor, #create-explosion, #toggle-pause {
-    color: white;
+    color: white !important; /* Force white text with !important */
+}
+
+/* Make sure all other buttons have dark text */
+#add-square, #add-triangle, #add-sand, #add-text, #clear, #save-state, #load-state {
+    color: #2c3e50 !important; /* Force dark text with !important */
 }
 
 .buttons button:hover {

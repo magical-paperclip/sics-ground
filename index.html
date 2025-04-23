@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiFlair | Elegant Physics Playground</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="logo">PhysiFlair</div>
+    
+    <div class="controls">
+        <div class="title">PhysiFlair</div>
+        
+        <!-- Tab navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="playground">Playground</button>
+            <button class="tab-btn" data-tab="wall-break">Wall Smash</button>
+        </div>
+        
+        <!-- Playground Tab Content -->
+        <div class="tab-content active" id="playground-tab">
+            <div class="buttons">
+                <button id="add-circle">Add Circle</button>
+                <button id="add-square">Add Square</button>
+                <button id="add-triangle">Add Triangle</button>
+                <button id="add-star">Add Star</button>
+                <button id="add-sand">Add Sand</button>
+            </div>
+            
+            <div class="buttons">
+                <button id="toggle-wind">Toggle Wind</button>
+                <button id="add-attractor">Add Attractor</button>
+                <button id="toggle-collision-sparks">Collision Effects</button>
+                <button id="clear">Clear All</button>
+            </div>
+            
+            <div class="theme-selector">
+                <label>Theme</label>
+                <select id="theme-select">
+                    <option value="boutique">Boutique</option>
+                    <option value="neon">Neon Night</option>
+                    <option value="pastel">Soft Pastel</option>
+                    <option value="minimal">Minimal</option>
+                </select>
+            </div>
+            
+            <div class="sliders">
+                <label>
+                    Gravity
+                    <input type="range" id="gravity-slider" min="-1" max="2" step="0.1" value="1">
+                </label>
+                <label>
+                    Wind Strength
+                    <input type="range" id="wind-slider" min="0" max="1" step="0.05" value="0.2">
+                </label>
+                <label>
+                    Bounciness
+                    <input type="range" id="bounce-slider" min="0" max="1" step="0.1" value="0.7">
+                </label>
+            </div>
+            
+            <div class="save-controls">
+                <button id="save-state">Save Scene</button>
+                <button id="load-state">Load Scene</button>
+            </div>
+        </div>
+        
+        <!-- Wall Break Tab Content -->
+        <div class="tab-content" id="wall-break-tab">
+            <div class="wall-break-intro">
+                <p>Click on walls to smash them! 💥</p>
+            </div>
+            
+            <div class="buttons">
+                <button id="add-walls">Add Walls</button>
+                <button id="clear-walls">Clear Walls</button>
+                <button id="toggle-background-wall">Toggle Crackable Wall</button>
+            </div>
+            
+            <div class="sliders">
+                <label>
+                    Wall Strength
+                    <input type="range" id="wall-strength-slider" min="1" max="10" step="1" value="3">
+                </label>
+                <label>
+                    Break Size
+                    <input type="range" id="break-size-slider" min="1" max="5" step="0.5" value="2">
+                </label>
+                <label>
+                    Wall Layers
+                    <input type="range" id="wall-layers-slider" min="3" max="15" step="1" value="10">
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Decorative elements -->
+    <div class="decoration top-right"></div>
+    <div class="decoration bottom-left"></div>
+    
+    <div class="footer">PhysiFlair | Elegant Physics Playground</div>
+    
+    <!-- Info modal for attractors -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Attractor Mode</h3>
+            <p>Click anywhere to place an attractor that will pull objects toward it.</p>
+            <p>Use the mouse wheel to adjust its strength.</p>
+        </div>
+    </div>
+    
+    <canvas id="physics-canvas"></canvas>
+    
+    <script src="node_modules/matter-js/build/matter.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

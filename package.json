@@ -1,0 +1,21 @@
+{
+  "name": "sics-ground",
+  "version": "1.0.0",
+  "description": "Physics playground with Matter.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "open index.html"
+  },
+  "keywords": [
+    "physics",
+    "matter.js",
+    "simulation",
+    "sandbox"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "matter-js": "^0.19.0"
+  }
+}

@@ -877,13 +877,14 @@ function createCircleParticle(position, size, color) {
     particle.style.transform = 'translate(-50%, -50%)';
     particle.style.zIndex = '5';
     particle.style.pointerEvents = 'none';
+    particle.style.transition = 'opacity 0.1s ease';
     document.body.appendChild(particle);
     
-    // Random direction
+    // Random direction with smoother movement
     const angle = Math.random() * Math.PI * 2;
     const velocity = {
-        x: Math.cos(angle) * (1 + Math.random() * 2),
-        y: Math.sin(angle) * (1 + Math.random() * 2) - 1 // Slight upward bias
+        x: Math.cos(angle) * (0.5 + Math.random() * 1.5),
+        y: Math.sin(angle) * (0.5 + Math.random() * 1.5) - 0.8 // Gentler upward bias
     };
     
     // Initial position
@@ -892,13 +893,13 @@ function createCircleParticle(position, size, color) {
     let opacity = 1;
     let currentSize = size;
     
-    // Animate the particle
+    // Animate the particle with smoother transitions
     function animateParticle() {
         x += velocity.x;
         y += velocity.y;
-        velocity.y += 0.05; // Gravity
-        opacity -= 0.05;
-        currentSize *= 0.95;
+        velocity.y += 0.025; // Reduced gravity for smoother fall
+        opacity -= 0.02; // Slower opacity reduction
+        currentSize *= 0.98; // Gentler size reduction
         
         particle.style.left = x + 'px';
         particle.style.top = y + 'px';
@@ -930,14 +931,15 @@ function createStarBurstParticle(position, size, color) {
     particle.style.transform = 'translate(-50%, -50%)';
     particle.style.zIndex = '5';
     particle.style.pointerEvents = 'none';
+    particle.style.transition = 'opacity 0.1s ease';
     document.body.appendChild(particle);
     
-    // Random direction
+    // Random direction with more controlled movement
     const angle = Math.random() * Math.PI * 2;
-    const speed = 1 + Math.random() * 3;
+    const speed = 0.5 + Math.random() * 1.5; // Reduced speed range
     const velocity = {
         x: Math.cos(angle) * speed,
-        y: Math.sin(angle) * speed
+        y: Math.sin(angle) * speed - 0.5 // Slight upward drift
     };
     
     // Initial position
@@ -951,9 +953,10 @@ function createStarBurstParticle(position, size, color) {
     function animateParticle() {
         x += velocity.x;
         y += velocity.y;
-        opacity -= 0.03;
-        currentSize *= 1.01; // Grow slightly
-        rotation += 5; // Rotate
+        velocity.y += 0.02; // Gentler gravity
+        opacity -= 0.015; // Slower opacity fade
+        currentSize *= 1.005; // More gradual growth
+        rotation += 2; // Slower rotation (was 5)
         
         particle.style.left = x + 'px';
         particle.style.top = y + 'px';
@@ -990,22 +993,28 @@ function createTrailParticle(position, size, color) {
             particle.style.zIndex = '5';
             particle.style.pointerEvents = 'none';
             particle.style.boxShadow = `0 0 ${size/2}px ${color || '#fff'}`;
+            particle.style.transition = 'opacity 0.15s ease';
             document.body.appendChild(particle);
             
-            // Create a curved path
+            // Create a curved path with smoother movement
             const baseAngle = Math.random() * Math.PI * 2;
-            const curveFactor = Math.random() * 0.1 - 0.05;
+            const curveFactor = Math.random() * 0.05 - 0.025; // Reduced curve factor
             let curX = position.x;
             let curY = position.y;
             let t = 0;
             let opacity = 0.7;
+            let prevTime = performance.now();
             
             function animateTrail() {
-                t += 0.05;
+                const now = performance.now();
+                const deltaTime = Math.min(30, now - prevTime) / 16.67; // Normalize to ~60fps
+                prevTime = now;
+                
+                t += 0.03 * deltaTime; // More consistent speed regardless of frame rate
                 const angle = baseAngle + curveFactor * t;
-                curX += Math.cos(angle) * 2;
-                curY += Math.sin(angle) * 2;
-                opacity -= 0.01;
+                curX += Math.cos(angle) * 1.5 * deltaTime;
+                curY += Math.sin(angle) * 1.5 * deltaTime;
+                opacity -= 0.008 * deltaTime;
                 
                 particle.style.left = curX + 'px';
                 particle.style.top = curY + 'px';
@@ -1019,7 +1028,7 @@ function createTrailParticle(position, size, color) {
             }
             
             requestAnimationFrame(animateTrail);
-        }, i * 50); // Staggered start
+        }, i * 70); // More separated staggered start
     }
 }
 
@@ -1038,13 +1047,17 @@ function createGlowParticle(position, size, color) {
     particle.style.transform = 'translate(-50%, -50%)';
     particle.style.zIndex = '5';
     particle.style.pointerEvents = 'none';
+    particle.style.transition = 'opacity 0.2s ease';
     document.body.appendChild(particle);
+    
+    // Use frame time tracking for consistent animation
+    let prevTime = performance.now();
     
     // Random direction, slower than normal particles
     const angle = Math.random() * Math.PI * 2;
     const velocity = {
-        x: Math.cos(angle) * (0.5 + Math.random()),
-        y: Math.sin(angle) * (0.5 + Math.random()) - 0.5
+        x: Math.cos(angle) * (0.3 + Math.random() * 0.7),
+        y: Math.sin(angle) * (0.3 + Math.random() * 0.7) - 0.3
     };
     
     // Initial position
@@ -1053,13 +1066,17 @@ function createGlowParticle(position, size, color) {
     let opacity = 1;
     let currentSize = size;
     
-    // Animate the particle
+    // Animate the particle with frame timing
     function animateParticle() {
-        x += velocity.x;
-        y += velocity.y;
-        velocity.y += 0.02; // Reduced gravity
-        opacity -= 0.015;
-        currentSize *= 1.02; // Grow
+        const now = performance.now();
+        const deltaTime = Math.min(30, now - prevTime) / 16.67; // Normalize to ~60fps
+        prevTime = now;
+        
+        x += velocity.x * deltaTime;
+        y += velocity.y * deltaTime;
+        velocity.y += 0.01 * deltaTime; // Very gentle gravity
+        opacity -= 0.01 * deltaTime;
+        currentSize *= (1 + 0.01 * deltaTime); // Gradual growth
         
         particle.style.left = x + 'px';
         particle.style.top = y + 'px';
@@ -1092,15 +1109,22 @@ function createRippleEffect(position, size, color) {
     ripple.style.transform = 'translate(-50%, -50%)';
     ripple.style.zIndex = '5';
     ripple.style.pointerEvents = 'none';
+    ripple.style.transition = 'opacity 0.15s ease';
     document.body.appendChild(ripple);
     
-    // Start small and expand
+    // Use frame time tracking for consistent animation
+    let prevTime = performance.now();
     let currentSize = size;
     let opacity = 1;
     
     function animateRipple() {
-        currentSize *= 1.05;
-        opacity -= 0.02;
+        const now = performance.now();
+        const deltaTime = Math.min(30, now - prevTime) / 16.67; // Normalize to ~60fps
+        prevTime = now;
+        
+        // Smoother growth with frame timing
+        currentSize *= (1 + 0.03 * deltaTime);
+        opacity -= 0.01 * deltaTime;
         
         ripple.style.width = (currentSize * 2) + 'px';
         ripple.style.height = (currentSize * 2) + 'px';

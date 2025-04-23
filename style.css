@@ -160,6 +160,8 @@ button:active {
 #add-circle { 
     background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
     color: white;
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
 }
 
 #add-square { 
@@ -178,8 +180,10 @@ button:active {
 }
 
 #toggle-wind { 
-    background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(45deg, #00c6ff 0%, #0072ff 100%);
     color: white;
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
 }
 
 #clear { 
@@ -537,6 +541,101 @@ input[type="range"]::-moz-range-thumb {
 /* Override for specific buttons with darker backgrounds */
 #add-circle, #toggle-wind, #add-star, #add-attractor, #create-explosion, #toggle-pause {
     color: white !important; /* Force white text with !important */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border: none;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+/* Add shine effect on hover */
+#add-circle:hover, #toggle-wind:hover, #add-star:hover, #add-attractor:hover, 
+#create-explosion:hover, #toggle-pause:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25), 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+/* Active state for white text buttons */
+#add-circle.active, #toggle-wind.active, #add-star.active, #add-attractor.active, 
+#create-explosion.active, #toggle-pause.active {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+}
+
+/* Individual button styles with vibrant gradients */
+#add-circle { 
+    background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+#toggle-wind { 
+    background: linear-gradient(45deg, #00c6ff 0%, #0072ff 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-star { 
+    background: linear-gradient(45deg, #ff4e50 0%, #f9d423 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-attractor { 
+    background: linear-gradient(45deg, #fc00ff 0%, #00dbde 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+#create-explosion { 
+    background: linear-gradient(45deg, #ff416c 0%, #ff4b2b 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+#toggle-pause { 
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 5s ease infinite;
+}
+
+/* Shine effect */
+#add-circle::before, #toggle-wind::before, #add-star::before, #add-attractor::before,
+#create-explosion::before, #toggle-pause::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(transparent, transparent, transparent, rgba(255, 255, 255, 0.3));
+    transform: rotate(45deg);
+    transition: all 0.5s ease;
+    opacity: 0;
+    z-index: -1;
+}
+
+#add-circle:hover::before, #toggle-wind:hover::before, #add-star:hover::before, 
+#add-attractor:hover::before, #create-explosion:hover::before, #toggle-pause:hover::before {
+    animation: shineEffect 1.5s forwards;
+}
+
+/* Animation for gradient shift */
+@keyframes gradientShift {
+    0% { background-position: 0% 50% }
+    50% { background-position: 100% 50% }
+    100% { background-position: 0% 50% }
+}
+
+/* Animation for shine effect */
+@keyframes shineEffect {
+    0% { opacity: 0; transform: translateX(-100%) rotate(45deg); }
+    20% { opacity: 0.5; }
+    100% { opacity: 0; transform: translateX(100%) rotate(45deg); }
 }
 
 /* Make sure all other buttons have dark text */
@@ -553,4 +652,144 @@ input[type="range"]::-moz-range-thumb {
     background-color: rgba(255, 255, 255, 0.3);
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
     border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Add gradient styling to all buttons */
+.buttons button {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #2c3e50;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 14px;
+    margin: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-size: 200% 200%;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    border: none;
+    z-index: 1;
+}
+
+/* Add shine effect to all buttons */
+.buttons button::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(transparent, transparent, transparent, rgba(255, 255, 255, 0.2));
+    transform: rotate(45deg);
+    transition: all 0.5s ease;
+    opacity: 0;
+    z-index: -1;
+}
+
+.buttons button:hover::before {
+    animation: shineEffect 1.5s forwards;
+}
+
+.buttons button:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+}
+
+.buttons button.active {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+}
+
+/* Individual button gradients */
+#add-circle { 
+    background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-square { 
+    background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-triangle { 
+    background: linear-gradient(120deg, #d4fc79 0%, #96e6a1 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-star { 
+    background: linear-gradient(45deg, #ff4e50 0%, #f9d423 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-sand { 
+    background: linear-gradient(to right, #f6d365 0%, #fda085 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-text { 
+    background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#toggle-wind { 
+    background: linear-gradient(45deg, #00c6ff 0%, #0072ff 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#add-attractor { 
+    background: linear-gradient(45deg, #fc00ff 0%, #00dbde 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#toggle-collision-sparks { 
+    background: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#create-explosion { 
+    background: linear-gradient(45deg, #ff416c 0%, #ff4b2b 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#toggle-pause { 
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
+}
+
+#clear { 
+    background: linear-gradient(to right, #e0c3fc 0%, #8ec5fc 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#save-state { 
+    background: linear-gradient(45deg, #5ee7df 0%, #b490ca 100%);
+    color: #2c3e50 !important;
+    animation: gradientShift 5s ease infinite;
+}
+
+#load-state { 
+    background: linear-gradient(45deg, #c471f5 0%, #fa71cd 100%);
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: gradientShift 5s ease infinite;
 }

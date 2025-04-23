@@ -792,3 +792,76 @@ input[type="range"]::-moz-range-thumb {
     background-size: 200% 200%;
     animation: gradientShift 5s ease infinite;
 }
+
+/* Mobile-friendly styles */
+@media screen and (max-width: 768px) {
+    .controls {
+        width: 90%;
+        max-width: none;
+        right: 5%;
+        padding: 10px;
+    }
+    
+    .buttons {
+        flex-direction: column;
+    }
+    
+    .buttons button {
+        margin: 5px 0;
+        padding: 10px;
+        width: 100%;
+    }
+    
+    .sliders label {
+        margin: 10px 0;
+    }
+    
+    .theme-selector, .save-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .save-controls button {
+        margin: 5px 0;
+        width: 100%;
+    }
+    
+    .logo, .footer {
+        display: none;
+    }
+    
+    .title {
+        font-size: 20px;
+    }
+}
+
+/* Touch feedback for buttons */
+.buttons button:active {
+    transform: scale(0.95);
+    opacity: 0.9;
+}
+
+/* Cursor follower effect */
+.cursor-follower {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.3s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.cursor-follower.active {
+    opacity: 0.7;
+    animation: pulse 1.5s ease-out infinite;
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.1); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}

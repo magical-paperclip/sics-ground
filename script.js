@@ -70,7 +70,7 @@ let frameRateHistory = Array(30).fill(60);
 // Engine variables
 let engine, render, runner, mouse, mouseConstraint, canvas;
 let draggedBody = null;
-let ground, leftWall, rightWall, ceiling;
+let ground, leftWall, rightWall, ceiling, basePlatform;
 
 // Wait for DOM to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', function() {
@@ -238,9 +238,11 @@ document.addEventListener('mousemove', function(event) {
     lastMousePos = { x: event.clientX, y: event.clientY };
 });
 
-// Create boundaries (ground, walls, ceiling)
+// Create boundaries (ground, walls, ceiling) and base platform
 function createBoundaries() {
     const wallThickness = 50;
+    
+    // Create the invisible boundary walls
     ground = Bodies.rectangle(
         window.innerWidth / 2, 
         window.innerHeight, 
@@ -301,8 +303,29 @@ function createBoundaries() {
         }
     );
 
+    // Create a visible base platform that objects will rest on
+    const platformHeight = 20;
+    const platformY = window.innerHeight - 100; // Position 100px from bottom
+    
+    basePlatform = Bodies.rectangle(
+        window.innerWidth / 2,
+        platformY,
+        window.innerWidth * 0.8, // 80% of screen width
+        platformHeight,
+        {
+            isStatic: true,
+            render: {
+                fillStyle: 'rgba(255, 255, 255, 0.1)',
+                strokeStyle: 'rgba(255, 255, 255, 0.6)',
+                lineWidth: 2
+            },
+            chamfer: { radius: 10 }, // Rounded corners
+            label: 'basePlatform'
+        }
+    );
+
     // Add all static bodies to the world
-    Composite.add(engine.world, [ground, leftWall, rightWall, ceiling]);
+    Composite.add(engine.world, [ground, leftWall, rightWall, ceiling, basePlatform]);
 }
 
 // Set up all event listeners
@@ -451,6 +474,16 @@ function setupEventListeners() {
         Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
         Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
         Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
+        Body.setPosition(basePlatform, { x: window.innerWidth / 2, y: window.innerHeight - 100 });
+        
+        // Also update the width of the base platform to match screen size
+        Body.setVertices(basePlatform, Bodies.rectangle(
+            window.innerWidth / 2,
+            window.innerHeight - 100,
+            window.innerWidth * 0.8,
+            20, 
+            { chamfer: { radius: 10 } }
+        ).vertices);
     }, 250));
 
     document.getElementById('toggle-wind').addEventListener('click', function() {
@@ -1460,7 +1493,7 @@ function showFloatingMessage(text) {
 
 // Function to create an explosion effect at a given position
 function createExplosion(position, radius = 200, strength = 0.05) {
-    // Visual effect
+    // Visual effect with improved animation
     const explosion = document.createElement('div');
     explosion.className = 'explosion';
     explosion.style.position = 'absolute';
@@ -1468,29 +1501,57 @@ function createExplosion(position, radius = 200, strength = 0.05) {
     explosion.style.top = position.y + 'px';
     explosion.style.width = radius * 2 + 'px';
     explosion.style.height = radius * 2 + 'px';
-    explosion.style.transform = 'translate(-50%, -50%)';
-    explosion.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,200,100,0.4) 40%, rgba(255,100,50,0) 70%)';
+    explosion.style.transform = 'translate(-50%, -50%) scale(0)';
+    explosion.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,200,100,0.5) 40%, rgba(255,100,50,0) 70%)';
     explosion.style.borderRadius = '50%';
     explosion.style.zIndex = '10';
     explosion.style.pointerEvents = 'none';
+    explosion.style.transition = 'transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.6s ease-out';
     document.body.appendChild(explosion);
     
-    // Animate explosion
-    let scale = 0;
-    const animate = () => {
-        scale += 0.1;
-        explosion.style.transform = `translate(-50%, -50%) scale(${scale})`;
-        explosion.style.opacity = 1 - scale/2;
-        
-        if (scale < 2) {
-            requestAnimationFrame(animate);
-        } else {
-            explosion.remove();
-        }
-    };
-    animate();
+    // Additional central glow
+    const centralGlow = document.createElement('div');
+    centralGlow.style.position = 'absolute';
+    centralGlow.style.left = position.x + 'px';
+    centralGlow.style.top = position.y + 'px';
+    centralGlow.style.width = radius * 0.5 + 'px';
+    centralGlow.style.height = radius * 0.5 + 'px';
+    centralGlow.style.background = 'rgba(255, 255, 255, 0.8)';
+    centralGlow.style.borderRadius = '50%';
+    centralGlow.style.transform = 'translate(-50%, -50%) scale(0)';
+    centralGlow.style.boxShadow = '0 0 30px 10px rgba(255, 220, 150, 0.8)';
+    centralGlow.style.zIndex = '11';
+    centralGlow.style.pointerEvents = 'none';
+    centralGlow.style.transition = 'transform 0.2s ease-out, opacity 0.4s ease-out';
+    document.body.appendChild(centralGlow);
     
-    // Apply forces to nearby bodies
+    // Use requestAnimationFrame for smoother animation
+    requestAnimationFrame(() => {
+        // Animate central glow
+        centralGlow.style.transform = 'translate(-50%, -50%) scale(1)';
+        centralGlow.style.opacity = '1';
+        
+        // Animate main explosion with slight delay
+        setTimeout(() => {
+            explosion.style.transform = 'translate(-50%, -50%) scale(1)';
+            explosion.style.opacity = '1';
+        }, 50);
+        
+        // Fade out
+        setTimeout(() => {
+            centralGlow.style.opacity = '0';
+            centralGlow.style.transform = 'translate(-50%, -50%) scale(0.1)';
+            explosion.style.opacity = '0';
+        }, 300);
+        
+        // Clean up
+        setTimeout(() => {
+            centralGlow.remove();
+            explosion.remove();
+        }, 800);
+    });
+    
+    // Apply forces to nearby bodies with improved physics
     const bodies = Composite.allBodies(engine.world);
     
     bodies.forEach(body => {
@@ -1501,45 +1562,102 @@ function createExplosion(position, radius = 200, strength = 0.05) {
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         if (distance < radius) {
-            // Calculate force inversely proportional to distance
-            const forceMagnitude = strength * (1 - distance / radius) * body.mass;
+            // Calculate force with smoother falloff
+            const forceFactor = 1 - Math.pow(distance / radius, 2); // Quadratic falloff
+            const forceMagnitude = strength * forceFactor * body.mass;
             const angle = Math.atan2(dy, dx);
             
+            // Apply force with dampened vertical component for more natural explosions
             Body.applyForce(body, body.position, {
                 x: Math.cos(angle) * forceMagnitude,
-                y: Math.sin(angle) * forceMagnitude
+                y: Math.sin(angle) * forceMagnitude * 0.8 // Reduced vertical force
             });
             
-            // Create explosion particles
-            const sparkCount = Math.floor(Math.random() * 3) + 1;
+            // Add rotation for more natural movement
+            Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.05);
+            
+            // Create explosion particles with more variety
+            const sparkCount = Math.floor(3 + Math.random() * 5);
             for (let i = 0; i < sparkCount; i++) {
                 createCollisionParticle(
-                    { x: position.x + dx/2, y: position.y + dy/2 },
-                    5 + Math.random() * 5,
+                    { 
+                        x: body.position.x + (Math.random() - 0.5) * 20, 
+                        y: body.position.y + (Math.random() - 0.5) * 20 
+                    },
+                    5 + Math.random() * 8,
                     getRandomColorFromTheme()
                 );
             }
         }
     });
     
-    // Create additional explosion particles
-    for (let i = 0; i < 30; i++) {
+    // Create additional explosion particles with more variety and patterns
+    const particleCount = isMobile() ? 20 : 40; // Fewer particles on mobile for performance
+    for (let i = 0; i < particleCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * radius * 0.7;
-        createCollisionParticle(
-            { 
-                x: position.x + Math.cos(angle) * dist, 
-                y: position.y + Math.sin(angle) * dist 
-            },
-            5 + Math.random() * 10,
-            getRandomColorFromTheme()
-        );
+        const distance = Math.random() * radius * 0.7;
+        const delay = Math.random() * 200; // Staggered particle creation
+        
+        setTimeout(() => {
+            createCollisionParticle(
+                { 
+                    x: position.x + Math.cos(angle) * distance, 
+                    y: position.y + Math.sin(angle) * distance 
+                },
+                4 + Math.random() * 8,
+                getRandomColorFromTheme()
+            );
+        }, delay);
     }
     
-    // Play explosion sound effect (optional)
-    // const audio = new Audio('explosion.mp3');
-    // audio.volume = 0.3;
-    // audio.play();
+    // Show cursor effect at explosion point
+    if (cursorFollower) {
+        cursorFollower.style.left = position.x + 'px';
+        cursorFollower.style.top = position.y + 'px';
+        cursorFollower.classList.add('active');
+        
+        // Make it bigger briefly
+        cursorFollower.style.width = '80px';
+        cursorFollower.style.height = '80px';
+        
+        // After a moment, reduce size
+        setTimeout(() => {
+            cursorFollower.style.width = '30px';
+            cursorFollower.style.height = '30px';
+            
+            // Eventually hide
+            setTimeout(() => {
+                cursorFollower.classList.remove('active');
+            }, 1000);
+        }, 300);
+    }
+    
+    // Create shock wave ring
+    const shockwave = document.createElement('div');
+    shockwave.style.position = 'absolute';
+    shockwave.style.left = position.x + 'px';
+    shockwave.style.top = position.y + 'px';
+    shockwave.style.width = '10px';
+    shockwave.style.height = '10px';
+    shockwave.style.borderRadius = '50%';
+    shockwave.style.border = '4px solid rgba(255, 255, 255, 0.8)';
+    shockwave.style.transform = 'translate(-50%, -50%) scale(0)';
+    shockwave.style.zIndex = '9';
+    shockwave.style.pointerEvents = 'none';
+    shockwave.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
+    document.body.appendChild(shockwave);
+    
+    // Animate shockwave
+    requestAnimationFrame(() => {
+        shockwave.style.transform = `translate(-50%, -50%) scale(${radius/10})`;
+        shockwave.style.opacity = '0';
+        shockwave.style.borderWidth = '1px';
+        
+        // Clean up
+        setTimeout(() => {
+            shockwave.remove();
+        }, 600);
+    });
 }
 
 // Function to create a text object that behaves as a physics body
@@ -1562,6 +1680,12 @@ function createTextObject(text = "Hello", position = lastMousePos) {
     // Remove measurement element
     measureElement.remove();
     
+    // Get a random background color from the theme
+    const backgroundColor = getRandomColorFromTheme();
+    
+    // Calculate a contrasting text color
+    const textColor = getContrastingColor(backgroundColor);
+    
     // Create the physics body (rectangle with text dimensions)
     const textBody = Bodies.rectangle(
         position.x,
@@ -1573,7 +1697,7 @@ function createTextObject(text = "Hello", position = lastMousePos) {
             friction: 0.2,
             frictionAir: 0.01,
             render: {
-                fillStyle: getRandomColorFromTheme(),
+                fillStyle: backgroundColor,
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
                 lineWidth: 1
             }
@@ -1584,7 +1708,7 @@ function createTextObject(text = "Hello", position = lastMousePos) {
     textBody.textContent = text;
     textBody.isTextObject = true;
     textBody.fontSize = 20;
-    textBody.fontColor = '#FFFFFF';
+    textBody.fontColor = textColor;
     textBody.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
     
     // Add to world
@@ -1592,3 +1716,207 @@ function createTextObject(text = "Hello", position = lastMousePos) {
     
     return textBody;
 }
+
+// Function to calculate a contrasting color for text based on background
+function getContrastingColor(hexColor) {
+    // Remove the # if it exists
+    hexColor = hexColor.replace('#', '');
+    
+    // Convert hex to RGB
+    let r = parseInt(hexColor.substr(0, 2), 16);
+    let g = parseInt(hexColor.substr(2, 2), 16);
+    let b = parseInt(hexColor.substr(4, 2), 16);
+    
+    // Calculate perceived brightness (using YIQ formula)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    
+    // Return black or white based on brightness
+    return brightness > 128 ? '#000000' : '#FFFFFF';
+}
+
+// Add cursor follower element
+function addCursorFollower() {
+    const follower = document.createElement('div');
+    follower.className = 'cursor-follower';
+    document.body.appendChild(follower);
+    return follower;
+}
+
+// Initialize cursor follower
+let cursorFollower;
+let isTouch = false;
+
+// Setup touch and cursor events
+function setupCursorAndTouchEvents() {
+    cursorFollower = addCursorFollower();
+    
+    // Track if device is touch-enabled
+    window.addEventListener('touchstart', function() {
+        isTouch = true;
+    }, { once: true });
+
+    // Handle mouse movements
+    document.addEventListener('mousemove', function(e) {
+        if (isTouch) return; // Skip if touch device
+        
+        cursorFollower.style.left = e.clientX + 'px';
+        cursorFollower.style.top = e.clientY + 'px';
+    });
+    
+    // Handle touch movements for mobile
+    document.addEventListener('touchmove', function(e) {
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            cursorFollower.style.left = touch.clientX + 'px';
+            cursorFollower.style.top = touch.clientY + 'px';
+        }
+    });
+    
+    // Show cursor follower on click/touch
+    document.addEventListener('mousedown', showCursorEffect);
+    document.addEventListener('touchstart', showCursorEffect);
+    
+    // Hide cursor follower after delay
+    document.addEventListener('mouseup', hideCursorEffectDelayed);
+    document.addEventListener('touchend', hideCursorEffectDelayed);
+}
+
+// Show cursor effect
+function showCursorEffect(e) {
+    // Get position (handle both mouse and touch)
+    const posX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : lastMousePos.x);
+    const posY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : lastMousePos.y);
+    
+    // Update last mouse position
+    lastMousePos.x = posX;
+    lastMousePos.y = posY;
+    
+    // Update cursor follower
+    cursorFollower.style.left = posX + 'px';
+    cursorFollower.style.top = posY + 'px';
+    cursorFollower.classList.add('active');
+    
+    // Make it bigger briefly
+    cursorFollower.style.width = '50px';
+    cursorFollower.style.height = '50px';
+    
+    // After a moment, reduce size but keep active
+    setTimeout(() => {
+        cursorFollower.style.width = '30px';
+        cursorFollower.style.height = '30px';
+    }, 150);
+}
+
+// Hide cursor effect with delay
+function hideCursorEffectDelayed() {
+    setTimeout(() => {
+        cursorFollower.classList.remove('active');
+    }, 1000);
+}
+
+// Helper to detect mobile devices
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
+// Initialize touch handling for mobile
+function initMobileSupport() {
+    // Add special handling for mobile devices
+    if (isMobile()) {
+        // Make buttons larger on mobile
+        document.querySelectorAll('.buttons button').forEach(button => {
+            button.style.padding = '12px 16px';
+            button.style.fontSize = '16px';
+        });
+        
+        // Add viewport meta tag if not present (should already be there)
+        if (!document.querySelector('meta[name="viewport"]')) {
+            const meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(meta);
+        }
+        
+        // Better touch handling for the canvas
+        canvas.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                lastMousePos.x = touch.clientX;
+                lastMousePos.y = touch.clientY;
+                
+                // Show the user where they touched
+                showTouchIndicator(touch.clientX, touch.clientY);
+            }
+        });
+        
+        // Handle mobile pinch-zoom
+        let lastDistance = 0;
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault(); // Prevent scrolling while interacting with canvas
+            
+            if (e.touches.length >= 2) {
+                // Handle pinch zoom (can be used for future features)
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                
+                const distance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                
+                if (lastDistance > 0) {
+                    const delta = distance - lastDistance;
+                    // Could implement zoom or other features here
+                }
+                
+                lastDistance = distance;
+            } else if (e.touches.length === 1) {
+                // Update for single touch
+                const touch = e.touches[0];
+                lastMousePos.x = touch.clientX;
+                lastMousePos.y = touch.clientY;
+            }
+        });
+        
+        canvas.addEventListener('touchend', function() {
+            lastDistance = 0;
+        });
+    }
+}
+
+// Show visual indicator for touch
+function showTouchIndicator(x, y) {
+    const indicator = document.createElement('div');
+    indicator.style.position = 'absolute';
+    indicator.style.width = '40px';
+    indicator.style.height = '40px';
+    indicator.style.borderRadius = '50%';
+    indicator.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)';
+    indicator.style.left = x + 'px';
+    indicator.style.top = y + 'px';
+    indicator.style.transform = 'translate(-50%, -50%)';
+    indicator.style.zIndex = '1000';
+    indicator.style.pointerEvents = 'none';
+    indicator.style.opacity = '0.8';
+    document.body.appendChild(indicator);
+    
+    // Animate and remove
+    indicator.animate([
+        { transform: 'translate(-50%, -50%) scale(0.8)', opacity: 0.8 },
+        { transform: 'translate(-50%, -50%) scale(1.5)', opacity: 0 }
+    ], {
+        duration: 400,
+        easing: 'ease-out'
+    }).onfinish = () => indicator.remove();
+}
+
+// Call the setup functions when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Add our new setup functions to the initialization
+    const originalInit = window.onload || function(){};
+    window.onload = function() {
+        if (typeof originalInit === 'function') originalInit();
+        setupCursorAndTouchEvents();
+        initMobileSupport();
+    };
+});

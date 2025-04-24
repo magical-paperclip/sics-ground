@@ -188,6 +188,9 @@ function setupMouseControl() {
         
         if (attractorMode) {
             createAttractor(event.clientX, event.clientY);
+        } else if (explosionMode) {
+            // Create explosion at click point when explosion mode is enabled
+            createExplosion({x: event.clientX, y: event.clientY});
         } else {
             // If we're in normal mode, place the current shape
             // Check if any of the creation buttons are active
@@ -415,6 +418,32 @@ function setupEventListeners() {
         
         // Show message about current state
         showFloatingMessage(explosionMode ? 'Explosion mode enabled - click anywhere to create explosions' : 'Explosion mode disabled');
+    });
+    
+    // Clear All button
+    document.getElementById('clear').addEventListener('click', function() {
+        // Clear all non-static bodies
+        clearNonStaticBodies();
+        
+        // Clear all attractors
+        while (attractors.length > 0) {
+            removeAttractor(attractors[0]);
+        }
+        
+        // Reset modes
+        attractorMode = false;
+        explosionMode = false;
+        
+        // Reset button states
+        document.getElementById('add-attractor').textContent = 'Add Attractor';
+        document.getElementById('create-explosion').textContent = 'Enable Explosion';
+        
+        // Deactivate all shape buttons
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        showFloatingMessage('All cleared!');
     });
     
     // Pause button

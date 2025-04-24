@@ -14,7 +14,7 @@ const {
     Vertices
 } = Matter;
 
-// Global variables
+// Global variables for the physics engine
 let currentMode = 'playground';
 let lastMousePos = { x: 0, y: 0 };
 let windForce = 0;
@@ -78,6 +78,13 @@ let ground, leftWall, rightWall, ceiling, basePlatform;
 // Gravity zone variables
 let gravityZones = [];
 let gravityZoneMode = false;
+
+// Track glowing elements
+const glowElements = {
+    portals: [],
+    attractors: [],
+    shapes: []
+};
 
 // Wait for DOM to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', function() {
@@ -371,9 +378,6 @@ function setupEventListeners() {
     // Shape buttons (these should toggle as a group)
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     
-    // Buttons that toggle modes (these should show active state when enabled)
-    const toggleButtons = ['toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion', 'add-portal', 'add-gravity-zone'];
-    
     // Function to clear active state from specific button groups
     function clearActiveState(buttonGroup) {
         buttonGroup.forEach(id => {
@@ -406,9 +410,8 @@ function setupEventListeners() {
         });
     });
 
-
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(event) {
-        
         if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
         
         switch(event.key.toLowerCase()) {
@@ -446,25 +449,135 @@ function setupEventListeners() {
                 document.getElementById('add-text').click();
                 break;
             case 'escape':
-                // deactivate all shape buttons when pressing Escape
-                document.querySelectorAll('.shape-button').forEach(btn => {
-                    btn.classList.remove('active');
-                });
+                // Deactivate all buttons when pressing Escape
+                clearActiveState(allActionButtons);
+                // Reset all modes
+                attractorMode = false;
+                explosionMode = false;
+                gravityZoneMode = false;
+                portalMode = false;
+                
+                // Reset button texts
+                document.getElementById('add-attractor').textContent = 'Add Attractor';
+                document.getElementById('create-explosion').textContent = 'Explosion';
                 break;
         }
     });
 
-    // explosion button
+    // Mode toggle buttons
+    
+    // Wind toggle
+    document.getElementById('toggle-wind').addEventListener('click', function() {
+        // Clear other active buttons only if this one is becoming active
+        if (!windEnabled) {
+            clearActiveState(shapeButtons);
+        }
+        
+        windEnabled = !windEnabled;
+        this.textContent = windEnabled ? 'Disable Wind' : 'Toggle Wind';
+        
+        // Toggle active class based on state
+        this.classList.toggle('active', windEnabled);
+    });
+
+    // Collision effects
+    document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
+        if (!collisionEffectsEnabled) {
+            collisionEffectsEnabled = true;
+        } else {
+            collisionEffectType = (collisionEffectType + 1) % 5;
+        }
+        
+        const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
+        this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
+        showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
+        
+        // Set active class based on whether effects are enabled
+        this.classList.toggle('active', collisionEffectsEnabled);
+    });
+
+    // Attractor mode
+    document.getElementById('add-attractor').addEventListener('click', function() {
+        // Clear active state from other buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'add-attractor'));
+        
+        // Toggle attractor mode
+        attractorMode = !attractorMode;
+        this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
+        
+        // Update active class to match state
+        this.classList.toggle('active', attractorMode);
+        
+        // Show info modal for attractor mode
+        if (attractorMode) {
+            document.getElementById('info-modal').style.display = 'flex';
+        }
+        
+        // Turn off other modes
+        gravityZoneMode = false;
+        explosionMode = false;
+        portalMode = false;
+    });
+    
+    // Modal close button
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        document.getElementById('info-modal').style.display = 'none';
+    });
+
+    // Gravity zone button
+    document.getElementById('add-gravity-zone').addEventListener('click', function() {
+        // Clear other active buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'add-gravity-zone'));
+        
+        // Toggle gravity zone mode
+        gravityZoneMode = !gravityZoneMode;
+        this.classList.toggle('active', gravityZoneMode);
+        
+        // Reset other modes
+        attractorMode = false;
+        explosionMode = false;
+        portalMode = false;
+        
+        if (gravityZoneMode) {
+            showFloatingMessage('Click to place a gravity zone');
+        }
+    });
+
+    // Portal button
+    document.getElementById('add-portal').addEventListener('click', function() {
+        // Clear other active buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
+        
+        // Toggle portal mode
+        portalMode = !portalMode;
+        this.classList.toggle('active', portalMode);
+        
+        // Reset other modes
+        attractorMode = false;
+        gravityZoneMode = false;
+        explosionMode = false;
+        
+        if (portalMode) {
+            showFloatingMessage('Click to place portal pairs. First click creates entrance, second creates exit.');
+        }
+    });
+
+    // Explosion button
     document.getElementById('create-explosion').addEventListener('click', function() {
         // Clear other active buttons
         clearActiveState(allActionButtons.filter(id => id !== 'create-explosion'));
         
-        // toggle explosion mode
+        // Toggle explosion mode
         explosionMode = !explosionMode;
-        this.textContent = explosionMode ? 'Disable Explosion' : 'Enable Explosion';
+        this.textContent = explosionMode ? 'Cancel Explosion' : 'Explosion';
         this.classList.toggle('active', explosionMode);
         
-        // show message about current state
+        // Reset other modes
+        attractorMode = false;
+        gravityZoneMode = false;
+        portalMode = false;
+        
+        // Show message about current state
         showFloatingMessage(explosionMode ? 'Explosion mode enabled - click anywhere to create explosions' : 'Explosion mode disabled');
     });
     
@@ -477,12 +590,12 @@ function setupEventListeners() {
         this.classList.toggle('active', isPaused);
     });
     
-    // clear button
+    // Clear button
     document.getElementById('clear').addEventListener('click', function() {
         // Clear all non-static bodies
         clearNonStaticBodies();
         
-        // clear all attractors
+        // Clear all attractors
         while (attractors.length > 0) {
             removeAttractor(attractors[0]);
         }
@@ -490,10 +603,13 @@ function setupEventListeners() {
         // Reset modes
         attractorMode = false;
         explosionMode = false;
+        gravityZoneMode = false;
+        portalMode = false;
         
-        // Reset button states
+        // Reset button texts
         document.getElementById('add-attractor').textContent = 'Add Attractor';
-        document.getElementById('create-explosion').textContent = 'Enable Explosion';
+        document.getElementById('create-explosion').textContent = 'Explosion';
+        document.getElementById('toggle-wind').textContent = 'Toggle Wind';
         
         // Deactivate all buttons
         clearActiveState(allActionButtons);
@@ -501,50 +617,32 @@ function setupEventListeners() {
         showFloatingMessage('All cleared!');
     });
 
-    // Escape key to clear active buttons
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            clearActiveState(allActionButtons);
-            
-            // Also reset modes
-            attractorMode = false;
-            explosionMode = false;
-            gravityZoneMode = false;
-            portalMode = false;
-            
-            // Reset button texts
-            document.getElementById('add-attractor').textContent = 'Add Attractor';
-            document.getElementById('create-explosion').textContent = 'Enable Explosion';
-        }
+    // Theme selector
+    document.getElementById('theme-select').addEventListener('change', function() {
+        setTheme(this.value);
     });
 
-    // gravity control
+    // Sliders
     document.getElementById('gravity-slider').addEventListener('input', function() {
         engine.world.gravity.y = parseFloat(this.value);
     });
 
-    // Wind strength control
     document.getElementById('wind-slider').addEventListener('input', function() {
         windStrength = parseFloat(this.value);
     });
 
-    // Bounciness control
     document.getElementById('bounce-slider').addEventListener('input', function() {
         defaultBounciness = parseFloat(this.value);
     });
 
-    // Time speed control
     document.getElementById('time-slider').addEventListener('input', function() {
         timeScale = parseFloat(this.value);
-        
-        // Apply time scale to the engine
         engine.timing.timeScale = timeScale;
         
         // Show visual feedback
         const speedText = timeScale < 1 ? 'Slow Motion' : 
-                         timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
+                          timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
         showFloatingMessage(`Time: ${speedText} (${timeScale.toFixed(1)}x)`);
-        
         
         if (timeScale < 0.5) {
             document.body.classList.add('slow-motion');
@@ -553,21 +651,28 @@ function setupEventListeners() {
         }
     });
 
+    // Save and load buttons
+    document.getElementById('save-state').addEventListener('click', function() {
+        savePlaygroundState();
+    });
     
+    document.getElementById('load-state').addEventListener('click', function() {
+        loadPlaygroundState();
+    });
+
+    // Window resize handler
     window.addEventListener('resize', debounce(function() {
-       
         render.options.width = window.innerWidth;
         render.options.height = window.innerHeight;
         render.canvas.width = window.innerWidth;
         render.canvas.height = window.innerHeight;
         
-        
+        // Adjust boundaries to match new window size
         Body.setPosition(ground, { x: window.innerWidth / 2, y: window.innerHeight });
         Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
         Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
         Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
         Body.setPosition(basePlatform, { x: window.innerWidth / 2, y: window.innerHeight - 100 });
-        
         
         Body.setVertices(basePlatform, Bodies.rectangle(
             window.innerWidth / 2,
@@ -577,112 +682,8 @@ function setupEventListeners() {
             { chamfer: { radius: 10 } }
         ).vertices);
     }, 250));
-
-    document.getElementById('toggle-wind').addEventListener('click', function() {
-        windEnabled = !windEnabled;
-        this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
-        
-        // Toggle active class to match state
-        this.classList.toggle('active', windEnabled);
-    });
-
-    document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
-        if (!collisionEffectsEnabled) {
-            
-            collisionEffectsEnabled = true;
-        } else {
-            
-            collisionEffectType = (collisionEffectType + 1) % 5;
-        }
-        
-        
-        const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
-        this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
-        showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
-        
-        // Set active class based on whether effects are enabled
-        this.classList.toggle('active', collisionEffectsEnabled);
-    });
-
-    document.getElementById('add-attractor').addEventListener('click', function() {
-        // Clear active state from shape buttons when enabling attractor mode
-        if (!attractorMode) {
-            clearActiveState(shapeButtons);
-        }
-        
-        // toggle attractor mode
-        attractorMode = !attractorMode;
-        this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
-        
-        // Update active class to match state
-        this.classList.toggle('active', attractorMode);
-        
-        // show info modal for attractor mode
-        if (attractorMode) {
-            document.getElementById('info-modal').style.display = 'flex';
-        }
-    });
-    
-    // event listener for the modal close button
-    document.querySelector('.close-modal').addEventListener('click', function() {
-        document.getElementById('info-modal').style.display = 'none';
-    });
-
-    // gravity zone button
-    document.getElementById('add-gravity-zone').addEventListener('click', function() {
-        // Clear other active buttons
-        clearActiveState(allActionButtons.filter(id => id !== 'add-gravity-zone'));
-        
-        // Toggle gravity zone mode
-        gravityZoneMode = !gravityZoneMode;
-        this.classList.toggle('active', gravityZoneMode);
-        
-        // Reset other modes
-        attractorMode = false;
-        document.getElementById('add-attractor').textContent = 'Add Attractor';
-        
-        if (gravityZoneMode) {
-            showFloatingMessage('Click to place a gravity zone');
-        }
-    });
-
-    // portal button
-    document.getElementById('add-portal').addEventListener('click', function() {
-        // Clear other active buttons
-        clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
-        
-        // Toggle portal mode
-        portalMode = !portalMode;
-        this.classList.toggle('active', portalMode);
-        
-        if (portalMode) {
-            setActiveMode('portal');
-            setCurrentMode('portal');
-        } else {
-            setCurrentMode('normal');
-        }
-    });
-
-
-    document.getElementById('physics-canvas').addEventListener('click', function(event) {
-        if (event.button !== 0) return; // only handle left clicks
-        
-        if (portalMode) {
-            handlePortalPlacement(event);
-        } else if (attractorMode) {
-            createAttractor(event.clientX, event.clientY);
-        } else if (gravityZoneMode) {
-            createGravityZone(event.clientX, event.clientY);
-        } else if (explosionMode) {
-            createExplosion(event.clientX, event.clientY);
-        } else {
-            // Normal physics object creation mode
-            createPhysicsObject(event.clientX, event.clientY);
-        }
-    });
 }
 
-// setup collision events
 function setupCollisionEvents() {
     Events.on(engine, 'collisionStart', function(event) {
         if (!collisionEffectsEnabled) return;
@@ -799,12 +800,16 @@ function setupUpdateLoop() {
                 Composite.remove(engine.world, particle);
             });
         }
+        
+        // Update all glow effects
+        updateGlowEffects();
     });
 }
 
 // SHAPE CREATION FUNCTIONS
 function addCircle() {
     const radius = 20 + Math.random() * 30;
+    const color = getRandomColorFromTheme();
     const circle = Bodies.circle(
         lastMousePos.x,
         lastMousePos.y,
@@ -814,7 +819,7 @@ function addCircle() {
             friction: 0.1,
             frictionAir: 0.001,
             render: {
-                fillStyle: getRandomColorFromTheme(),
+                fillStyle: color,
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
                 lineWidth: 1
             }
@@ -824,6 +829,10 @@ function addCircle() {
     circle.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
     
     Composite.add(engine.world, circle);
+    
+    // Create subtle glow effect for the shape
+    createGlowEffect('shape', {x: lastMousePos.x, y: lastMousePos.y}, radius, color);
+    
     return circle;
 }
 
@@ -1003,7 +1012,9 @@ function createAttractor(x, y) {
     // reference the DOM element
     attractor.element = element;
     
-    // return the attractor
+    // Create glow effect for the attractor
+    createGlowEffect('attractor', {x, y}, radius, null);
+    
     return attractor;
 }
 
@@ -1344,7 +1355,7 @@ function createGlowParticle(position, size, color) {
     particle.style.height = (size * 2) + 'px';
     particle.style.background = 'transparent';
     particle.style.borderRadius = '50%';
-    particle.style.boxShadow = `0 0 ${size*2}px ${color || '#fff'}, 0 0 ${size}px #fff`;
+    particle.style.boxShadow = `0 0 ${size*2}px ${size}px ${color || '#fff'}`;
     particle.style.transform = 'translate(-50%, -50%)';
     particle.style.zIndex = '5';
     particle.style.pointerEvents = 'none';
@@ -1384,7 +1395,7 @@ function createGlowParticle(position, size, color) {
         particle.style.opacity = opacity;
         particle.style.width = (currentSize * 2) + 'px';
         particle.style.height = (currentSize * 2) + 'px';
-        particle.style.boxShadow = `0 0 ${currentSize*2}px ${color || '#fff'}, 0 0 ${currentSize}px #fff`;
+        particle.style.boxShadow = `0 0 ${currentSize*2}px ${currentSize}px ${color || '#fff'}`;
         
         if (opacity > 0) {
             requestAnimationFrame(animateParticle);
@@ -1408,9 +1419,9 @@ function createRippleEffect(position, size, color) {
     ripple.style.borderRadius = '50%';
     ripple.style.border = `2px solid ${color || '#fff'}`;
     ripple.style.transform = 'translate(-50%, -50%)';
-    ripple.style.zIndex = '5';
+    ripple.style.zIndex = '9';
     ripple.style.pointerEvents = 'none';
-    ripple.style.transition = 'opacity 0.15s ease';
+    ripple.style.opacity = '0';
     document.body.appendChild(ripple);
     
     // Use frame time tracking for consistent animation
@@ -2118,7 +2129,7 @@ function initMobileSupport() {
         if (!document.querySelector('meta[name="viewport"]')) {
             const meta = document.createElement('meta');
             meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable
             document.head.appendChild(meta);
         }
         
@@ -2135,18 +2146,19 @@ function initMobileSupport() {
         });
         
         // handle mobile pinch-zoom
+     ```javascript
+        let lastDistance =```javascript
         let lastDistance = 0;
         canvas.addEventListener('touchmove', function(e) {
             e.preventDefault(); // Prevent scrolling while interacting with canvas
             
             if (e.touches.length >= 2) {
-                // handle pinch zoom (can be used```javascript
                 // handle pinch zoom (can be used for future features)
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 
                 const distance = Math.hypot(
-                    touch1.clientX - touch2.clientX,
+                    touch1.clientX -touch2.clientX,
                     touch1.clientY - touch2.clientY
                 );
                 
@@ -2242,7 +2254,10 @@ function handlePortalPlacement(event) {
     
     // Create entrance (odd index) or exit (even index) portal
     const isEntrance = portals.length % 2 === 0;
-    createPortal(x, y, isEntrance);
+    const portal = createPortal(x, y, isEntrance);
+    
+    // Create glow effect for the portal
+    createGlowEffect('portal', {x, y}, portal.radius, isEntrance ? 'entrance' : 'exit');
 }
 
 function renderPortals(context) {
@@ -2327,4 +2342,163 @@ function checkPortalTeleportation() {
         });
     }
 }
-```
+
+// Create a glow effect for an element
+function createGlowEffect(element, type) {
+    // Create a DOM element for the glow
+    const glowElement = document.createElement('div');
+    glowElement.className = `glow-effect ${type}-glow`;
+    document.body.appendChild(glowElement);
+    
+    // Set initial styles based on type
+    let color;
+    switch(type) {
+        case 'portal':
+            color = element.pairId % 2 === 0 ? '#00aaff' : '#ff00aa';
+            break;
+        case 'attractor':
+            color = element.isRepeller ? '#ff4444' : '#44ff44';
+            break;
+        case 'shape':
+            // Different colors for different shapes
+            const hue = (element.id * 137) % 360; // Golden ratio to distribute colors
+            color = `hsl(${hue}, 70%, 60%)`;
+            break;
+    }
+    
+    // Set basic styles
+    Object.assign(glowElement.style, {
+        position: 'absolute',
+        borderRadius: '50%',
+        pointerEvents: 'none',
+        background: `radial-gradient(circle, ${color}55 0%, ${color}00 70%)`,
+        transform: 'translate(-50%, -50%)',
+        zIndex: '-1',
+        filter: 'blur(8px)'
+    });
+    
+    // Create glow tracking object with random phase for varied animation
+    const glowTracker = {
+        element: glowElement,
+        sourceElement: element,
+        updated: true,
+        pulsePhase: Math.random() * Math.PI * 2 // Random starting phase
+    };
+    
+    // Add to the appropriate collection
+    if (type === 'portal') {
+        glowElements.portals.push(glowTracker);
+    } else if (type === 'attractor') {
+        glowElements.attractors.push(glowTracker);
+    } else if (type === 'shape') {
+        glowElements.shapes.push(glowTracker);
+    }
+    
+    return glowTracker;
+}
+
+// Update glow positions and animations
+function updateGlowEffects() {
+    const currentTime = performance.now() / 1000;
+    
+    // Update portal glows
+    glowElements.portals.forEach((glow, index) => {
+        // Check if the portal still exists
+        if (!glow.sourceElement || !glow.updated) {
+            // Remove the glow effect if the portal was removed
+            document.body.removeChild(glow.element);
+            glowElements.portals.splice(index, 1);
+            return;
+        }
+        
+        // Update position to match the portal
+        const x = glow.sourceElement.position.x;
+        const y = glow.sourceElement.position.y;
+        
+        // Apply pulse effect
+        const pulseScale = 1 + 0.15 * Math.sin(currentTime * 2 + glow.pulsePhase);
+        const size = glow.sourceElement.circleRadius * 2.5 * pulseScale;
+        
+        // Update the DOM element
+        glow.element.style.left = `${x}px`;
+        glow.element.style.top = `${y}px`;
+        glow.element.style.width = `${size}px`;
+        glow.element.style.height = `${size}px`;
+        
+        // Reset the updated flag for the next frame
+        glow.updated = false;
+    });
+    
+    // Update attractor glows
+    glowElements.attractors.forEach((glow, index) => {
+        if (!glow.sourceElement || !glow.updated) {
+            document.body.removeChild(glow.element);
+            glowElements.attractors.splice(index, 1);
+            return;
+        }
+        
+        const x = glow.sourceElement.position.x;
+        const y = glow.sourceElement.position.y;
+        
+        // Apply pulse effect for attractors
+        const pulseScale = 1 + 0.2 * Math.sin(currentTime * 3 + glow.pulsePhase);
+        const size = 80 * pulseScale;
+        
+        glow.element.style.left = `${x}px`;
+        glow.element.style.top = `${y}px`;
+        glow.element.style.width = `${size}px`;
+        glow.element.style.height = `${size}px`;
+        
+        glow.updated = false;
+    });
+    
+    // Update shape glows
+    glowElements.shapes.forEach((glow, index) => {
+        if (!glow.sourceElement || !glow.updated) {
+            document.body.removeChild(glow.element);
+            glowElements.shapes.splice(index, 1);
+            return;
+        }
+        
+        // For shapes, we need to compute the center of the bounds
+        const bounds = glow.sourceElement.bounds;
+        const x = (bounds.max.x + bounds.min.x) / 2;
+        const y = (bounds.max.y + bounds.min.y) / 2;
+        
+        // Calculate the size based on the bounds
+        const baseSize = Math.max(
+            bounds.max.x - bounds.min.x,
+            bounds.max.y - bounds.min.y
+        ) * 1.3;
+        
+        // Apply subtle pulse effect for shapes
+        const pulseScale = 1 + 0.1 * Math.sin(currentTime * 1.5 + glow.pulsePhase);
+        const size = baseSize * pulseScale;
+        
+        glow.element.style.left = `${x}px`;
+        glow.element.style.top = `${y}px`;
+        glow.element.style.width = `${size}px`;
+        glow.element.style.height = `${size}px`;
+        
+        glow.updated = false;
+    });
+}
+
+// Remove any glow effects that weren't updated
+function cleanupGlowEffects() {
+    ['portal', 'attractor', 'shape'].forEach(type => {
+        const collection = glowElements[`${type}s`];
+        
+        for (let i = collection.length - 1; i >= 0; i--) {
+            if (!collection[i].updated) {
+                // Remove the HTML element
+                if (collection[i].element && collection[i].element.parentNode) {
+                    collection[i].element.parentNode.removeChild(collection[i].element);
+                }
+                
+                // Remove from collection
+                collection.splice(i, 1);
+            }
+        }
+    });
+}

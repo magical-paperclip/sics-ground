@@ -354,6 +354,7 @@ function createBoundaries() {
             chamfer: { radius: 10 }, 
             label: 'basePlatform'
         }
+    );
 
     Composite.add(engine.world, [ground, leftWall, rightWall, ceiling, basePlatform]);
 }
@@ -622,7 +623,7 @@ function setupEventListeners() {
     });
 
 
-    document.getElementById('canvas').addEventListener('click', function(event) {
+    document.getElementById('physics-canvas').addEventListener('click', function(event) {
         if (event.button !== 0) return; // only handle left clicks
         
         if (portalMode) {
@@ -2137,7 +2138,7 @@ function initMobileSupport() {
 
 // Show visual indicator for touch
 function showTouchIndicator(x, y) {
-    const indicator = document.createElement('div');
+    const indicator = documentElement('div');
     indicator.style.position = 'absolute';
     indicator.style.width = '40px';
     indicator.style.height = '40px';
@@ -2200,7 +2201,7 @@ function createPortal(x, y, isEntrance) {
 function handlePortalPlacement(event) {
     if (!portalMode) return;
     
-    const canvas = document.getElementById('canvas');
+    const canvas = document.getElementById('physics-canvas');
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -2209,7 +2210,6 @@ function handlePortalPlacement(event) {
     const isEntrance = portals.length % 2 === 0;
     createPortal(x, y, isEntrance);
 }
-
 
 function renderPortals(context) {
     portals.forEach(portal => {
@@ -2265,11 +2265,9 @@ function checkPortalTeleportation() {
         bodies.forEach(body => {
             if (body.isStatic) return;
             
-            const bodyPos = body.position;
-            const distance = Math.sqrt(
-                Math.pow(bodyPos.x - entrancePortal.x, 2) + 
-                Math.pow(bodyPos.y - entrancePortal.y, 2)
-            );
+            const dx = body.position.x - entrancePortal.x;
+            const dy = body.position.y - entrancePortal.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance < entrancePortal.radius + body.circleRadius) {
                
@@ -2293,325 +2291,5 @@ function checkPortalTeleportation() {
                 createExplosion(exitPortal.x, exitPortal.y, 10, exitPortal.color, 3);
             }
         });
-    }
-}
-
-
-function handlePortalPlacement(event) {
-    const x = event.clientX;
-    const y = event.clientY;
-    
-    // if we have no portals or a complete pair, start a new pair
-    if (portals.length === 0 || portals.length === 2) {
-        // clear existing portals if we have a complete pair
-        if (portals.length === 2) {
-            removePortals();
-        }
-        
-        // create the first portal of a new pair
-        createPortal(x, y, 'entrance');
-        showFloatingMessage('Entrance portal created. Click to place exit portal.');
-    } else {
-        // create the second portal to complete the pair
-        createPortal(x, y, 'exit');
-        showFloatingMessage('Portal pair complete! Objects will teleport between portals.');
-        
-        // turn off portal mode after placing a complete pair
-        portalMode = false;
-        document.getElementById('add-portal').classList.remove('active');
-    }
-}
-
-function createPortal(x, y, type) {
-    const radius = 40;
-    const color = type === 'entrance' ? '#3498db' : '#e74c3c'; // Blue for entrance, red for exit
-    
-    
-    const portal = {
-        position: { x, y },
-        radius: radius,
-        type: type,
-        element: null,
-        cooldown: false
-    };
-    
-    const element = document.createElement('div');
-    element.className = 'portal ' + type;
-    element.style.position = 'absolute';
-    element.style.width = (radius * 2) + 'px';
-    element.style.height = (radius * 2) + 'px';
-    element.style.left = (x - radius) + 'px';
-    element.style.top = (y - radius) + 'px';
-    element.style.borderRadius = '50%';
-    element.style.background = `radial-gradient(circle, ${color} 0%, rgba(255,255,255,0.8) 30%, rgba(255,255,255,0) 70%)`;
-    element.style.boxShadow = `0 0 15px ${color}`;
-    element.style.zIndex = '1';
-    element.style.pointerEvents = 'none';
-    document.body.appendChild(element);
-    
-
-    element.style.animation = 'pulse 2s infinite';
-    
-
-    portal.element = element;
-    
-    portals.push(portal);
-    
-    return portal;
-}
-
-function removePortals() {
-    
-    portals.forEach(portal => {
-        if (portal.element && portal.element.parentNode) {
-            portal.element.parentNode.removeChild(portal.element);
-        }
-    });
-    
-   
-    portals = [];
-}
-
-function checkPortalTeleportation() {
-    // skip if no complete portal pair
-    if (portals.length !== 2) return;
-    
-    // get entrance and exit portals
-    const entrance = portals.find(p => p.type === 'entrance');
-    const exit = portals.find(p => p.type === 'exit');
-    
-    // skip if either portal is on cooldown
-    if (entrance.cooldown || exit.cooldown) return;
-    
-    // check all bodies
-    const bodies = Composite.allBodies(engine.world);
-    bodies.forEach(body => {
-      
-        if (body.isStatic) return;
-        
-        // distance to entrance portal
-        const dx = body.position.x - entrance.position.x;
-        const dy = body.position.y - entrance.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // if body is close to entrance portal, teleport to exit
-        if (distance < entrance.radius) {
-            
-            teleportBody(body, entrance, exit);
-        }
-    });
-}
-
-function teleportBody(body, fromPortal, toPortal) {
-    // set cooldown to prevent immediate teleport back
-    fromPortal.cooldown = true;
-    toPortal.cooldown = true;
-    
-    // store original velocity + angular velocity
-    const originalVelocity = { x: body.velocity.x, y: body.velocity.y };
-    const originalAngularVelocity = body.angularVelocity;
-    
-    // create teleport visual effect
-    createTeleportEffect(fromPortal.position, toPortal.position);
-    
-    // move the body to destination portal
-    Body.setPosition(body, toPortal.position);
-    
-    // maintain velocity direction relative to portal orientation
-    // find the angle between portals
-    const portalAngle = Math.atan2(
-        toPortal.position.y - fromPortal.position.y,
-        toPortal.position.x - fromPortal.position.x
-    );
-    
-    // adjust velocity to maintain momentum through the portal
-    Body.setVelocity(body, {
-        x: originalVelocity.x * 1.05, // increase speed slightly
-        y: originalVelocity.y * 1.05
-    });
-    
-    // maintain angular velocity
-    Body.setAngularVelocity(body, originalAngularVelocity);
-    
-    // reset cooldowns after a delay
-    setTimeout(() => {
-        fromPortal.cooldown = false;
-        toPortal.cooldown = false;
-    }, 500); // 500ms cooldown
-}
-
-function createTeleportEffect(fromPos, toPos) {
-    // create particles at from and to positions
-    for (let i = 0; i < 20; i++) {
-        // from portal particles
-        const fromParticle = document.createElement('div');
-        fromParticle.className = 'teleport-particle';
-        fromParticle.style.position = 'absolute';
-        fromParticle.style.width = '8px';
-        fromParticle.style.height = '8px';
-        fromParticle.style.borderRadius = '50%';
-        fromParticle.style.backgroundColor = '#3498db';
-        fromParticle.style.left = fromPos.x + 'px';
-        fromParticle.style.top = fromPos.y + 'px';
-        fromParticle.style.transform = 'translate(-50%, -50%)';
-        fromParticle.style.pointerEvents = 'none';
-        document.body.appendChild(fromParticle);
-        
-        // to portal particles
-        const toParticle = document.createElement('div');
-        toParticle.className = 'teleport-particle';
-        toParticle.style.position = 'absolute';
-        toParticle.style.width = '8px';
-        toParticle.style.height = '8px';
-        toParticle.style.borderRadius = '50%';
-        toParticle.style.backgroundColor = '#e74c3c';
-        toParticle.style.left = toPos.x + 'px';
-        toParticle.style.top = toPos.y + 'px';
-        toParticle.style.transform = 'translate(-50%, -50%)';
-        toParticle.style.pointerEvents = 'none';
-        document.body.appendChild(toParticle);
-        
-        // animate particles
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 40;
-        const duration = 300 + Math.random() * 500;
-        
-        // from portal animation
-        animateParticle(fromParticle, angle, distance, duration);
-        
-        // to portal animation
-        animateParticle(toParticle, angle, distance, duration);
-    }
-}
-
-function animateParticle(particle, angle, distance, duration) {
-    const startX = parseInt(particle.style.left);
-    const startY = parseInt(particle.style.top);
-    const targetX = startX + Math.cos(angle) * distance;
-    const targetY = startY + Math.sin(angle) * distance;
-    
-    let startTime = null;
-    
-    function animate(timestamp) {
-        if (!startTime) startTime = timestamp;
-        const progress = (timestamp - startTime) / duration;
-        
-        if (progress < 1) {
-            const x = startX + (targetX - startX) * progress;
-            const y = startY + (targetY - startY) * progress;
-            const scale = 1 - progress;
-            const opacity = 1 - progress;
-            
-            particle.style.left = x + 'px';
-            particle.style.top = y + 'px';
-            particle.style.transform = `translate(-50%, -50%) scale(${scale})`;
-            particle.style.opacity = opacity;
-            
-            requestAnimationFrame(animate);
-        } else {
-            particle.remove();
-        }
-    }
-    
-    requestAnimationFrame(animate);
-}
-
-function renderPortals(context) {
-    portals.forEach(portal => {
-        // skip if the portal doesn't exist
-        if (!portal || !portal.position) return;
-        
-        // draw portal glow effect
-        const gradient = context.createRadialGradient(
-            portal.position.x, portal.position.y, portal.radius * 0.3,
-            portal.position.x, portal.position.y, portal.radius * 1.2
-        );
-        
-        const color = portal.type === 'entrance' ? '#3498db' : '#e74c3c';
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(0.5, color.replace(')', ', 0.5)').replace('rgb', 'rgba'));
-        gradient.addColorStop(1, color.replace(')', ', 0)').replace('rgb', 'rgba'));
-        
-        context.beginPath();
-        context.arc(portal.position.x, portal.position.y, portal.radius * 1.2, 0, Math.PI * 2);
-        context.fillStyle = gradient;
-        context.fill();
-        
-        // draw portal inner circle
-        context.beginPath();
-        context.arc(portal.position.x, portal.position.y, portal.radius * 0.8, 0, Math.PI * 2);
-        context.lineWidth = 3;
-        context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-        context.stroke();
-        
-        // draw swirl effect (changes over time)
-        const time = Date.now() / 1000;
-        const swirlAngle = time % (Math.PI * 2);
-        
-        context.save();
-        context.translate(portal.position.x, portal.position.y);
-        context.rotate(swirlAngle);
-        
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            context.beginPath();
-            context.moveTo(0, 0);
-            context.lineTo(Math.cos(angle) * portal.radius * 0.7, Math.sin(angle) * portal.radius * 0.7);
-            context.lineWidth = 2;
-            context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            context.stroke();
-        }
-        
-        context.restore();
-    });
-}
-
-// helper to determine if on a mobile device
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-}
-
-// set active mode (buttons  portal, attractor, etc.)
-function setActiveMode(mode) {
-    // disable other modes
-    portalMode = false;
-    attractorMode = false;
-    gravityZoneMode = false;
-    explosionMode = false;
-    
-    // set requested mode
-    switch(mode) {
-        case 'portal':
-            portalMode = true;
-            break;
-        case 'attractor':
-            attractorMode = true;
-            break;
-        case 'gravity-zone':
-            gravityZoneMode = true;
-            break;
-        case 'explosion':
-            explosionMode = true;
-            break;
-    }
-    
-    // update button states 
-    document.querySelectorAll('.controls button').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // acctivate current mode butotn
-    if (mode === 'portal') document.getElementById('add-portal').classList.add('active');
-    if (mode === 'attractor') document.getElementById('add-attractor').classList.add('active');
-    if (mode === 'gravity-zone') document.getElementById('add-gravity-zone').classList.add('active');
-    if (mode === 'explosion') document.getElementById('create-explosion').classList.add('active');
-}
-
-// set current mode (used by event listeners)
-function setCurrentMode(mode) {
-    currentMode = mode;
-    
-    if (mode === 'portal') {
-        showFloatingMessage('Portal mode active - click to place entrance and exit portals');
     }
 }

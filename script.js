@@ -2146,9 +2146,8 @@ function initMobileSupport() {
         });
         
         // handle mobile pinch-zoom
-     ```javascript
-        let lastDistance =```javascript
         let lastDistance = 0;
+       ```javascript
         canvas.addEventListener('touchmove', function(e) {
             e.preventDefault(); // Prevent scrolling while interacting with canvas
             
@@ -2399,106 +2398,134 @@ function createGlowEffect(element, type) {
 
 // Update glow positions and animations
 function updateGlowEffects() {
-    const currentTime = performance.now() / 1000;
+    const timestamp = Date.now() / 1000; // Current time in seconds for animation
     
-    // Update portal glows
-    glowElements.portals.forEach((glow, index) => {
-        // Check if the portal still exists
-        if (!glow.sourceElement || !glow.updated) {
-            // Remove the glow effect if the portal was removed
-            document.body.removeChild(glow.element);
-            glowElements.portals.splice(index, 1);
-            return;
+    // Update portal glow effects
+    for (let i = 0; i < glowElements.portals.length; i++) {
+        const glowObj = glowElements.portals[i];
+        if (!glowObj.updated) {
+            // Remove glow for deleted elements
+            glowObj.element.remove();
+            glowElements.portals.splice(i, 1);
+            i--;
+            continue;
         }
         
-        // Update position to match the portal
-        const x = glow.sourceElement.position.x;
-        const y = glow.sourceElement.position.y;
+        const portal = glowObj.sourceElement;
+        const position = portal.position;
         
-        // Apply pulse effect
-        const pulseScale = 1 + 0.15 * Math.sin(currentTime * 2 + glow.pulsePhase);
-        const size = glow.sourceElement.circleRadius * 2.5 * pulseScale;
+        // Position the glow
+        glowObj.element.style.left = `${position.x}px`;
+        glowObj.element.style.top = `${position.y}px`;
         
-        // Update the DOM element
-        glow.element.style.left = `${x}px`;
-        glow.element.style.top = `${y}px`;
-        glow.element.style.width = `${size}px`;
-        glow.element.style.height = `${size}px`;
+        // Pulse animation (size and opacity)
+        const pulseRate = 1.5; // Pulses per second
+        const pulseAmount = 0.2; // Amount of size variation
+        const pulseFactor = 1 + pulseAmount * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
         
-        // Reset the updated flag for the next frame
-        glow.updated = false;
-    });
+        const baseSize = portal.radius * 2.5;
+        const size = baseSize * pulseFactor;
+        
+        glowObj.element.style.width = `${size}px`;
+        glowObj.element.style.height = `${size}px`;
+        glowObj.element.style.opacity = 0.7 + 0.3 * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
+        
+        // Reset updated flag for next frame
+        glowObj.updated = false;
+    }
     
-    // Update attractor glows
-    glowElements.attractors.forEach((glow, index) => {
-        if (!glow.sourceElement || !glow.updated) {
-            document.body.removeChild(glow.element);
-            glowElements.attractors.splice(index, 1);
-            return;
+    // Update attractor glow effects
+    for (let i = 0; i < glowElements.attractors.length; i++) {
+        const glowObj = glowElements.attractors[i];
+        if (!glowObj.updated) {
+            glowObj.element.remove();
+            glowElements.attractors.splice(i, 1);
+            i--;
+            continue;
         }
         
-        const x = glow.sourceElement.position.x;
-        const y = glow.sourceElement.position.y;
+        const attractor = glowObj.sourceElement;
+        const position = attractor.position;
         
-        // Apply pulse effect for attractors
-        const pulseScale = 1 + 0.2 * Math.sin(currentTime * 3 + glow.pulsePhase);
-        const size = 80 * pulseScale;
+        // Position the glow
+        glowObj.element.style.left = `${position.x}px`;
+        glowObj.element.style.top = `${position.y}px`;
         
-        glow.element.style.left = `${x}px`;
-        glow.element.style.top = `${y}px`;
-        glow.element.style.width = `${size}px`;
-        glow.element.style.height = `${size}px`;
+        // Pulse animation with different frequency for attractors
+        const pulseRate = attractor.isRepeller ? 2.0 : 1.0; // Different rates for repellers vs attractors
+        const pulseAmount = 0.3;
+        const pulseFactor = 1 + pulseAmount * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
         
-        glow.updated = false;
-    });
+        // Size based on strength of attractor
+        const strengthFactor = Math.min(Math.abs(attractor.strength) / 0.001, 5); // Scale based on strength
+        const baseSize = 150 * strengthFactor;
+        const size = baseSize * pulseFactor;
+        
+        glowObj.element.style.width = `${size}px`;
+        glowObj.element.style.height = `${size}px`;
+        glowObj.element.style.opacity = 0.6 + 0.4 * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
+        
+        glowObj.updated = false;
+    }
     
-    // Update shape glows
-    glowElements.shapes.forEach((glow, index) => {
-        if (!glow.sourceElement || !glow.updated) {
-            document.body.removeChild(glow.element);
-            glowElements.shapes.splice(index, 1);
-            return;
+    // Update shape glow effects
+    for (let i = 0; i < glowElements.shapes.length; i++) {
+        const glowObj = glowElements.shapes[i];
+        if (!glowObj.updated) {
+            glowObj.element.remove();
+            glowElements.shapes.splice(i, 1);
+            i--;
+            continue;
         }
         
-        // For shapes, we need to compute the center of the bounds
-        const bounds = glow.sourceElement.bounds;
-        const x = (bounds.max.x + bounds.min.x) / 2;
-        const y = (bounds.max.y + bounds.min.y) / 2;
+        const shape = glowObj.sourceElement;
+        const position = shape.position;
         
-        // Calculate the size based on the bounds
-        const baseSize = Math.max(
-            bounds.max.x - bounds.min.x,
-            bounds.max.y - bounds.min.y
-        ) * 1.3;
+        // Position the glow
+        glowObj.element.style.left = `${position.x}px`;
+        glowObj.element.style.top = `${position.y}px`;
         
-        // Apply subtle pulse effect for shapes
-        const pulseScale = 1 + 0.1 * Math.sin(currentTime * 1.5 + glow.pulsePhase);
-        const size = baseSize * pulseScale;
+        // Pulse animation
+        const pulseRate = 0.8; // Slower pulse for shapes
+        const pulseAmount = 0.15;
+        const pulseFactor = 1 + pulseAmount * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
         
-        glow.element.style.left = `${x}px`;
-        glow.element.style.top = `${y}px`;
-        glow.element.style.width = `${size}px`;
-        glow.element.style.height = `${size}px`;
+        // Size based on shape area
+        let size;
+        if (shape.circleRadius) {
+            // For circles
+            size = shape.circleRadius * 2.2 * pulseFactor;
+        } else if (shape.vertices) {
+            // For polygons (estimate size from vertices)
+            const bounds = getBoundsFromVertices(shape.vertices);
+            const maxDimension = Math.max(bounds.width, bounds.height);
+            size = maxDimension * 1.5 * pulseFactor;
+        } else {
+            // Default fallback
+            size = 50 * pulseFactor;
+        }
         
-        glow.updated = false;
-    });
+        glowObj.element.style.width = `${size}px`;
+        glowObj.element.style.height = `${size}px`;
+        glowObj.element.style.opacity = 0.5 + 0.3 * Math.sin(timestamp * pulseRate * Math.PI * 2 + glowObj.pulsePhase);
+        
+        glowObj.updated = false;
+    }
 }
 
-// Remove any glow effects that weren't updated
-function cleanupGlowEffects() {
-    ['portal', 'attractor', 'shape'].forEach(type => {
-        const collection = glowElements[`${type}s`];
-        
-        for (let i = collection.length - 1; i >= 0; i--) {
-            if (!collection[i].updated) {
-                // Remove the HTML element
-                if (collection[i].element && collection[i].element.parentNode) {
-                    collection[i].element.parentNode.removeChild(collection[i].element);
-                }
-                
-                // Remove from collection
-                collection.splice(i, 1);
-            }
-        }
-    });
+// Helper function to get bounds from vertices
+function getBoundsFromVertices(vertices) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    for (const vertex of vertices) {
+        minX = Math.min(minX, vertex.x);
+        minY = Math.min(minY, vertex.y);
+        maxX = Math.max(maxX, vertex.x);
+        maxY = Math.max(maxY, vertex.y);
+    }
+    
+    return {
+        width: maxX - minX,
+        height: maxY - minY
+    };
 }

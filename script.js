@@ -266,16 +266,15 @@ function setupMouseControl() {
     });
 }
 
-// Track mouse position continuously
 document.addEventListener('mousemove', function(event) {
     lastMousePos = { x: event.clientX, y: event.clientY };
 });
 
-// Create boundaries (ground, walls, ceiling) and base platform
+
 function createBoundaries() {
     const wallThickness = 50;
     
-    // Create the invisible boundary walls
+  
     ground = Bodies.rectangle(
         window.innerWidth / 2, 
         window.innerHeight, 
@@ -336,9 +335,9 @@ function createBoundaries() {
         }
     );
 
-    // Create a visible base platform that objects will rest on
+
     const platformHeight = 20;
-    const platformY = window.innerHeight - 100; // Position 100px from bottom
+    const platformY = window.innerHeight - 100; // position 100px from bottom
     
     basePlatform = Bodies.rectangle(
         window.innerWidth / 2,
@@ -352,48 +351,46 @@ function createBoundaries() {
                 strokeStyle: 'rgba(255, 255, 255, 0.6)',
                 lineWidth: 2
             },
-            chamfer: { radius: 10 }, // Rounded corners
+            chamfer: { radius: 10 }, 
             label: 'basePlatform'
         }
-    );
 
-    // Add all static bodies to the world
     Composite.add(engine.world, [ground, leftWall, rightWall, ceiling, basePlatform]);
 }
 
-// Set up all event listeners
+
 function setupEventListeners() {
-    // Set up our shape button listeners to toggle active state
+   
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     
     shapeButtons.forEach(buttonId => {
         const button = document.getElementById(buttonId);
-        // Add shape-button class to all shape buttons
+
         button.classList.add('shape-button');
         
         button.addEventListener('click', () => {
-            // If already active, deactivate it
+
             if (button.classList.contains('active')) {
                 button.classList.remove('active');
                 return;
             }
             
-            // Deactivate all other shape buttons
+
             shapeButtons.forEach(id => {
                 document.getElementById(id).classList.remove('active');
             });
             
-            // Activate this button
+
             button.classList.add('active');
             
-            // Show message about what to do
+            
             showFloatingMessage(`Now click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
         });
     });
 
-    // Add keyboard shortcuts
+
     document.addEventListener('keydown', function(event) {
-        // Only respond to keyboard shortcuts if not typing in an input field
+        
         if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
         
         switch(event.key.toLowerCase()) {
@@ -536,7 +533,7 @@ function setupEventListeners() {
                          timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
         showFloatingMessage(`Time: ${speedText} (${timeScale.toFixed(1)}x)`);
         
-        // Visual effect for slow motion
+        
         if (timeScale < 0.5) {
             document.body.classList.add('slow-motion');
         } else {
@@ -544,22 +541,22 @@ function setupEventListeners() {
         }
     });
 
-    // Handle window resize
+    
     window.addEventListener('resize', debounce(function() {
-        // Update canvas size
+       
         render.options.width = window.innerWidth;
         render.options.height = window.innerHeight;
         render.canvas.width = window.innerWidth;
         render.canvas.height = window.innerHeight;
         
-        // Update wall positions
+        
         Body.setPosition(ground, { x: window.innerWidth / 2, y: window.innerHeight });
         Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
         Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
         Body.setPosition(ceiling, { x: window.innerWidth / 2, y: 0 });
         Body.setPosition(basePlatform, { x: window.innerWidth / 2, y: window.innerHeight - 100 });
         
-        // Also update the width of the base platform to match screen size
+        
         Body.setVertices(basePlatform, Bodies.rectangle(
             window.innerWidth / 2,
             window.innerHeight - 100,
@@ -576,42 +573,42 @@ function setupEventListeners() {
 
     document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
         if (!collisionEffectsEnabled) {
-            // If effects were off, turn them on with current type
+            
             collisionEffectsEnabled = true;
         } else {
-            // Cycle through effect types
+            
             collisionEffectType = (collisionEffectType + 1) % 5;
         }
         
-        // Show what effect is active now
+        
         const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
         this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
         showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
     });
 
     document.getElementById('add-attractor').addEventListener('click', function() {
-        // Toggle attractor mode
+        // toggle atractor mode
         attractorMode = !attractorMode;
         this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
         
-        // Show info modal for attractor mode
+        // show info modal for attractor mode
         if (attractorMode) {
             document.getElementById('info-modal').style.display = 'flex';
         }
     });
     
-    // Add event listener for the modal close button
+    // event listener for the modal close button
     document.querySelector('.close-modal').addEventListener('click', function() {
         document.getElementById('info-modal').style.display = 'none';
     });
 
-    // Add gravity zone button
+    // gravity zone button
     document.getElementById('add-gravity-zone').addEventListener('click', function() {
         setActiveMode('gravity-zone');
         showFloatingMessage('Click to place a gravity zone');
     });
 
-    // Portal button
+    // portal button
     document.getElementById('add-portal').addEventListener('click', function() {
         portalMode = !portalMode;
         this.classList.toggle('active');
@@ -624,9 +621,9 @@ function setupEventListeners() {
         }
     });
 
-    // Handle clicks based on current mode
+
     document.getElementById('canvas').addEventListener('click', function(event) {
-        if (event.button !== 0) return; // Only handle left clicks
+        if (event.button !== 0) return; // only handle left clicks
         
         if (portalMode) {
             handlePortalPlacement(event);
@@ -1720,156 +1717,198 @@ function showFloatingMessage(text) {
     }, 1500);
 }
 
-// Function to create an explosion effect at a given position
+
 function createExplosion(position, radius = 200, strength = 0.05) {
-    // Ensure we have a valid position
-    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
-        position = lastMousePos; // Fallback to last known mouse position
+
+    const pos = {
+        x: typeof position === 'object' && position.x !== undefined ? position.x : position,
+        y: typeof position === 'object' && position.y !== undefined ? position.y : arguments[1]
+    };
+
+   
+    if (typeof position !== 'object') {
+        radius = arguments[2] || 200;
+        strength = arguments[3] || 0.05;
     }
 
-    // Visual effect with improved animation
+   
     const explosion = document.createElement('div');
     explosion.className = 'explosion';
     explosion.style.position = 'absolute';
-    explosion.style.left = position.x + 'px';
-    explosion.style.top = position.y + 'px';
-    explosion.style.width = radius * 2 + 'px';
-    explosion.style.height = radius * 2 + 'px';
-    explosion.style.transform = 'translate(-50%, -50%) scale(0)';
+    explosion.style.left = pos.x + 'px';
+    explosion.style.top = pos.y + 'px';
+    explosion.style.width = '0';
+    explosion.style.height = '0';
+    explosion.style.transform = 'translate(-50%, -50%)';
     explosion.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,200,100,0.5) 40%, rgba(255,100,50,0) 70%)';
     explosion.style.borderRadius = '50%';
     explosion.style.zIndex = '10';
     explosion.style.pointerEvents = 'none';
+    explosion.style.opacity = '0';
     document.body.appendChild(explosion);
     
-    // Additional central glow
+
     const centralGlow = document.createElement('div');
     centralGlow.style.position = 'absolute';
-    centralGlow.style.left = position.x + 'px';
-    centralGlow.style.top = position.y + 'px';
-    centralGlow.style.width = radius * 0.5 + 'px';
-    centralGlow.style.height = radius * 0.5 + 'px';
+    centralGlow.style.left = pos.x + 'px';
+    centralGlow.style.top = pos.y + 'px';
+    centralGlow.style.width = '0';
+    centralGlow.style.height = '0';
     centralGlow.style.background = 'rgba(255, 255, 255, 0.8)';
     centralGlow.style.borderRadius = '50%';
-    centralGlow.style.transform = 'translate(-50%, -50%) scale(0)';
+    centralGlow.style.transform = 'translate(-50%, -50%)';
     centralGlow.style.boxShadow = '0 0 30px 10px rgba(255, 220, 150, 0.8)';
     centralGlow.style.zIndex = '11';
     centralGlow.style.pointerEvents = 'none';
+    centralGlow.style.opacity = '0';
     document.body.appendChild(centralGlow);
     
-    // Use requestAnimationFrame for smoother animation
-    requestAnimationFrame(() => {
-        // Animate central glow
-        centralGlow.style.transition = 'transform 0.2s ease-out, opacity 0.4s ease-out';
-        centralGlow.style.transform = 'translate(-50%, -50%) scale(1)';
-        centralGlow.style.opacity = '1';
+
+    let startTime;
+    const duration = 600; 
+    
+    function animate(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / duration, 1);
         
-        // Animate main explosion with slight delay
-        setTimeout(() => {
-            explosion.style.transition = 'transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.6s ease-out';
-            explosion.style.transform = 'translate(-50%, -50%) scale(1)';
-            explosion.style.opacity = '1';
-        }, 50);
+
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const currentSize = radius * 2 * easeOutQuart;
+        const centralSize = radius * 0.5 * easeOutQuart;
         
-        // Fade out
-        setTimeout(() => {
-            centralGlow.style.opacity = '0';
-            centralGlow.style.transform = 'translate(-50%, -50%) scale(0.1)';
-            explosion.style.opacity = '0';
-        }, 300);
+
+        const opacityProgress = progress < 0.3 ? progress / 0.3 : 1 - ((progress - 0.3) / 0.7);
+        const opacity = Math.max(0, Math.min(1, opacityProgress));
         
-        // Clean up
-        setTimeout(() => {
-            centralGlow.remove();
+
+        explosion.style.width = currentSize + 'px';
+        explosion.style.height = currentSize + 'px';
+        explosion.style.opacity = opacity * 0.8;
+        
+        centralGlow.style.width = centralSize + 'px';
+        centralGlow.style.height = centralSize + 'px';
+        centralGlow.style.opacity = opacity;
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Clean up
             explosion.remove();
-        }, 800);
-    });
+            centralGlow.remove();
+        }
+    }
+    
+    // Start animation
+    requestAnimationFrame(animate);
+    
+    // Create shock wave ring with better animation
+    const shockwave = document.createElement('div');
+    shockwave.style.position = 'absolute';
+    shockwave.style.left = pos.x + 'px';
+    shockwave.style.top = pos.y + 'px';
+    shockwave.style.width = '0';
+    shockwave.style.height = '0';
+    shockwave.style.borderRadius = '50%';
+    shockwave.style.border = '4px solid rgba(255, 255, 255, 0.8)';
+    shockwave.style.transform = 'translate(-50%, -50%)';
+    shockwave.style.zIndex = '9';
+    shockwave.style.pointerEvents = 'none';
+    shockwave.style.opacity = '0';
+    document.body.appendChild(shockwave);
+    
+    // Animate shockwave separately
+    let shockwaveStart;
+    const shockwaveDuration = 500; // ms
+    
+    function animateShockwave(timestamp) {
+        if (!shockwaveStart) shockwaveStart = timestamp;
+        const elapsed = timestamp - shockwaveStart;
+        const progress = Math.min(elapsed / shockwaveDuration, 1);
+        
+        // Custom easing for smoother wave
+        const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+        const size = radius * 2 * easeOutCubic;
+        const opacity = Math.max(0, 1 - easeOutCubic);
+        const borderWidth = 4 - (3 * easeOutCubic);
+        
+        shockwave.style.width = size + 'px';
+        shockwave.style.height = size + 'px';
+        shockwave.style.opacity = opacity;
+        shockwave.style.borderWidth = borderWidth + 'px';
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateShockwave);
+        } else {
+            shockwave.remove();
+        }
+    }
+    
+    requestAnimationFrame(animateShockwave);
     
     // Apply forces to nearby bodies with improved physics
     const bodies = Composite.allBodies(engine.world);
     
-    bodies.forEach(body => {
-        if (body.isStatic) return;
-        
-        const dx = body.position.x - position.x;
-        const dy = body.position.y - position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < radius) {
-            // Calculate force with smoother falloff
-            const forceFactor = 1 - Math.pow(distance / radius, 2); // Quadratic falloff
-            const forceMagnitude = strength * forceFactor * body.mass;
-            const angle = Math.atan2(dy, dx);
+    // Stagger force application to reduce glitches
+    setTimeout(() => {
+        bodies.forEach(body => {
+            if (body.isStatic) return;
             
-            // Apply force with dampened vertical component for more natural explosions
-            Body.applyForce(body, body.position, {
-                x: Math.cos(angle) * forceMagnitude,
-                y: Math.sin(angle) * forceMagnitude * 0.8 // Reduced vertical force
-            });
+            const dx = body.position.x - pos.x;
+            const dy = body.position.y - pos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
             
-            // Add rotation for more natural movement
-            Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.05);
-            
-            // Create explosion particles with more variety
-            const sparkCount = Math.floor(3 + Math.random() * 5);
-            for (let i = 0; i < sparkCount; i++) {
-                createCollisionParticle(
-                    { 
-                        x: body.position.x + (Math.random() - 0.5) * 20, 
-                        y: body.position.y + (Math.random() - 0.5) * 20 
-                    },
-                    5 + Math.random() * 8,
-                    getRandomColorFromTheme()
+            if (distance < radius) {
+                // Calculate force with smoother falloff (cubic instead of linear)
+                const normalizedDistance = distance / radius;
+                const forceFactor = 1 - (normalizedDistance * normalizedDistance * normalizedDistance);
+                
+                // Apply force based on distance from center (stronger near center)
+                const forceMagnitude = strength * forceFactor * body.mass;
+                
+                // Calculate direction with slight randomization to reduce uniform movement
+                const angle = Math.atan2(dy, dx);
+                const randomVariation = (Math.random() * 0.1) - 0.05; // ±5% variation
+                
+                // Apply force with dampened vertical component for more natural explosions
+                Body.applyForce(body, body.position, {
+                    x: Math.cos(angle + randomVariation) * forceMagnitude,
+                    y: Math.sin(angle + randomVariation) * forceMagnitude * 0.85 // Slightly reduced vertical force
+                });
+                
+                // Apply rotation based on distance from center (more natural)
+                const rotationFactor = (1 - normalizedDistance) * 0.02;
+                Body.setAngularVelocity(
+                    body, 
+                    body.angularVelocity + (Math.random() * 2 - 1) * rotationFactor
                 );
             }
-        }
-    });
+        });
+    }, 10); // Small delay helps sync visual and physical effects
     
-    // Create additional explosion particles with more variety and patterns
-    const particleCount = isMobile() ? 20 : 40; // Fewer particles on mobile for performance
+    // Create explosion particles with staggered timing
+    const particleCount = isMobile() ? 15 : 30; // Fewer particles on mobile for performance
+    
     for (let i = 0; i < particleCount; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * radius * 0.7;
-        const delay = Math.random() * 200; // Staggered particle creation
-        
+        // Stagger particle creation for smoother effect
         setTimeout(() => {
-            createCollisionParticle(
-                { 
-                    x: position.x + Math.cos(angle) * distance, 
-                    y: position.y + Math.sin(angle) * distance 
-                },
-                4 + Math.random() * 8,
-                getRandomColorFromTheme()
-            );
-        }, delay);
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * radius * 0.6;
+            
+            // Use different patterns based on particle index
+            const particlePosition = {
+                x: pos.x + Math.cos(angle) * distance * (i % 3 === 0 ? 0.5 : 1),
+                y: pos.y + Math.sin(angle) * distance * (i % 3 === 0 ? 0.5 : 1)
+            };
+            
+            // Vary particle size
+            const particleSize = 4 + Math.random() * (i % 3 === 0 ? 8 : 4);
+            
+            // Create particle with varied appearance
+            const effectType = i % 5; // Use different effect types for variety
+            createCollisionParticle(particlePosition, particleSize, getRandomColorFromTheme());
+        }, i * (isMobile() ? 40 : 20)); // Staggered timing based on device
     }
-    
-    // Create shock wave ring
-    const shockwave = document.createElement('div');
-    shockwave.style.position = 'absolute';
-    shockwave.style.left = position.x + 'px';
-    shockwave.style.top = position.y + 'px';
-    shockwave.style.width = '10px';
-    shockwave.style.height = '10px';
-    shockwave.style.borderRadius = '50%';
-    shockwave.style.border = '4px solid rgba(255, 255, 255, 0.8)';
-    shockwave.style.transform = 'translate(-50%, -50%) scale(0)';
-    shockwave.style.zIndex = '9';
-    shockwave.style.pointerEvents = 'none';
-    document.body.appendChild(shockwave);
-    
-    // Animate shockwave
-    requestAnimationFrame(() => {
-        shockwave.style.transition = 'all 0.6s cubic-bezier(0.1, 0.8, 0.3, 1)';
-        shockwave.style.transform = `translate(-50%, -50%) scale(${radius/10})`;
-        shockwave.style.opacity = '0';
-        shockwave.style.borderWidth = '1px';
-        
-        // Clean up
-        setTimeout(() => {
-            shockwave.remove();
-        }, 600);
-    });
 }
 
 // Function to create a text object that behaves as a physics body
@@ -2026,22 +2065,22 @@ function hideCursorEffectDelayed() {
     }, 1000);
 }
 
-// Helper to detect mobile devices
+// helper to determine if on a mobile device
 function isMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
 }
 
-// Initialize touch handling for mobile
+// initialize touch handling for mobile
 function initMobileSupport() {
-    // Add special handling for mobile devices
+    // add special handling for mobile devices
     if (isMobile()) {
-        // Make buttons larger on mobile
+        // make buttons larger on mobile
         document.querySelectorAll('.buttons button').forEach(button => {
             button.style.padding = '12px 16px';
             button.style.fontSize = '16px';
         });
         
-        // Add viewport meta tag if not present (should already be there)
+        // add viewport meta tag if not present (should already be there)
         if (!document.querySelector('meta[name="viewport"]')) {
             const meta = document.createElement('meta');
             meta.name = 'viewport';
@@ -2049,25 +2088,25 @@ function initMobileSupport() {
             document.head.appendChild(meta);
         }
         
-        // Better touch handling for the canvas
+        // better touch handling for the canvas
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
                 lastMousePos.x = touch.clientX;
                 lastMousePos.y = touch.clientY;
                 
-                // Show the user where they touched
+                // show the user where they touched
                 showTouchIndicator(touch.clientX, touch.clientY);
             }
         });
         
-        // Handle mobile pinch-zoom
+        // handle mobile pinch-zoom
         let lastDistance = 0;
         canvas.addEventListener('touchmove', function(e) {
             e.preventDefault(); // Prevent scrolling while interacting with canvas
             
             if (e.touches.length >= 2) {
-                // Handle pinch zoom (can be used for future features)
+                // handle pinch zoom (can be used for future features)
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 
@@ -2083,8 +2122,8 @@ function initMobileSupport() {
                 
                 lastDistance = distance;
             } else if (e.touches.length === 1) {
-                // Update for single touch
-                const touch = e.touches[0];
+                // update for single touch
+                const touch =e.touches[0];
                 lastMousePos.x = touch.clientX;
                 lastMousePos.y = touch.clientY;
             }
@@ -2171,16 +2210,16 @@ function handlePortalPlacement(event) {
     createPortal(x, y, isEntrance);
 }
 
-// Render portals
+
 function renderPortals(context) {
     portals.forEach(portal => {
-        // Draw main portal circle
+        
         context.beginPath();
         context.arc(portal.x, portal.y, portal.radius, 0, Math.PI * 2);
         context.fillStyle = portal.color;
         context.fill();
         
-        // Draw swirl effect inside portal
+       
         context.beginPath();
         const time = Date.now() * 0.005;
         for (let i = 0; i < 3; i++) {
@@ -2199,20 +2238,20 @@ function renderPortals(context) {
         context.fillStyle = portal.isEntrance ? '#1e6fb8' : '#b83232';
         context.fill();
         
-        // Generate portal particles
+        
         portal.particleTimer += 1;
         if (portal.particleTimer > 5) {
             portal.particleTimer = 0;
-            // Particle effect code could be added here
+           
         }
     });
 }
 
-// Check if any bodies need to teleport through portals
+
 function checkPortalTeleportation() {
     if (portals.length < 2) return;
     
-    // Check each portal pair
+
     for (let i = 0; i < portals.length; i += 2) {
         if (i + 1 >= portals.length) continue;
         
@@ -2221,7 +2260,7 @@ function checkPortalTeleportation() {
         
         if (!entrancePortal || !exitPortal) continue;
         
-        // Check all bodies for portal collision
+   
         const bodies = Composite.allBodies(engine.world);
         bodies.forEach(body => {
             if (body.isStatic) return;
@@ -2233,51 +2272,51 @@ function checkPortalTeleportation() {
             );
             
             if (distance < entrancePortal.radius + body.circleRadius) {
-                // Calculate velocity vector for preserving momentum
+               
                 const velX = body.velocity.x;
                 const velY = body.velocity.y;
                 const speed = Math.sqrt(velX * velX + velY * velY);
                 
-                // Teleport body to exit portal
+                
                 Body.setPosition(body, {
                     x: exitPortal.x,
                     y: exitPortal.y
                 });
                 
-                // Apply a small outward force
+                
                 Body.setVelocity(body, {
                     x: velX * 1.1,
                     y: velY * 1.1
                 });
                 
-                // Add visual effect
+                
                 createExplosion(exitPortal.x, exitPortal.y, 10, exitPortal.color, 3);
             }
         });
     }
 }
 
-// Portal System Implementation
+
 function handlePortalPlacement(event) {
     const x = event.clientX;
     const y = event.clientY;
     
-    // If we have no portals or a complete pair, start a new pair
+    // if we have no portals or a complete pair, start a new pair
     if (portals.length === 0 || portals.length === 2) {
-        // Clear existing portals if we have a complete pair
+        // clear existing portals if we have a complete pair
         if (portals.length === 2) {
             removePortals();
         }
         
-        // Create the first portal of a new pair
+        // create the first portal of a new pair
         createPortal(x, y, 'entrance');
         showFloatingMessage('Entrance portal created. Click to place exit portal.');
     } else {
-        // Create the second portal to complete the pair
+        // create the second portal to complete the pair
         createPortal(x, y, 'exit');
         showFloatingMessage('Portal pair complete! Objects will teleport between portals.');
         
-        // Turn off portal mode after placing a complete pair
+        // turn off portal mode after placing a complete pair
         portalMode = false;
         document.getElementById('add-portal').classList.remove('active');
     }
@@ -2287,7 +2326,7 @@ function createPortal(x, y, type) {
     const radius = 40;
     const color = type === 'entrance' ? '#3498db' : '#e74c3c'; // Blue for entrance, red for exit
     
-    // Create portal object
+    
     const portal = {
         position: { x, y },
         radius: radius,
@@ -2296,7 +2335,6 @@ function createPortal(x, y, type) {
         cooldown: false
     };
     
-    // Create visual element
     const element = document.createElement('div');
     element.className = 'portal ' + type;
     element.style.position = 'absolute';
@@ -2311,92 +2349,91 @@ function createPortal(x, y, type) {
     element.style.pointerEvents = 'none';
     document.body.appendChild(element);
     
-    // Add animation
+
     element.style.animation = 'pulse 2s infinite';
     
-    // Store element reference
+
     portal.element = element;
     
-    // Add to portals array
     portals.push(portal);
     
     return portal;
 }
 
 function removePortals() {
-    // Remove portal elements from the DOM
+    
     portals.forEach(portal => {
         if (portal.element && portal.element.parentNode) {
             portal.element.parentNode.removeChild(portal.element);
         }
     });
     
-    // Clear the portals array
+   
     portals = [];
 }
 
 function checkPortalTeleportation() {
-    // Skip if we don't have a complete portal pair
+    // skip if no complete portal pair
     if (portals.length !== 2) return;
     
-    // Get entrance and exit portals
+    // get entrance and exit portals
     const entrance = portals.find(p => p.type === 'entrance');
     const exit = portals.find(p => p.type === 'exit');
     
-    // Skip if either portal is on cooldown
+    // skip if either portal is on cooldown
     if (entrance.cooldown || exit.cooldown) return;
     
-    // Check all bodies
+    // check all bodies
     const bodies = Composite.allBodies(engine.world);
     bodies.forEach(body => {
-        // Skip static bodies
+      
         if (body.isStatic) return;
         
-        // Calculate distance to entrance portal
+        // distance to entrance portal
         const dx = body.position.x - entrance.position.x;
         const dy = body.position.y - entrance.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // If body is close to entrance portal, teleport it to exit
+        // if body is close to entrance portal, teleport to exit
         if (distance < entrance.radius) {
-            // Teleport the body
+            
             teleportBody(body, entrance, exit);
         }
     });
 }
 
 function teleportBody(body, fromPortal, toPortal) {
-    // Set cooldown to prevent immediate teleport back
+    // set cooldown to prevent immediate teleport back
     fromPortal.cooldown = true;
     toPortal.cooldown = true;
     
-    // Store original velocity and angular velocity
+    // store original velocity + angular velocity
     const originalVelocity = { x: body.velocity.x, y: body.velocity.y };
     const originalAngularVelocity = body.angularVelocity;
     
-    // Create teleport visual effect
+    // create teleport visual effect
     createTeleportEffect(fromPortal.position, toPortal.position);
     
-    // Move the body to the destination portal
+    // move the body to destination portal
     Body.setPosition(body, toPortal.position);
     
-    // Maintain velocity direction relative to portal orientation
-    // Calculate angle between portals
+    // maintain velocity direction relative to portal orientation
+    // find the angle between portals
     const portalAngle = Math.atan2(
         toPortal.position.y - fromPortal.position.y,
         toPortal.position.x - fromPortal.position.x
     );
     
-    // Adjust velocity to maintain momentum through the portal
+    // adjust velocity to maintain momentum through the portal
     Body.setVelocity(body, {
-        x: originalVelocity.x * 1.05, // Slight speed boost for fun
+        x: originalVelocity.x * 1.05, // increase speed slightly
         y: originalVelocity.y * 1.05
     });
     
-    // Maintain angular velocity
+    // maintain angular velocity
     Body.setAngularVelocity(body, originalAngularVelocity);
     
-    // Reset cooldowns after a delay
+    // reset cooldowns after a delay
     setTimeout(() => {
         fromPortal.cooldown = false;
         toPortal.cooldown = false;
@@ -2404,9 +2441,9 @@ function teleportBody(body, fromPortal, toPortal) {
 }
 
 function createTeleportEffect(fromPos, toPos) {
-    // Create particles at both from and to positions
+    // create particles at from and to positions
     for (let i = 0; i < 20; i++) {
-        // From portal particles
+        // from portal particles
         const fromParticle = document.createElement('div');
         fromParticle.className = 'teleport-particle';
         fromParticle.style.position = 'absolute';
@@ -2420,7 +2457,7 @@ function createTeleportEffect(fromPos, toPos) {
         fromParticle.style.pointerEvents = 'none';
         document.body.appendChild(fromParticle);
         
-        // To portal particles
+        // to portal particles
         const toParticle = document.createElement('div');
         toParticle.className = 'teleport-particle';
         toParticle.style.position = 'absolute';
@@ -2434,15 +2471,15 @@ function createTeleportEffect(fromPos, toPos) {
         toParticle.style.pointerEvents = 'none';
         document.body.appendChild(toParticle);
         
-        // Animate particles
+        // animate particles
         const angle = Math.random() * Math.PI * 2;
         const distance = Math.random() * 40;
         const duration = 300 + Math.random() * 500;
         
-        // From portal animation
+        // from portal animation
         animateParticle(fromParticle, angle, distance, duration);
         
-        // To portal animation
+        // to portal animation
         animateParticle(toParticle, angle, distance, duration);
     }
 }
@@ -2481,10 +2518,10 @@ function animateParticle(particle, angle, distance, duration) {
 
 function renderPortals(context) {
     portals.forEach(portal => {
-        // Skip if the portal doesn't exist
+        // skip if the portal doesn't exist
         if (!portal || !portal.position) return;
         
-        // Draw portal glow effect
+        // draw portal glow effect
         const gradient = context.createRadialGradient(
             portal.position.x, portal.position.y, portal.radius * 0.3,
             portal.position.x, portal.position.y, portal.radius * 1.2
@@ -2500,14 +2537,14 @@ function renderPortals(context) {
         context.fillStyle = gradient;
         context.fill();
         
-        // Draw portal inner circle
+        // draw portal inner circle
         context.beginPath();
         context.arc(portal.position.x, portal.position.y, portal.radius * 0.8, 0, Math.PI * 2);
         context.lineWidth = 3;
         context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
         context.stroke();
         
-        // Draw swirl effect (changes over time)
+        // draw swirl effect (changes over time)
         const time = Date.now() / 1000;
         const swirlAngle = time % (Math.PI * 2);
         
@@ -2529,20 +2566,20 @@ function renderPortals(context) {
     });
 }
 
-// Helper to determine if we're on a mobile device
+// helper to determine if on a mobile device
 function isMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
 }
 
-// Set active mode (for buttons like portal, attractor, etc.)
+// set active mode (buttons  portal, attractor, etc.)
 function setActiveMode(mode) {
-    // Disable all other modes
+    // disable other modes
     portalMode = false;
     attractorMode = false;
     gravityZoneMode = false;
     explosionMode = false;
     
-    // Set the requested mode
+    // set requested mode
     switch(mode) {
         case 'portal':
             portalMode = true;
@@ -2558,19 +2595,19 @@ function setActiveMode(mode) {
             break;
     }
     
-    // Update button states
+    // update button states 
     document.querySelectorAll('.controls button').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Activate the current mode button
+    // acctivate current mode butotn
     if (mode === 'portal') document.getElementById('add-portal').classList.add('active');
     if (mode === 'attractor') document.getElementById('add-attractor').classList.add('active');
     if (mode === 'gravity-zone') document.getElementById('add-gravity-zone').classList.add('active');
     if (mode === 'explosion') document.getElementById('create-explosion').classList.add('active');
 }
 
-// Set current mode (used by the event listeners)
+// set current mode (used by event listeners)
 function setCurrentMode(mode) {
     currentMode = mode;
     

@@ -144,20 +144,20 @@ function initPhysics() {
     Runner.run(runner, engine);
     Render.run(render);
 
-    // Set up mouse control
+    // set up mouse control
     setupMouseControl();
     
-    // Create boundaries
+
     createBoundaries();
     
-    // Set up collision event handling
+
     setupCollisionEvents();
     
-    // Set up update loop
+ 
     setupUpdateLoop();
 }
 
-// Set up mouse control
+
 function setupMouseControl() {
     // set up mouse control wit bettr feel
     mouse = Mouse.create(render.canvas);
@@ -179,7 +179,7 @@ function setupMouseControl() {
         }
     });
 
-    // lite up what we're draggin
+    // light up the dragged body
     Events.on(mouseConstraint, 'startdrag', function(event) {
         draggedBody = event.body;
         if (draggedBody) {
@@ -197,32 +197,31 @@ function setupMouseControl() {
         }
     });
 
-    // Add mouse constraint to the world
+    // add mouse constraint to the world
     Composite.add(engine.world, mouseConstraint);
 
-    // Ensure mouse events aren't interpreted by the browser
+    // ensure mouse events aren't interperted by the browser
     render.canvas.addEventListener('mousewheel', function(event) {
         event.preventDefault();
     });
     
-    // Listen for clicks on the canvas to place objects or attractors
+    // listen for clicks on the canvas to place objects or attractors
     canvas.addEventListener('click', function(event) {
-        // Update mouse position
+        // update mouse position
         lastMousePos.x = event.clientX;
         lastMousePos.y = event.clientY;
         
         if (attractorMode) {
             createAttractor(event.clientX, event.clientY);
         } else if (explosionMode) {
-            // Create explosion at click point when explosion mode is enabled
+            // create explosion at click point when explosion mode is enabled
             createExplosion({x: event.clientX, y: event.clientY});
         } else if (gravityZoneMode) {
             createGravityZone(event.clientX, event.clientY);
         } else if (portalMode) {
             handlePortalPlacement(event);
         } else {
-            // If we're in normal mode, place the current shape
-            // Check if any of the creation buttons are active
+
             const activeButtonId = document.querySelector('.shape-button.active')?.id;
             
             if (activeButtonId) {
@@ -246,10 +245,10 @@ function setupMouseControl() {
             }
         }
         
-        // Double-click to remove an attractor
+  
         const currentTime = new Date().getTime();
         if (currentTime - lastClickTime < doubleClickThreshold) {
-            // Look for attractors near the click
+      
             attractors.forEach(attractor => {
                 const distance = Math.sqrt(
                     Math.pow(event.clientX - attractor.position.x, 2) + 
@@ -361,29 +360,47 @@ function createBoundaries() {
 
 
 function setupEventListeners() {
-   
+    // All buttons that need to be tracked for active state
+    const allActionButtons = [
+        'add-circle', 'add-square', 'add-triangle', 'add-star', 
+        'add-sand', 'add-text', 'add-gravity-zone', 'toggle-wind', 
+        'add-attractor', 'toggle-collision-sparks', 'create-explosion',
+        'add-portal', 'toggle-pause', 'clear'
+    ];
+    
+    // Shape buttons (these should toggle as a group)
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     
+    // Buttons that toggle modes (these should show active state when enabled)
+    const toggleButtons = ['toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion', 'add-portal', 'add-gravity-zone'];
+    
+    // Function to clear active state from specific button groups
+    function clearActiveState(buttonGroup) {
+        buttonGroup.forEach(id => {
+            const button = document.getElementById(id);
+            if (button) button.classList.remove('active');
+        });
+    }
+    
+    // Setup shape buttons
     shapeButtons.forEach(buttonId => {
         const button = document.getElementById(buttonId);
-
+        if (!button) return;
+        
         button.classList.add('shape-button');
         
         button.addEventListener('click', () => {
-
+            // If already active, deactivate it
             if (button.classList.contains('active')) {
                 button.classList.remove('active');
                 return;
             }
             
-
-            shapeButtons.forEach(id => {
-                document.getElementById(id).classList.remove('active');
-            });
+            // Clear active state from all buttons that should toggle
+            clearActiveState(allActionButtons);
             
-
+            // Activate this button
             button.classList.add('active');
-            
             
             showFloatingMessage(`Now click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
         });
@@ -429,7 +446,7 @@ function setupEventListeners() {
                 document.getElementById('add-text').click();
                 break;
             case 'escape':
-                // Deactivate all shape buttons when pressing Escape
+                // deactivate all shape buttons when pressing Escape
                 document.querySelectorAll('.shape-button').forEach(btn => {
                     btn.classList.remove('active');
                 });
@@ -437,22 +454,35 @@ function setupEventListeners() {
         }
     });
 
-    // Explosion button
+    // explosion button
     document.getElementById('create-explosion').addEventListener('click', function() {
-        // Toggle explosion mode
+        // Clear other active buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'create-explosion'));
+        
+        // toggle explosion mode
         explosionMode = !explosionMode;
         this.textContent = explosionMode ? 'Disable Explosion' : 'Enable Explosion';
+        this.classList.toggle('active', explosionMode);
         
-        // Show message about current state
+        // show message about current state
         showFloatingMessage(explosionMode ? 'Explosion mode enabled - click anywhere to create explosions' : 'Explosion mode disabled');
     });
     
-    // Clear All button
+    // Pause button
+    document.getElementById('toggle-pause').addEventListener('click', function() {
+        // Toggle pause state
+        togglePause();
+        
+        // Update active class to match state
+        this.classList.toggle('active', isPaused);
+    });
+    
+    // clear button
     document.getElementById('clear').addEventListener('click', function() {
         // Clear all non-static bodies
         clearNonStaticBodies();
         
-        // Clear all attractors
+        // clear all attractors
         while (attractors.length > 0) {
             removeAttractor(attractors[0]);
         }
@@ -465,49 +495,30 @@ function setupEventListeners() {
         document.getElementById('add-attractor').textContent = 'Add Attractor';
         document.getElementById('create-explosion').textContent = 'Enable Explosion';
         
-        // Deactivate all shape buttons
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
+        // Deactivate all buttons
+        clearActiveState(allActionButtons);
         
         showFloatingMessage('All cleared!');
     });
-    
-    // Pause button
-    document.getElementById('toggle-pause').addEventListener('click', togglePause);
 
-    // Handle tab switching
-    document.querySelectorAll('.tab-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            // Toggle active tab button
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            this.classList.add('active');
+    // Escape key to clear active buttons
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            clearActiveState(allActionButtons);
             
-            // Toggle tab content
-            const tabId = this.getAttribute('data-tab');
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(tabId + '-tab').classList.add('active');
-            
-            // Set current mode
-            currentMode = tabId;
-            
-            // Reset attractorMode when switching tabs
+            // Also reset modes
             attractorMode = false;
+            explosionMode = false;
+            gravityZoneMode = false;
+            portalMode = false;
+            
+            // Reset button texts
             document.getElementById('add-attractor').textContent = 'Add Attractor';
-        });
+            document.getElementById('create-explosion').textContent = 'Enable Explosion';
+        }
     });
 
-    // Initialize the theme from select
-    const themeSelect = document.getElementById('theme-select');
-    themeSelect.addEventListener('change', function() {
-        setTheme(this.value);
-    });
-
-    // Gravity control
+    // gravity control
     document.getElementById('gravity-slider').addEventListener('input', function() {
         engine.world.gravity.y = parseFloat(this.value);
     });
@@ -570,6 +581,9 @@ function setupEventListeners() {
     document.getElementById('toggle-wind').addEventListener('click', function() {
         windEnabled = !windEnabled;
         this.textContent = windEnabled ? 'Disable Wind' : 'Enable Wind';
+        
+        // Toggle active class to match state
+        this.classList.toggle('active', windEnabled);
     });
 
     document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
@@ -585,12 +599,23 @@ function setupEventListeners() {
         const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
         this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
         showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
+        
+        // Set active class based on whether effects are enabled
+        this.classList.toggle('active', collisionEffectsEnabled);
     });
 
     document.getElementById('add-attractor').addEventListener('click', function() {
-        // toggle atractor mode
+        // Clear active state from shape buttons when enabling attractor mode
+        if (!attractorMode) {
+            clearActiveState(shapeButtons);
+        }
+        
+        // toggle attractor mode
         attractorMode = !attractorMode;
         this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
+        
+        // Update active class to match state
+        this.classList.toggle('active', attractorMode);
         
         // show info modal for attractor mode
         if (attractorMode) {
@@ -605,14 +630,30 @@ function setupEventListeners() {
 
     // gravity zone button
     document.getElementById('add-gravity-zone').addEventListener('click', function() {
-        setActiveMode('gravity-zone');
-        showFloatingMessage('Click to place a gravity zone');
+        // Clear other active buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'add-gravity-zone'));
+        
+        // Toggle gravity zone mode
+        gravityZoneMode = !gravityZoneMode;
+        this.classList.toggle('active', gravityZoneMode);
+        
+        // Reset other modes
+        attractorMode = false;
+        document.getElementById('add-attractor').textContent = 'Add Attractor';
+        
+        if (gravityZoneMode) {
+            showFloatingMessage('Click to place a gravity zone');
+        }
     });
 
     // portal button
     document.getElementById('add-portal').addEventListener('click', function() {
+        // Clear other active buttons
+        clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
+        
+        // Toggle portal mode
         portalMode = !portalMode;
-        this.classList.toggle('active');
+        this.classList.toggle('active', portalMode);
         
         if (portalMode) {
             setActiveMode('portal');
@@ -641,7 +682,7 @@ function setupEventListeners() {
     });
 }
 
-// Setup collision events
+// setup collision events
 function setupCollisionEvents() {
     Events.on(engine, 'collisionStart', function(event) {
         if (!collisionEffectsEnabled) return;
@@ -651,10 +692,10 @@ function setupCollisionEvents() {
         for (let i = 0; i < pairs.length; i++) {
             const pair = pairs[i];
             
-            // Skip collisions with walls and static objects
+            // skip collisions with walls and static objects
             if (pair.bodyA.isStatic || pair.bodyB.isStatic) continue;
             
-            // Calculate collision velocity magnitude
+            // calculate collision velocity magnitude
             const velA = pair.bodyA.velocity;
             const velB = pair.bodyB.velocity;
             const relativeVelocity = Math.sqrt(
@@ -662,24 +703,24 @@ function setupCollisionEvents() {
                 Math.pow(velA.y - velB.y, 2)
             );
             
-            // Skip low-energy collisions
+            // skip low-energy collisions
             if (relativeVelocity < 3) continue;
             
-            // Calculate collision point
+            // calculate collision point
             const collision = pair.collision;
             const pos = collision.supports[0] || { 
                 x: (pair.bodyA.position.x + pair.bodyB.position.x) / 2,
                 y: (pair.bodyA.position.y + pair.bodyB.position.y) / 2
             };
             
-            // Create visual effect at collision point
+            // create visual effect at collision point
             const sparkCount = Math.min(10, Math.floor(relativeVelocity / 2));
             
-            // Random color from theme
+            // random color from theme
             const sparkColors = boutiqueColors.sparkColors;
             const sparkColor = sparkColors[Math.floor(Math.random() * sparkColors.length)];
             
-            // Create collision particles
+            // create collision particles
             for (let j = 0; j < sparkCount; j++) {
                 createCollisionParticle(pos, relativeVelocity / 2, sparkColor);
             }
@@ -687,14 +728,14 @@ function setupCollisionEvents() {
     });
 }
 
-// Set up the main render/update loop
+// set up the main render/update loop
 function setupUpdateLoop() {
-    // Override the standard render function to add text rendering
+    // override the standard render function to add text rendering
     const originalRender = render.render;
     render.render = function() {
         originalRender.apply(this, arguments);
         
-        // Get the rendering context
+        // get the rendering context
         const context = render.context;
         const bodies = Composite.allBodies(engine.world);
         
@@ -702,34 +743,34 @@ function setupUpdateLoop() {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         
-        // Render text for text objects
+        // render text for text objects
         bodies.forEach(body => {
             if (body.isTextObject) {
-                // Save the current transform
+                // save the current transform
                 context.save();
                 
-                // Translate and rotate to match the body
+                // translate + rotate to match the body
                 context.translate(body.position.x, body.position.y);
                 context.rotate(body.angle);
                 
-                // Draw the text
+                // draw text
                 context.fillStyle = body.fontColor || '#FFFFFF';
                 context.fillText(body.textContent, 0, 0);
                 
-                // Restore the transform
+                // restore the transform
                 context.restore();
             }
         });
         
-        // Render portals
+        // render portals
         renderPortals(context);
     };
 
     Events.on(engine, 'beforeUpdate', function() {
-        // Track current time
+        // track current time
         const now = performance.now();
         
-        // Calculate frame rate
+        // calculate frame rate
         if (lastFrameTime) {
             const fps = 1000 / (now - lastFrameTime);
             frameRateHistory.push(fps);
@@ -737,21 +778,21 @@ function setupUpdateLoop() {
         }
         lastFrameTime = now;
         
-        // Apply wind if enabled
+        // apply wind if enabled
         if (windEnabled) {
             applyWind();
         }
         
-        // Apply attractor forces
+        // apply attractor forces
         applyAttractorForces();
         
-        // Apply gravity zone forces
+        // apply gravity zone forces
         applyGravityZoneForces();
         
-        // Check for portal teleportation
+        // check for portal teleportation
         checkPortalTeleportation();
         
-        // Clean up sand particles if there are too many (performance optimization)
+        // clean up sand particles if there are too many (performance optimization)
         if (sandParticles.length > 500) {
             const toRemove = sandParticles.splice(0, 100);
             toRemove.forEach(particle => {
@@ -905,9 +946,9 @@ function addSandParticle() {
     return particle;
 }
 
-// Add decorative elements
+// add decorative elements
 function addDecorativeElements() {
-    // Create some decorative fixed elements
+    // create some decorative fixed elements
     const decorCount = 5;
     
     for (let i = 0; i < decorCount; i++) {
@@ -929,28 +970,28 @@ function addDecorativeElements() {
     }
 }
 
-// Helper to get random color from current theme
+// helper to get random color from current theme
 function getRandomColorFromTheme() {
     const colors = boutiqueColors.sparkColors;
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// Create and manage attractors
+// create and manage attractors
 function createAttractor(x, y) {
     const strength = 0.1;
     const radius = 100;
     
-    // Create attractor object
+    // create attractor object
     const attractor = {
         position: { x, y },
         strength: strength,
         radius: radius
     };
     
-    // Add to array
+    // add to array :D
     attractors.push(attractor);
     
-    // Create visual element
+    // create visual element
     const element = document.createElement('div');
     element.className = 'attractor';
     element.style.width = (radius * 2) + 'px';
@@ -959,21 +1000,21 @@ function createAttractor(x, y) {
     element.style.top = (y - radius) + 'px';
     document.body.appendChild(element);
     
-    // Reference the DOM element
+    // reference the DOM element
     attractor.element = element;
     
-    // Return the attractor
+    // return the attractor
     return attractor;
 }
 
 function removeAttractor(attractor) {
-    // Remove from array
+    // remove from array
     const index = attractors.indexOf(attractor);
     if (index !== -1) {
         attractors.splice(index, 1);
     }
     
-    // Remove DOM element
+    // remove DOM element
     if (attractor.element && attractor.element.parentNode) {
         attractor.element.parentNode.removeChild(attractor.element);
     }
@@ -984,7 +1025,7 @@ function applyAttractorForces() {
     
     const bodies = Composite.allBodies(engine.world);
     
-    // Apply force from each attractor to each body
+    // apply force from each attractor to each body
     attractors.forEach(attractor => {
         bodies.forEach(body => {
             if (body.isStatic) return;
@@ -1006,12 +1047,12 @@ function applyAttractorForces() {
     });
 }
 
-// Create and manage gravity zones
+// create and manage gravity zones
 function createGravityZone(x, y) {
     const radius = 150;
     const strength = document.getElementById('gravity-slider').value * -0.5; // Inverse of current gravity
     
-    // Create gravity zone object
+    // create gravity zone object
     const gravityZone = {
         position: { x, y },
         strength: strength,
@@ -1019,7 +1060,7 @@ function createGravityZone(x, y) {
         pulsePhase: 0
     };
     
-    // Create visual element
+    // create visual element
     const element = document.createElement('div');
     element.className = 'gravity-zone';
     element.style.width = (radius * 2) + 'px';
@@ -1032,10 +1073,10 @@ function createGravityZone(x, y) {
     element.style.border = `2px dashed ${strength > 0 ? 'rgba(100,150,255,0.3)' : 'rgba(255,100,100,0.3)'}`;
     document.body.appendChild(element);
     
-    // Reference the DOM element
+    // reference the DOM element
     gravityZone.element = element;
     
-    // Add to array
+    // add to array
     gravityZones.push(gravityZone);
     
     showFloatingMessage(strength > 0 ? 'Pull gravity zone added' : 'Push gravity zone added');
@@ -1044,13 +1085,13 @@ function createGravityZone(x, y) {
 }
 
 function removeGravityZone(gravityZone) {
-    // Remove from array
+    // remove from array
     const index = gravityZones.indexOf(gravityZone);
     if (index !== -1) {
         gravityZones.splice(index, 1);
     }
     
-    // Remove DOM element
+    // remove DOM element
     if (gravityZone.element && gravityZone.element.parentNode) {
         gravityZone.element.parentNode.removeChild(gravityZone.element);
     }
@@ -1061,16 +1102,16 @@ function applyGravityZoneForces() {
     
     const bodies = Composite.allBodies(engine.world);
     
-    // Update time for pulse effect
+    // update time for pulse effect
     const time = Date.now() / 1000;
     
-    // Apply force from each gravity zone to each body
+    // apply force from each gravity zone to each body
     gravityZones.forEach(zone => {
-        // Update pulse phase
+        // update pulse phase
         zone.pulsePhase += 0.05;
         if (zone.pulsePhase > Math.PI * 2) zone.pulsePhase -= Math.PI * 2;
         
-        // Pulse effect for visualization
+        // pulse effect for visualization
         const pulse = 1 + Math.sin(zone.pulsePhase) * 0.1;
         zone.element.style.transform = `translate(-50%, -50%) scale(${pulse})`;
         
@@ -1082,7 +1123,7 @@ function applyGravityZoneForces() {
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance < zone.radius) {
-                // Create a localized gravity effect
+                // create a localized gravity effect
                 const forceMagnitude = zone.strength * 0.001 * body.mass;
                 
                 Body.applyForce(body, body.position, {
@@ -1090,7 +1131,7 @@ function applyGravityZoneForces() {
                     y: forceMagnitude
                 });
                 
-                // Also add a slight pull toward center for more interesting effects
+                // also add a slight pull toward center for more interesting effects
                 const centerPull = 0.0001 * zone.strength;
                 Body.applyForce(body, body.position, {
                     x: dx * centerPull,
@@ -1101,9 +1142,9 @@ function applyGravityZoneForces() {
     });
 }
 
-// Create particle for collision effects
+// create particle for collision effects
 function createCollisionParticle(position, size, color) {
-    // Different effect types based on current collisionEffectType
+    // different effect types based on current collisionEffectType
     switch (collisionEffectType) {
         case 0: // Standard circle particles
             createCircleParticle(position, size, color);
@@ -1528,7 +1569,7 @@ function loadPlaygroundState() {
         state.bodies.forEach(bodyData => {
             let body;
             
-            // Create appropriate shape
+
             switch (bodyData.type) {
                 case 'circle':
                     body = Bodies.circle(
@@ -1600,18 +1641,18 @@ function loadPlaygroundState() {
             }
             
             if (body) {
-                // Apply physics properties
+
                 Body.setVelocity(body, bodyData.velocity);
                 Body.setAngularVelocity(body, bodyData.angularVelocity);
                 Body.setAngle(body, bodyData.angle);
                 
-                // Add to world
+             
                 Composite.add(engine.world, body);
             }
         });
     }
     
-    // Create attractors
+    
     if (state.attractors) {
         state.attractors.forEach(attractorData => {
             createAttractor(attractorData.position.x, attractorData.position.y);
@@ -1631,7 +1672,7 @@ function clearNonStaticBodies() {
     sandParticles = [];
 }
 
-// debounce functoin for smoother window resize
+
 function debounce(func, wait) {
     let timeout;
     return function() {
@@ -1642,28 +1683,28 @@ function debounce(func, wait) {
     };
 }
 
-// Function to set the theme
+
 function setTheme(theme) {
-    // Update the boutiqueColors reference
+
     boutiqueColors = themes[theme];
     
-    // Update body class for CSS styles
+
     document.body.className = '';
     document.body.classList.add(theme + '-theme');
     
-    // Save theme
+
     currentTheme = theme;
 }
 
-// Function to toggle pause state
+// function to toggle pause state
 function togglePause() {
     isPaused = !isPaused;
     
     if (isPaused) {
-        // Pause the simulation
+
         Runner.stop(runner);
         
-        // Create a pause indicator
+        
         const pauseIndicator = document.createElement('div');
         pauseIndicator.id = 'pause-indicator';
         pauseIndicator.textContent = 'PAUSED';
@@ -1679,21 +1720,21 @@ function togglePause() {
         pauseIndicator.style.textShadow = '0 0 10px rgba(0, 0, 0, 0.5)';
         document.body.appendChild(pauseIndicator);
     } else {
-        // Resume the simulation
+        // resume the simulation
         Runner.start(runner, engine);
         
-        // Remove pause indicator
+        // remove pause indicator
         const pauseIndicator = document.getElementById('pause-indicator');
         if (pauseIndicator) {
             pauseIndicator.remove();
         }
     }
     
-    // Show message
+  
     showFloatingMessage(isPaused ? 'Paused (P to resume)' : 'Resumed');
 }
 
-// Function for showing temporary floating messages
+// function showing temporary floating messages
 function showFloatingMessage(text) {
     const message = document.createElement('div');
     message.style.position = 'absolute';
@@ -1783,14 +1824,6 @@ function createExplosion(position, radius = 200, strength = 0.05) {
         const opacity = Math.max(0, Math.min(1, opacityProgress));
         
 
-        explosion.style.width = currentSize + 'px';
-        explosion.style.height = currentSize + 'px';
-        explosion.style.opacity = opacity * 0.8;
-        
-        centralGlow.style.width = centralSize + 'px';
-        centralGlow.style.height = centralSize + 'px';
-        centralGlow.style.opacity = opacity;
-        
         if (progress < 1) {
             requestAnimationFrame(animate);
         } else {
@@ -2107,6 +2140,7 @@ function initMobileSupport() {
             e.preventDefault(); // Prevent scrolling while interacting with canvas
             
             if (e.touches.length >= 2) {
+                // handle pinch zoom (can be used```javascript
                 // handle pinch zoom (can be used for future features)
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
@@ -2138,7 +2172,7 @@ function initMobileSupport() {
 
 // Show visual indicator for touch
 function showTouchIndicator(x, y) {
-    const indicator = documentElement('div');
+    const indicator = document.createElement('div');
     indicator.style.position = 'absolute';
     indicator.style.width = '40px';
     indicator.style.height = '40px';
@@ -2293,3 +2327,4 @@ function checkPortalTeleportation() {
         });
     }
 }
+```

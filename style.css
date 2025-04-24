@@ -865,3 +865,47 @@ input[type="range"]::-moz-range-thumb {
     50% { transform: translate(-50%, -50%) scale(1.1); }
     100% { transform: translate(-50%, -50%) scale(1); }
 }
+
+/* Slow motion visual effects */
+.slow-motion canvas {
+    filter: brightness(1.1) contrast(1.1) saturate(1.2);
+    transition: filter 0.5s ease-out;
+}
+
+body.slow-motion {
+    background-color: rgba(20, 20, 40, 1.0); /* Slightly darker and more blue when in slow motion */
+    transition: background-color 0.5s ease;
+}
+
+.slow-motion .collision-particle {
+    filter: blur(1px) brightness(1.2);
+    transition: all 0.3s ease-out;
+}
+
+.gravity-zone {
+    position: absolute;
+    border-radius: 50%;
+    box-sizing: border-box;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Slow motion effect */
+body.slow-motion .collision-particle {
+    animation-duration: 3s !important;
+    transition-duration: 3s !important;
+}
+
+body.slow-motion .explosion,
+body.slow-motion .gravity-zone {
+    animation-duration: 4s !important;
+    transition-duration: 4s !important;
+}

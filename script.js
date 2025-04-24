@@ -33,6 +33,8 @@ let isPaused = false; // Track if simulation is paused
 let timeScale = 1.0; // For slow-motion effects
 let collisionEffectType = 0; // Track current collision effect type
 let explosionMode = false; // Track if explosion mode is enabled
+let portalMode = false; // Track if portal placement mode is enabled
+let portals = []; // Array to store portal pairs
 
 // Theming variables
 let currentTheme = 'default';
@@ -73,6 +75,10 @@ let engine, render, runner, mouse, mouseConstraint, canvas;
 let draggedBody = null;
 let ground, leftWall, rightWall, ceiling, basePlatform;
 
+// Gravity zone variables
+let gravityZones = [];
+let gravityZoneMode = false;
+
 // Wait for DOM to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
@@ -88,6 +94,25 @@ document.addEventListener('DOMContentLoaded', function() {
             addStar();
         }, i * 200);
     }
+    
+    // Gravity zone mode
+    document.getElementById('add-gravity-zone').addEventListener('click', function() {
+        toggleButtonMode('add-gravity-zone');
+        gravityZoneMode = !gravityZoneMode;
+        attractorMode = false; // Ensure other modes are off
+        sandMode = false;
+        
+        if (gravityZoneMode) {
+            showFloatingMessage('Click to place a gravity zone');
+        }
+    });
+    
+    // Portal Button
+    document.getElementById('portalBtn').addEventListener('click', function() {
+        portalMode = !portalMode;
+        this.classList.toggle('active', portalMode);
+        setCurrentMode('portal');
+    });
 });
 
 // Initialize physics engine and environment
@@ -191,6 +216,10 @@ function setupMouseControl() {
         } else if (explosionMode) {
             // Create explosion at click point when explosion mode is enabled
             createExplosion({x: event.clientX, y: event.clientY});
+        } else if (gravityZoneMode) {
+            createGravityZone(event.clientX, event.clientY);
+        } else if (portalMode) {
+            handlePortalPlacement(event);
         } else {
             // If we're in normal mode, place the current shape
             // Check if any of the creation buttons are active
@@ -495,6 +524,26 @@ function setupEventListeners() {
         defaultBounciness = parseFloat(this.value);
     });
 
+    // Time speed control
+    document.getElementById('time-slider').addEventListener('input', function() {
+        timeScale = parseFloat(this.value);
+        
+        // Apply time scale to the engine
+        engine.timing.timeScale = timeScale;
+        
+        // Show visual feedback
+        const speedText = timeScale < 1 ? 'Slow Motion' : 
+                         timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
+        showFloatingMessage(`Time: ${speedText} (${timeScale.toFixed(1)}x)`);
+        
+        // Visual effect for slow motion
+        if (timeScale < 0.5) {
+            document.body.classList.add('slow-motion');
+        } else {
+            document.body.classList.remove('slow-motion');
+        }
+    });
+
     // Handle window resize
     window.addEventListener('resize', debounce(function() {
         // Update canvas size
@@ -554,6 +603,43 @@ function setupEventListeners() {
     // Add event listener for the modal close button
     document.querySelector('.close-modal').addEventListener('click', function() {
         document.getElementById('info-modal').style.display = 'none';
+    });
+
+    // Add gravity zone button
+    document.getElementById('add-gravity-zone').addEventListener('click', function() {
+        setActiveMode('gravity-zone');
+        showFloatingMessage('Click to place a gravity zone');
+    });
+
+    // Portal button
+    document.getElementById('add-portal').addEventListener('click', function() {
+        portalMode = !portalMode;
+        this.classList.toggle('active');
+        
+        if (portalMode) {
+            setActiveMode('portal');
+            setCurrentMode('portal');
+        } else {
+            setCurrentMode('normal');
+        }
+    });
+
+    // Handle clicks based on current mode
+    document.getElementById('canvas').addEventListener('click', function(event) {
+        if (event.button !== 0) return; // Only handle left clicks
+        
+        if (portalMode) {
+            handlePortalPlacement(event);
+        } else if (attractorMode) {
+            createAttractor(event.clientX, event.clientY);
+        } else if (gravityZoneMode) {
+            createGravityZone(event.clientX, event.clientY);
+        } else if (explosionMode) {
+            createExplosion(event.clientX, event.clientY);
+        } else {
+            // Normal physics object creation mode
+            createPhysicsObject(event.clientX, event.clientY);
+        }
     });
 }
 
@@ -636,6 +722,9 @@ function setupUpdateLoop() {
                 context.restore();
             }
         });
+        
+        // Render portals
+        renderPortals(context);
     };
 
     Events.on(engine, 'beforeUpdate', function() {
@@ -657,6 +746,12 @@ function setupUpdateLoop() {
         
         // Apply attractor forces
         applyAttractorForces();
+        
+        // Apply gravity zone forces
+        applyGravityZoneForces();
+        
+        // Check for portal teleportation
+        checkPortalTeleportation();
         
         // Clean up sand particles if there are too many (performance optimization)
         if (sandParticles.length > 500) {
@@ -907,6 +1002,101 @@ function applyAttractorForces() {
                 Body.applyForce(body, body.position, {
                     x: (dx / distance) * forceMagnitude,
                     y: (dy / distance) * forceMagnitude
+                });
+            }
+        });
+    });
+}
+
+// Create and manage gravity zones
+function createGravityZone(x, y) {
+    const radius = 150;
+    const strength = document.getElementById('gravity-slider').value * -0.5; // Inverse of current gravity
+    
+    // Create gravity zone object
+    const gravityZone = {
+        position: { x, y },
+        strength: strength,
+        radius: radius,
+        pulsePhase: 0
+    };
+    
+    // Create visual element
+    const element = document.createElement('div');
+    element.className = 'gravity-zone';
+    element.style.width = (radius * 2) + 'px';
+    element.style.height = (radius * 2) + 'px';
+    element.style.left = (x - radius) + 'px';
+    element.style.top = (y - radius) + 'px';
+    element.style.background = strength > 0 ? 
+        'radial-gradient(circle, rgba(100,200,255,0.15) 0%, rgba(50,100,255,0.1) 40%, rgba(0,30,100,0) 80%)' : 
+        'radial-gradient(circle, rgba(255,100,100,0.15) 0%, rgba(255,50,50,0.1) 40%, rgba(100,0,0,0) 80%)';
+    element.style.border = `2px dashed ${strength > 0 ? 'rgba(100,150,255,0.3)' : 'rgba(255,100,100,0.3)'}`;
+    document.body.appendChild(element);
+    
+    // Reference the DOM element
+    gravityZone.element = element;
+    
+    // Add to array
+    gravityZones.push(gravityZone);
+    
+    showFloatingMessage(strength > 0 ? 'Pull gravity zone added' : 'Push gravity zone added');
+    
+    return gravityZone;
+}
+
+function removeGravityZone(gravityZone) {
+    // Remove from array
+    const index = gravityZones.indexOf(gravityZone);
+    if (index !== -1) {
+        gravityZones.splice(index, 1);
+    }
+    
+    // Remove DOM element
+    if (gravityZone.element && gravityZone.element.parentNode) {
+        gravityZone.element.parentNode.removeChild(gravityZone.element);
+    }
+}
+
+function applyGravityZoneForces() {
+    if (gravityZones.length === 0) return;
+    
+    const bodies = Composite.allBodies(engine.world);
+    
+    // Update time for pulse effect
+    const time = Date.now() / 1000;
+    
+    // Apply force from each gravity zone to each body
+    gravityZones.forEach(zone => {
+        // Update pulse phase
+        zone.pulsePhase += 0.05;
+        if (zone.pulsePhase > Math.PI * 2) zone.pulsePhase -= Math.PI * 2;
+        
+        // Pulse effect for visualization
+        const pulse = 1 + Math.sin(zone.pulsePhase) * 0.1;
+        zone.element.style.transform = `translate(-50%, -50%) scale(${pulse})`;
+        
+        bodies.forEach(body => {
+            if (body.isStatic) return;
+            
+            const dx = zone.position.x - body.position.x;
+            const dy = zone.position.y - body.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < zone.radius) {
+                // Create a localized gravity effect
+                const forceMagnitude = zone.strength * 0.001 * body.mass;
+                
+                Body.applyForce(body, body.position, {
+                    x: 0,
+                    y: forceMagnitude
+                });
+                
+                // Also add a slight pull toward center for more interesting effects
+                const centerPull = 0.0001 * zone.strength;
+                Body.applyForce(body, body.position, {
+                    x: dx * centerPull,
+                    y: dy * centerPull
                 });
             }
         });
@@ -1942,3 +2132,449 @@ document.addEventListener('DOMContentLoaded', function() {
         initMobileSupport();
     };
 });
+
+// Function to create a portal
+function createPortal(x, y, isEntrance) {
+    const portalColor = isEntrance ? '#3498db' : '#e74c3c'; // Blue for entrance, red for exit
+    const portal = {
+        x: x,
+        y: y,
+        radius: 30,
+        isEntrance: isEntrance,
+        color: portalColor,
+        partner: null, // Will be linked to its partner portal
+        particleTimer: 0
+    };
+    
+    // If we have an odd number of portals, link the last two as a pair
+    if (portals.length % 2 === 1) {
+        const lastPortal = portals[portals.length - 1];
+        portal.partner = lastPortal;
+        lastPortal.partner = portal;
+    }
+    
+    portals.push(portal);
+    return portal;
+}
+
+// Function to handle portal placement
+function handlePortalPlacement(event) {
+    if (!portalMode) return;
+    
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Create entrance (odd index) or exit (even index) portal
+    const isEntrance = portals.length % 2 === 0;
+    createPortal(x, y, isEntrance);
+}
+
+// Render portals
+function renderPortals(context) {
+    portals.forEach(portal => {
+        // Draw main portal circle
+        context.beginPath();
+        context.arc(portal.x, portal.y, portal.radius, 0, Math.PI * 2);
+        context.fillStyle = portal.color;
+        context.fill();
+        
+        // Draw swirl effect inside portal
+        context.beginPath();
+        const time = Date.now() * 0.005;
+        for (let i = 0; i < 3; i++) {
+            const angle = time + i * Math.PI / 1.5;
+            const radius = portal.radius * (0.8 - i * 0.2);
+            const x = portal.x + Math.cos(angle) * radius * 0.5;
+            const y = portal.y + Math.sin(angle) * radius * 0.5;
+            
+            if (i === 0) {
+                context.moveTo(x, y);
+            } else {
+                context.lineTo(x, y);
+            }
+        }
+        context.closePath();
+        context.fillStyle = portal.isEntrance ? '#1e6fb8' : '#b83232';
+        context.fill();
+        
+        // Generate portal particles
+        portal.particleTimer += 1;
+        if (portal.particleTimer > 5) {
+            portal.particleTimer = 0;
+            // Particle effect code could be added here
+        }
+    });
+}
+
+// Check if any bodies need to teleport through portals
+function checkPortalTeleportation() {
+    if (portals.length < 2) return;
+    
+    // Check each portal pair
+    for (let i = 0; i < portals.length; i += 2) {
+        if (i + 1 >= portals.length) continue;
+        
+        const entrancePortal = portals[i].isEntrance ? portals[i] : portals[i + 1];
+        const exitPortal = portals[i].isEntrance ? portals[i + 1] : portals[i];
+        
+        if (!entrancePortal || !exitPortal) continue;
+        
+        // Check all bodies for portal collision
+        const bodies = Composite.allBodies(engine.world);
+        bodies.forEach(body => {
+            if (body.isStatic) return;
+            
+            const bodyPos = body.position;
+            const distance = Math.sqrt(
+                Math.pow(bodyPos.x - entrancePortal.x, 2) + 
+                Math.pow(bodyPos.y - entrancePortal.y, 2)
+            );
+            
+            if (distance < entrancePortal.radius + body.circleRadius) {
+                // Calculate velocity vector for preserving momentum
+                const velX = body.velocity.x;
+                const velY = body.velocity.y;
+                const speed = Math.sqrt(velX * velX + velY * velY);
+                
+                // Teleport body to exit portal
+                Body.setPosition(body, {
+                    x: exitPortal.x,
+                    y: exitPortal.y
+                });
+                
+                // Apply a small outward force
+                Body.setVelocity(body, {
+                    x: velX * 1.1,
+                    y: velY * 1.1
+                });
+                
+                // Add visual effect
+                createExplosion(exitPortal.x, exitPortal.y, 10, exitPortal.color, 3);
+            }
+        });
+    }
+}
+
+// Portal System Implementation
+function handlePortalPlacement(event) {
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    // If we have no portals or a complete pair, start a new pair
+    if (portals.length === 0 || portals.length === 2) {
+        // Clear existing portals if we have a complete pair
+        if (portals.length === 2) {
+            removePortals();
+        }
+        
+        // Create the first portal of a new pair
+        createPortal(x, y, 'entrance');
+        showFloatingMessage('Entrance portal created. Click to place exit portal.');
+    } else {
+        // Create the second portal to complete the pair
+        createPortal(x, y, 'exit');
+        showFloatingMessage('Portal pair complete! Objects will teleport between portals.');
+        
+        // Turn off portal mode after placing a complete pair
+        portalMode = false;
+        document.getElementById('add-portal').classList.remove('active');
+    }
+}
+
+function createPortal(x, y, type) {
+    const radius = 40;
+    const color = type === 'entrance' ? '#3498db' : '#e74c3c'; // Blue for entrance, red for exit
+    
+    // Create portal object
+    const portal = {
+        position: { x, y },
+        radius: radius,
+        type: type,
+        element: null,
+        cooldown: false
+    };
+    
+    // Create visual element
+    const element = document.createElement('div');
+    element.className = 'portal ' + type;
+    element.style.position = 'absolute';
+    element.style.width = (radius * 2) + 'px';
+    element.style.height = (radius * 2) + 'px';
+    element.style.left = (x - radius) + 'px';
+    element.style.top = (y - radius) + 'px';
+    element.style.borderRadius = '50%';
+    element.style.background = `radial-gradient(circle, ${color} 0%, rgba(255,255,255,0.8) 30%, rgba(255,255,255,0) 70%)`;
+    element.style.boxShadow = `0 0 15px ${color}`;
+    element.style.zIndex = '1';
+    element.style.pointerEvents = 'none';
+    document.body.appendChild(element);
+    
+    // Add animation
+    element.style.animation = 'pulse 2s infinite';
+    
+    // Store element reference
+    portal.element = element;
+    
+    // Add to portals array
+    portals.push(portal);
+    
+    return portal;
+}
+
+function removePortals() {
+    // Remove portal elements from the DOM
+    portals.forEach(portal => {
+        if (portal.element && portal.element.parentNode) {
+            portal.element.parentNode.removeChild(portal.element);
+        }
+    });
+    
+    // Clear the portals array
+    portals = [];
+}
+
+function checkPortalTeleportation() {
+    // Skip if we don't have a complete portal pair
+    if (portals.length !== 2) return;
+    
+    // Get entrance and exit portals
+    const entrance = portals.find(p => p.type === 'entrance');
+    const exit = portals.find(p => p.type === 'exit');
+    
+    // Skip if either portal is on cooldown
+    if (entrance.cooldown || exit.cooldown) return;
+    
+    // Check all bodies
+    const bodies = Composite.allBodies(engine.world);
+    bodies.forEach(body => {
+        // Skip static bodies
+        if (body.isStatic) return;
+        
+        // Calculate distance to entrance portal
+        const dx = body.position.x - entrance.position.x;
+        const dy = body.position.y - entrance.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If body is close to entrance portal, teleport it to exit
+        if (distance < entrance.radius) {
+            // Teleport the body
+            teleportBody(body, entrance, exit);
+        }
+    });
+}
+
+function teleportBody(body, fromPortal, toPortal) {
+    // Set cooldown to prevent immediate teleport back
+    fromPortal.cooldown = true;
+    toPortal.cooldown = true;
+    
+    // Store original velocity and angular velocity
+    const originalVelocity = { x: body.velocity.x, y: body.velocity.y };
+    const originalAngularVelocity = body.angularVelocity;
+    
+    // Create teleport visual effect
+    createTeleportEffect(fromPortal.position, toPortal.position);
+    
+    // Move the body to the destination portal
+    Body.setPosition(body, toPortal.position);
+    
+    // Maintain velocity direction relative to portal orientation
+    // Calculate angle between portals
+    const portalAngle = Math.atan2(
+        toPortal.position.y - fromPortal.position.y,
+        toPortal.position.x - fromPortal.position.x
+    );
+    
+    // Adjust velocity to maintain momentum through the portal
+    Body.setVelocity(body, {
+        x: originalVelocity.x * 1.05, // Slight speed boost for fun
+        y: originalVelocity.y * 1.05
+    });
+    
+    // Maintain angular velocity
+    Body.setAngularVelocity(body, originalAngularVelocity);
+    
+    // Reset cooldowns after a delay
+    setTimeout(() => {
+        fromPortal.cooldown = false;
+        toPortal.cooldown = false;
+    }, 500); // 500ms cooldown
+}
+
+function createTeleportEffect(fromPos, toPos) {
+    // Create particles at both from and to positions
+    for (let i = 0; i < 20; i++) {
+        // From portal particles
+        const fromParticle = document.createElement('div');
+        fromParticle.className = 'teleport-particle';
+        fromParticle.style.position = 'absolute';
+        fromParticle.style.width = '8px';
+        fromParticle.style.height = '8px';
+        fromParticle.style.borderRadius = '50%';
+        fromParticle.style.backgroundColor = '#3498db';
+        fromParticle.style.left = fromPos.x + 'px';
+        fromParticle.style.top = fromPos.y + 'px';
+        fromParticle.style.transform = 'translate(-50%, -50%)';
+        fromParticle.style.pointerEvents = 'none';
+        document.body.appendChild(fromParticle);
+        
+        // To portal particles
+        const toParticle = document.createElement('div');
+        toParticle.className = 'teleport-particle';
+        toParticle.style.position = 'absolute';
+        toParticle.style.width = '8px';
+        toParticle.style.height = '8px';
+        toParticle.style.borderRadius = '50%';
+        toParticle.style.backgroundColor = '#e74c3c';
+        toParticle.style.left = toPos.x + 'px';
+        toParticle.style.top = toPos.y + 'px';
+        toParticle.style.transform = 'translate(-50%, -50%)';
+        toParticle.style.pointerEvents = 'none';
+        document.body.appendChild(toParticle);
+        
+        // Animate particles
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 40;
+        const duration = 300 + Math.random() * 500;
+        
+        // From portal animation
+        animateParticle(fromParticle, angle, distance, duration);
+        
+        // To portal animation
+        animateParticle(toParticle, angle, distance, duration);
+    }
+}
+
+function animateParticle(particle, angle, distance, duration) {
+    const startX = parseInt(particle.style.left);
+    const startY = parseInt(particle.style.top);
+    const targetX = startX + Math.cos(angle) * distance;
+    const targetY = startY + Math.sin(angle) * distance;
+    
+    let startTime = null;
+    
+    function animate(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const progress = (timestamp - startTime) / duration;
+        
+        if (progress < 1) {
+            const x = startX + (targetX - startX) * progress;
+            const y = startY + (targetY - startY) * progress;
+            const scale = 1 - progress;
+            const opacity = 1 - progress;
+            
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            particle.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            particle.style.opacity = opacity;
+            
+            requestAnimationFrame(animate);
+        } else {
+            particle.remove();
+        }
+    }
+    
+    requestAnimationFrame(animate);
+}
+
+function renderPortals(context) {
+    portals.forEach(portal => {
+        // Skip if the portal doesn't exist
+        if (!portal || !portal.position) return;
+        
+        // Draw portal glow effect
+        const gradient = context.createRadialGradient(
+            portal.position.x, portal.position.y, portal.radius * 0.3,
+            portal.position.x, portal.position.y, portal.radius * 1.2
+        );
+        
+        const color = portal.type === 'entrance' ? '#3498db' : '#e74c3c';
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(0.5, color.replace(')', ', 0.5)').replace('rgb', 'rgba'));
+        gradient.addColorStop(1, color.replace(')', ', 0)').replace('rgb', 'rgba'));
+        
+        context.beginPath();
+        context.arc(portal.position.x, portal.position.y, portal.radius * 1.2, 0, Math.PI * 2);
+        context.fillStyle = gradient;
+        context.fill();
+        
+        // Draw portal inner circle
+        context.beginPath();
+        context.arc(portal.position.x, portal.position.y, portal.radius * 0.8, 0, Math.PI * 2);
+        context.lineWidth = 3;
+        context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        context.stroke();
+        
+        // Draw swirl effect (changes over time)
+        const time = Date.now() / 1000;
+        const swirlAngle = time % (Math.PI * 2);
+        
+        context.save();
+        context.translate(portal.position.x, portal.position.y);
+        context.rotate(swirlAngle);
+        
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            context.beginPath();
+            context.moveTo(0, 0);
+            context.lineTo(Math.cos(angle) * portal.radius * 0.7, Math.sin(angle) * portal.radius * 0.7);
+            context.lineWidth = 2;
+            context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            context.stroke();
+        }
+        
+        context.restore();
+    });
+}
+
+// Helper to determine if we're on a mobile device
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
+// Set active mode (for buttons like portal, attractor, etc.)
+function setActiveMode(mode) {
+    // Disable all other modes
+    portalMode = false;
+    attractorMode = false;
+    gravityZoneMode = false;
+    explosionMode = false;
+    
+    // Set the requested mode
+    switch(mode) {
+        case 'portal':
+            portalMode = true;
+            break;
+        case 'attractor':
+            attractorMode = true;
+            break;
+        case 'gravity-zone':
+            gravityZoneMode = true;
+            break;
+        case 'explosion':
+            explosionMode = true;
+            break;
+    }
+    
+    // Update button states
+    document.querySelectorAll('.controls button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Activate the current mode button
+    if (mode === 'portal') document.getElementById('add-portal').classList.add('active');
+    if (mode === 'attractor') document.getElementById('add-attractor').classList.add('active');
+    if (mode === 'gravity-zone') document.getElementById('add-gravity-zone').classList.add('active');
+    if (mode === 'explosion') document.getElementById('create-explosion').classList.add('active');
+}
+
+// Set current mode (used by the event listeners)
+function setCurrentMode(mode) {
+    currentMode = mode;
+    
+    if (mode === 'portal') {
+        showFloatingMessage('Portal mode active - click to place entrance and exit portals');
+    }
+}

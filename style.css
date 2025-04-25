@@ -373,12 +373,12 @@ input[type="range"]:hover {
     border-color: rgba(255, 182, 193, 0.4);
 }
 
-/* Fix layout and spacing with removed elements */
+/* fix layout and spacing with removed elements */
 .controls {
     margin-top: 15px;
 }
 
-/* Fix for modal showing in background */
+/* fix for modal showing in background */
 .modal {
     display: none;
     position: fixed;
@@ -441,4 +441,15 @@ input[type="range"]:hover {
 
 .close-modal:hover {
     color: white;
+}
+
+#physics-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: transparent;
+    display: block;
 }

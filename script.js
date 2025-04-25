@@ -122,15 +122,23 @@ function initButtonsClasses() {
 
 // initialize physics engine and environment
 function initPhysics() {
-    // create the physics enginen
+    // create the physics engine
     engine = Engine.create();
     engine.world.gravity.y = 1;
     engine.timing.timeScale = 0.9;
-    // performance tweeks
+    
+    // configure collision resolution to prevent overlapping
+    engine.positionIterations = 12; // increase from default (6) for more accurate collision resolution
+    engine.velocityIterations = 8;  // increase from default (4) for better collision response
     engine.enableSleeping = true;
 
-    // set up our canvus
+    // set up our canvas
     canvas = document.getElementById('physics-canvas');
+    
+    // make sure canvas is properly sized to window dimensions
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
     render = Render.create({
         canvas: canvas,
         engine: engine,
@@ -144,7 +152,7 @@ function initPhysics() {
         }
     });
 
-    // get things runnin
+    // get things running
     runner = Runner.create();
     Runner.run(runner, engine);
     Render.run(render);
@@ -2146,6 +2154,8 @@ function initMobileSupport() {
         }
 
         // better touch handling for the canvas
+        canvas```javascript
+        // better touch handling for the canvas
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
@@ -2474,3 +2484,4 @@ function updateGlowEffects(now) {
         return true;
     });
 }
+```

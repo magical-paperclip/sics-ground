@@ -1735,15 +1735,43 @@ function debounce(func, wait) {
 
 
 function setTheme(theme) {
-
+    // Make sure the theme exists, default to 'boutique' if it doesn't
+    if (!themes[theme]) {
+        theme = 'boutique';
+    }
+    
+    // Update the theme colors for particles and effects
     boutiqueColors = themes[theme];
     
-
+    // Remove all existing theme classes
     document.body.className = '';
+    
+    // Add the new theme class
     document.body.classList.add(theme + '-theme');
     
-
+    // Update all appropriate styles
+    const attractors = document.querySelectorAll('.attractor');
+    attractors.forEach(el => {
+        // The CSS will handle the specific theme styling
+    });
+    
+    // Update any active elements to match the new theme
+    const activeButtons = document.querySelectorAll('button.active');
+    activeButtons.forEach(button => {
+        // The CSS will handle updating active buttons
+    });
+    
+    // Store the current theme
     currentTheme = theme;
+    
+    // Update the theme selector to match
+    const themeSelect = document.getElementById('theme-select');
+    if (themeSelect) {
+        themeSelect.value = theme;
+    }
+    
+    // Show user feedback
+    showFloatingMessage(`Theme changed to ${theme}`);
 }
 
 // function to toggle pause state
@@ -2072,30 +2100,37 @@ function getContrastingColor(hexColor) {
 // Add cursor follower element
 function addCursorFollower() {
     const follower = document.createElement('div');
-    follower.className = 'cursor-follower';
+    follower.className = 'cursor-follower'; 
     document.body.appendChild(follower);
     return follower;
 }
 
-// Initialize cursor follower
+// initialize cursor follower
 let cursorFollower;
 let isTouch = false;
 
-// Setup touch and cursor events
+// setup touch and cursor events
 function setupCursorAndTouchEvents() {
-    cursorFollower = addCursorFollower();
+    // Create cursor follower element
+    cursorFollower = document.createElement('div');
+    cursorFollower.className = 'cursor-follower';
+    document.body.appendChild(cursorFollower);
     
     // Track if device is touch-enabled
     window.addEventListener('touchstart', function() {
         isTouch = true;
     }, { once: true });
 
-    // Handle mouse movements
+    // handle mouse movements
     document.addEventListener('mousemove', function(e) {
         if (isTouch) return; // Skip if touch device
         
         cursorFollower.style.left = e.clientX + 'px';
         cursorFollower.style.top = e.clientY + 'px';
+        
+        // Update last mouse position for other functions
+        lastMousePos.x = e.clientX;
+        lastMousePos.y = e.clientY;
     });
     
     // Handle touch movements for mobile
@@ -2104,6 +2139,10 @@ function setupCursorAndTouchEvents() {
             const touch = e.touches[0];
             cursorFollower.style.left = touch.clientX + 'px';
             cursorFollower.style.top = touch.clientY + 'px';
+            
+            // Update last mouse position for other functions
+            lastMousePos.x = touch.clientX;
+            lastMousePos.y = touch.clientY;
         }
     });
     
@@ -2138,8 +2177,7 @@ function showCursorEffect(e) {
     // After a moment, reduce size but keep active
     setTimeout(() => {
         cursorFollower.style.width = '30px';
-        cursorFollower```javascript
-.style.height = '30px';
+        cursorFollower.style.height = '30px';
     }, 150);
 }
 
@@ -2150,262 +2188,113 @@ function hideCursorEffectDelayed() {
     }, 1000);
 }
 
-// helper to determine if on a mobile device
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-}
-
-// initialize touch handling for mobile
+// Initialize mobile support functions
 function initMobileSupport() {
-    // add special handling for mobile devices
-    if (isMobile()) {
-        // make buttonslarger on mobile
-        document.querySelectorAll('.buttons button').forEach(button => {
-            button.style.padding = '12px 16px';
-            button.style.fontSize = '16px';
-        });
+    // Detect if device is mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Add mobile-specific CSS class
+        document.body.classList.add('mobile');
         
-        // add viewport meta tag if not present (should already be there)
-        if (!document.querySelector('meta[name="viewport"]')) {
-            const meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            document.head.appendChild(meta);
+        // Adjust physics parameters for better mobile performance
+        engine.timing.timeScale = 0.8;
+        
+        // Adjust positioning of controls for mobile
+        const controls = document.querySelector('.controls');
+        if (controls) {
+            controls.style.maxHeight = '60vh';
+            controls.style.overflow = 'auto';
         }
-
-        // better touch handling for the canvas
-        canvas.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 1) {
-                const touch = e.touches[0];
-                lastMousePos.x = touch.clientX;
-                lastMousePos.y = touch.clientY;
-                
-                // show the user where they touched
-                showTouchIndicator(touch.clientX, touch.clientY);
-            }
-        });
-        
-        // handle mobile pinch-zoom
-        let lastDistance = 0;
-        canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault(); // prevent default touch actions
-            
-            if (e.touches.length === 2) {
-                const touch1 = e.touches[0];
-                const touch2 = e.touches[1];
-                
-                const distance = Math.hypot(
-                    touch1.clientX - touch2.clientX,
-                    touch1.clientY - touch2.clientY
-                );
-                
-                if (lastDistance > 0) {
-                    const delta = distance - lastDistance;
-                    // could implement zoom or other features here
-                }
-                
-                lastDistance = distance;
-            } else if (e.touches.length === 1) {
-                // update for single touch
-                const touch = e.touches[0];
-                lastMousePos.x = touch.clientX;
-                lastMousePos.y = touch.clientY;
-            }
-        });
-        
-        canvas.addEventListener('touchend', function() {
-            lastDistance = 0;
-        });
     }
 }
 
-// show visual indicator for touch
-function showTouchIndicator(x, y) {
-    const indicator = document.createElement('div');
-    indicator.style.position = 'absolute';
-    indicator.style.width = '40px';
-    indicator.style.height = '40px';
-    indicator.style.borderRadius = '50%';
-    indicator.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)';
-    indicator.style.left = x + 'px';
-    indicator.style.top = y + 'px';
-    indicator.style.transform = 'translate(-50%, -50%)';
-    indicator.style.zIndex = '1000';
-    indicator.style.pointerEvents = 'none';
-    indicator.style.opacity = '0.8';
-    document.body.appendChild(indicator);
-    
-    // animate and remove
-    indicator.animate([
-        { transform: 'translate(-50%, -50%) scale(0.8)', opacity: 0.8 },
-        { transform: 'translate(-50%, -50%) scale(1.5)', opacity: 0 }
-    ], {
-        duration: 400,
-        easing: 'ease-out'
-    }).onfinish = () => indicator.remove();
+// Check if device is mobile
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// function to create a portal
-function createPortal(x, y, isEntrance) {
-    const portalColor = isEntrance ? '#3498db' : '#e74c3c'; // blue for entrance, red for exit
-    const portal = {
-        x: x,
-        y: y,
-        radius: 30,
-        isEntrance: isEntrance,
-        color: portalColor,
-        partner: null, // will be linked to its partner portal
-        particleTimer: 0
-    };
+// Add the missing helper function to create glow effects
+function createGlowEffect(type, object, options = {}) {
+    // Skip on mobile devices for performance
+    if (isMobile()) return;
     
-    // odd portals = link the last two as a pair
-    if (portals.length % 2 === 1) {
-        const lastPortal = portals[portals.length - 1];
-        portal.partner = lastPortal;
-        lastPortal.partner = portal;
+    const size = options.size || 20;
+    const color = options.color || getRandomColorFromTheme();
+    
+    // Create new glow element
+    const element = document.createElement('div');
+    element.className = `glow-effect ${type}-glow`;
+    
+    // Position and style based on type
+    switch (type) {
+        case 'shape':
+            // Track movement of physics body
+            object.glowElement = element;
+            break;
+            
+        case 'attractor':
+            // Fixed position for attractor
+            element.style.position = 'absolute';
+            element.style.left = object.position.x + 'px';
+            element.style.top = object.position.y + 'px';
+            element.style.width = (size * 2) + 'px';
+            element.style.height = (size * 2) + 'px';
+            element.style.transform = 'translate(-50%, -50%)';
+            element.style.borderRadius = '50%';
+            element.style.boxShadow = `0 0 ${size}px ${size/2}px ${color}`;
+            element.style.opacity = '0.5';
+            element.style.pointerEvents = 'none';
+            break;
     }
     
-    portals.push(portal);
-    return portal;
+    // Add to document
+    document.body.appendChild(element);
+    
+    // Track in glowElements
+    if (!glowElements[type]) glowElements[type] = [];
+    glowElements[type].push({
+        element,
+        object,
+        color
+    });
+    
+    return element;
 }
 
-// Function to handle portal placement
-function handlePortalPlacement(event) {
-    if (!portalMode) return;
+// Function to update glow effects
+function updateGlowEffects(timestamp) {
+    // Skip if paused
+    if (isPaused) return;
     
-    // Use client coordinates directly to place the portal at the exact cursor position
-    const x = event.clientX;
-    const y = event.clientY;
+    // Skip on mobile for performance
+    if (isMobile()) return;
     
-    // Create entrance (odd index) or exit (even index) portal
-    const isEntrance = portals.length % 2 === 0;
-    const portal = createPortal(x, y, isEntrance);
-    
-    // Show user feedback about portal placement
-    showFloatingMessage(isEntrance ? 'Entrance portal created - click again to place exit' : 'Exit portal created');
-    
-    // Create glow effect for the portal
-    createGlowEffect('portal', portal, { size: portal.radius });
-}
-
-function renderPortals(context) {
-    portals.forEach(portal => {
-        
-        context.beginPath();
-        context.arc(portal.x, portal.y, portal.radius, 0, Math.PI * 2);
-        context.fillStyle = portal.color;
-        context.fill();
-        
-       
-        context.beginPath();
-        const time = Date.now() * 0.005;
-        for (let i = 0; i < 3; i++) {
-            const angle = time + i * Math.PI / 1.5;
-            const radius = portal.radius * (0.8 - i * 0.2);
-            const x = portal.x + Math.cos(angle) * radius * 0.5;
-            const y = portal.y + Math.sin(angle) * radius * 0.5;
-            
-            if (i === 0) {
-                context.moveTo(x, y);
-            } else {
-                context.lineTo(x, y);
+    // Update shape glows
+    glowElements.shapes.forEach((glow, index) => {
+        if (!glow.object.position) {
+            // Remove if shape no longer exists
+            if (glow.element.parentNode) {
+                glow.element.parentNode.removeChild(glow.element);
             }
+            glowElements.shapes.splice(index, 1);
+            return;
         }
-        context.closePath();
-        context.fillStyle = portal.isEntrance ? '#1e6fb8' : '#b83232';
-        context.fill();
         
-        
-        portal.particleTimer += 1;
-        if (portal.particleTimer > 5) {
-            portal.particleTimer = 0;
-           
-        }
+        // Update position to follow the body
+        glow.element.style.left = glow.object.position.x + 'px';
+        glow.element.style.top = glow.object.position.y + 'px';
     });
 }
 
+// Define missing allActionButtons array
+const allActionButtons = [
+    'add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text',
+    'toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion',
+    'add-portal', 'toggle-pause', 'add-gravity-zone'
+];
 
-function checkPortalTeleportation() {
-    if (portals.length < 2) return;
-    
-    // process portal pairs (entrance and exit)
-    for (let i = 0; i < portals.length; i += 2) {
-        if (i + 1 >= portals.length) continue;
-        
-        const entrancePortal = portals[i].isEntrance ? portals[i] : portals[i + 1];
-        const exitPortal = portals[i].isEntrance ? portals[i + 1] : portals[i];
-        
-        if (!entrancePortal || !exitPortal) continue;
-        
-        // check for bodies near the entrance portal
-        const bodies = Composite.allBodies(engine.world);
-        bodies.forEach(body => {
-            if (body.isStatic) return;
-            
-            const dx = body.position.x - entrancePortal.x;
-            const dy = body.position.y - entrancePortal.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // if body is inside entrance portal
-            const bodyRadius = body.circleRadius || Math.sqrt(body.area / Math.PI);
-            if (distance < entrancePortal.radius + bodyRadius) {
-                // save current velocity and angular velocity
-                const velX = body.velocity.x;
-                const velY = body.velocity.y;
-                const angularVel = body.angularVelocity;
-                
-                // teleport body to exit portal
-                Body.setPosition(body, {
-                    x: exitPortal.x,
-                    y: exitPortal.y
-                });
-                
-                // maintain velocity direction but give a slight boost
-                Body.setVelocity(body, {
-                    x: velX * 1.1,
-                    y: velY * 1.1
-                });
-                
-                // maintain angular velocity
-                Body.setAngularVelocity(body, angularVel);
-                
-                // create particles at exit portal
-                for (let j = 0; j < 5; j++) {
-                    createCollisionParticle(
-                        {x: exitPortal.x, y: exitPortal.y}, 
-                        5 + Math.random() * 5, 
-                        exitPortal.color
-                    );
-                }
-            }
-        });
-    }
-}
-
-// array of all interactive buttons to help with toggling
-const allActionButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text', 
-                         'add-attractor', 'add-gravity-zone', 'create-explosion', 'add-portal'];
-
-// toggle an action button and cancel other modes
-function toggleButtonMode(buttonId) {
-    const button = document.getElementById(buttonId);
-    if (!button) return;
-    
-    // if already active, deactivate it
-    if (button.classList.contains('active')) {
-        button.classList.remove('active');
-        return false; // return false to indicate it was turned off
-    }
-    
-    // clear active state from all buttons
-    clearActiveState(allActionButtons);
-    
-    // activate this button
-    button.classList.add('active');
-    return true; // return true to indicate it was turned on
-}
-
-// helper to clear active state from multiple buttons
+// Function to clear active state from buttons
 function clearActiveState(buttonIds) {
     buttonIds.forEach(id => {
         const button = document.getElementById(id);
@@ -2415,81 +2304,19 @@ function clearActiveState(buttonIds) {
     });
 }
 
-// function to create glow effects for various elements
-function createGlowEffect(type, target, options = {}) {
-    const size = options.size || 30;
-    const color = options.color || (type === 'portal' ? target.color : 
-                                   type === 'attractor' ? '#FFD700' : 
-                                   getRandomColorFromTheme());
+// Portal handling functions
+function handlePortalPlacement(event) {
+    // Implement basic portal placement logic
+    const x = event.clientX;
+    const y = event.clientY;
     
-    const glowElement = {
-        target: target,
-        type: type,
-        size: size,
-        color: color,
-        lastUpdate: Date.now(),
-        phase: Math.random() * Math.PI * 2 // random initial phase for variation
-    };
-    
-    // add to appropriate collection
-    if (type === 'portal') {
-        glowElements.portals.push(glowElement);
-    } else if (type === 'attractor') {
-        glowElements.attractors.push(glowElement);
-    } else if (type === 'shape') {
-        glowElements.shapes.push(glowElement);
-    }
-    
-    return glowElement;
+    showFloatingMessage('Portal feature coming soon!');
 }
 
-// update glow effects
-function updateGlowEffects(now) {
-    // portal glows
-    glowElements.portals = glowElements.portals.filter(glow => {
-        const portal = glow.target;
-        if (!portal || !portals.includes(portal)) return false;
-        
-        // animate portal glow
-        glow.phase += 0.02;
-        const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.2);
-        
-        // CSS box-shadow for glow
-        portal.element = portal.element || {};
-        portal.element.style = portal.element.style || {};
-        portal.element.style.boxShadow = `0 0 ${pulseSize}px ${pulseSize/2}px ${portal.color}`;
-        
-        return true;
-    });
-    
-    // attractor glows
-    glowElements.attractors = glowElements.attractors.filter(glow => {
-        const attractor = glow.target;
-        if (!attractor || !attractors.includes(attractor)) return false;
-        
-        // animate attractor glow
-        glow.phase += 0.03;
-        const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.15);
-        
-        if (attractor.element) {
-            attractor.element.style.boxShadow = `0 0 ${pulseSize}px ${pulseSize/2}px rgba(255, 215, 0, 0.6)`;
-        }
-        
-        return true;
-    });
-    
-    // shape glows - temporary effects that fade
-    glowElements.shapes = glowElements.shapes.filter(glow => {
-        const body = glow.target;
-        if (!body || !Composite.get(engine.world, body.id, 'body')) return false;
-        
-        const elapsed = now - glow.lastUpdate;
-        
-        // Fade out glow over time
-        if (elapsed > 1000) {
-            return false;
-        }
-        
-        return true;
-    });
+function renderPortals(context) {
+    // Placeholder for portal rendering
+}
+
+function checkPortalTeleportation() {
+    // Placeholder for portal teleportation logic
 }

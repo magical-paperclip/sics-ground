@@ -2153,7 +2153,7 @@ function initMobileSupport() {
                 lastMousePos.y = touch.clientY;
                 
                 // show the user where they touched
-                showTouchIndicator(touch.clientX, touchY);
+                showTouchIndicator(touch.clientX, touch.clientY);
             }
         });
         

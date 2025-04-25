@@ -75,24 +75,24 @@ let engine, render, runner, mouse, mouseConstraint, canvas;
 let draggedBody = null;
 let ground, leftWall, rightWall, ceiling, basePlatform;
 
-// Gravity zone variables
+// gravity zone variables
 let gravityZones = [];
 let gravityZoneMode = false;
 
-// Track glowing elements
+// glow effects tracking
 const glowElements = {
     portals: [],
     attractors: [],
     shapes: []
 };
 
-// Wait for DOM to be fully loaded before initializing
+// wait for DOM to be fully loaded bfr initializing
 document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
     setupEventListeners();
     addDecorativeElements();
     
-    // Populate with some initial shapes
+    // populate with some initial shapes
     for (let i = 0; i < 5; i++) {
         setTimeout(() => {
             addCircle();
@@ -102,11 +102,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }, i * 200);
     }
     
-    // Gravity zone mode
+    // gravity zone mode
     document.getElementById('add-gravity-zone').addEventListener('click', function() {
         toggleButtonMode('add-gravity-zone');
         gravityZoneMode = !gravityZoneMode;
-        attractorMode = false; // Ensure other modes are off
+        attractorMode = false; // ensure other modes r off
         sandMode = false;
         
         if (gravityZoneMode) {
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Portal Button
+    // portal Button
     document.getElementById('portalBtn').addEventListener('click', function() {
         portalMode = !portalMode;
         this.classList.toggle('active', portalMode);
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Initialize physics engine and environment
+// initialize physics engine and environment
 function initPhysics() {
     // fire up da physics engien
     engine = Engine.create();
@@ -367,7 +367,7 @@ function createBoundaries() {
 
 
 function setupEventListeners() {
-    // All buttons that need to be tracked for active state
+    // all buttons that need to be tracked for active state
     const allActionButtons = [
         'add-circle', 'add-square', 'add-triangle', 'add-star', 
         'add-sand', 'add-text', 'add-gravity-zone', 'toggle-wind', 
@@ -375,10 +375,10 @@ function setupEventListeners() {
         'add-portal', 'toggle-pause', 'clear'
     ];
     
-    // Shape buttons (these should toggle as a group)
+    // shape buttons (these should toggle as a group)
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     
-    // Function to clear active state from specific button groups
+    // function to clear active state frm specific button groups
     function clearActiveState(buttonGroup) {
         buttonGroup.forEach(id => {
             const button = document.getElementById(id);
@@ -386,7 +386,7 @@ function setupEventListeners() {
         });
     }
     
-    // Setup shape buttons
+    // setup shape buttons
     shapeButtons.forEach(buttonId => {
         const button = document.getElementById(buttonId);
         if (!button) return;
@@ -394,23 +394,23 @@ function setupEventListeners() {
         button.classList.add('shape-button');
         
         button.addEventListener('click', () => {
-            // If already active, deactivate it
+            // if already active, deactivate it
             if (button.classList.contains('active')) {
                 button.classList.remove('active');
                 return;
             }
             
-            // Clear active state from all buttons that should toggle
+            // clear active state from all buttons that shoud toggle
             clearActiveState(allActionButtons);
             
-            // Activate this button
+            // activate this button
             button.classList.add('active');
             
             showFloatingMessage(`Now click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
         });
     });
 
-    // Keyboard shortcuts
+    // keyboard shortcuts
     document.addEventListener('keydown', function(event) {
         if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
         
@@ -449,26 +449,26 @@ function setupEventListeners() {
                 document.getElementById('add-text').click();
                 break;
             case 'escape':
-                // Deactivate all buttons when pressing Escape
+                // deactivate all buttons when pressing escape
                 clearActiveState(allActionButtons);
-                // Reset all modes
+                // reset all modes
                 attractorMode = false;
                 explosionMode = false;
                 gravityZoneMode = false;
                 portalMode = false;
                 
-                // Reset button texts
+                // reset button texts
                 document.getElementById('add-attractor').textContent = 'Add Attractor';
                 document.getElementById('create-explosion').textContent = 'Explosion';
                 break;
         }
     });
 
-    // Mode toggle buttons
+    // mode toggle buttons
     
-    // Wind toggle
+    // wind toggle
     document.getElementById('toggle-wind').addEventListener('click', function() {
-        // Clear other active buttons only if this one is becoming active
+        // clear other active buttons only if this one is becoming active
         if (!windEnabled) {
             clearActiveState(shapeButtons);
         }
@@ -476,11 +476,11 @@ function setupEventListeners() {
         windEnabled = !windEnabled;
         this.textContent = windEnabled ? 'Disable Wind' : 'Toggle Wind';
         
-        // Toggle active class based on state
+        // toggle active class based on state
         this.classList.toggle('active', windEnabled);
     });
 
-    // Collision effects
+    // collision effects
     document.getElementById('toggle-collision-sparks').addEventListener('click', function() {
         if (!collisionEffectsEnabled) {
             collisionEffectsEnabled = true;
@@ -492,28 +492,28 @@ function setupEventListeners() {
         this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
         showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
         
-        // Set active class based on whether effects are enabled
+        // set active class based on whether effects r enabled
         this.classList.toggle('active', collisionEffectsEnabled);
     });
 
-    // Attractor mode
+    // attractor mode
     document.getElementById('add-attractor').addEventListener('click', function() {
-        // Clear active state from other buttons
+        // clear active state from other buttons
         clearActiveState(allActionButtons.filter(id => id !== 'add-attractor'));
         
-        // Toggle attractor mode
+        // toggle attractor mode
         attractorMode = !attractorMode;
         this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
         
-        // Update active class to match state
+        // update active class to match state
         this.classList.toggle('active', attractorMode);
         
-        // Show info modal for attractor mode
+        // show info modal for attractor mode
         if (attractorMode) {
             document.getElementById('info-modal').style.display = 'flex';
         }
         
-        // Turn off other modes
+        // turn off other modes
         gravityZoneMode = false;
         explosionMode = false;
         portalMode = false;
@@ -524,16 +524,16 @@ function setupEventListeners() {
         document.getElementById('info-modal').style.display = 'none';
     });
 
-    // Gravity zone button
+    // gravity zone button
     document.getElementById('add-gravity-zone').addEventListener('click', function() {
-        // Clear other active buttons
+        // clear other active buttons
         clearActiveState(allActionButtons.filter(id => id !== 'add-gravity-zone'));
         
-        // Toggle gravity zone mode
+        // toggle gravity zone mode
         gravityZoneMode = !gravityZoneMode;
         this.classList.toggle('active', gravityZoneMode);
         
-        // Reset other modes
+        // reset other modes
         attractorMode = false;
         explosionMode = false;
         portalMode = false;
@@ -543,16 +543,16 @@ function setupEventListeners() {
         }
     });
 
-    // Portal button
+    // portal button
     document.getElementById('add-portal').addEventListener('click', function() {
-        // Clear other active buttons
+        /
         clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
         
-        // Toggle portal mode
+        
         portalMode = !portalMode;
         this.classList.toggle('active', portalMode);
         
-        // Reset other modes
+        
         attractorMode = false;
         gravityZoneMode = false;
         explosionMode = false;
@@ -562,26 +562,26 @@ function setupEventListeners() {
         }
     });
 
-    // Explosion button
+    
     document.getElementById('create-explosion').addEventListener('click', function() {
-        // Clear other active buttons
+       
         clearActiveState(allActionButtons.filter(id => id !== 'create-explosion'));
         
-        // Toggle explosion mode
+
         explosionMode = !explosionMode;
         this.textContent = explosionMode ? 'Cancel Explosion' : 'Explosion';
         this.classList.toggle('active', explosionMode);
         
-        // Reset other modes
+
         attractorMode = false;
         gravityZoneMode = false;
         portalMode = false;
         
-        // Show message about current state
+
         showFloatingMessage(explosionMode ? 'Explosion mode enabled - click anywhere to create explosions' : 'Explosion mode disabled');
     });
     
-    // Pause button
+   
     document.getElementById('toggle-pause').addEventListener('click', function() {
         // Toggle pause state
         togglePause();
@@ -802,7 +802,7 @@ function setupUpdateLoop() {
         }
         
         // update the time scale
-        updateGlowEffects();
+        updateGlowEffects(now);
     });
 }
 
@@ -831,7 +831,7 @@ function addCircle() {
     Composite.add(engine.world, circle);
     
     // Create subtle glow effect for the shape
-    createGlowEffect('shape', {x: lastMousePos.x, y: lastMousePos.y}, radius, color);
+    createGlowEffect(circle, 'shape', radius);
     
     return circle;
 }
@@ -1013,7 +1013,7 @@ function createAttractor(x, y) {
     attractor.element = element;
     
     // Create glow effect for the attractor
-    createGlowEffect('attractor', {x, y}, radius, null);
+    createGlowEffect(attractor, 'attractor', radius);
     
     return attractor;
 }
@@ -2147,38 +2147,36 @@ function initMobileSupport() {
         
         // handle mobile pinch-zoom
         let lastDistance = 0;
-       ```javascript
         canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault(); // Prevent scrolling while interacting with canvas
+            e.preventDefault(); // Prevent```javascript
+            // handle pinch zoom (can be used for future features)
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
             
-            if (e.touches.length >= 2) {
-                // handle pinch zoom (can be used for future features)
-                const touch1 = e.touches[0];
-                const touch2 = e.touches[1];
-                
-                const distance = Math.hypot(
-                    touch1.clientX -touch2.clientX,
-                    touch1.clientY - touch2.clientY
-                );
-                
-                if (lastDistance > 0) {
-                    const delta = distance - lastDistance;
-                    // Could implement zoom or other features here
-                }
-                
-                lastDistance = distance;
-            } else if (e.touches.length === 1) {
-                // update for single touch
-                const touch =e.touches[0];
-                lastMousePos.x = touch.clientX;
-                lastMousePos.y = touch.clientY;
+            const distance = Math.h```javascript
+            const distance = Math.hypot(
+                touch1.clientX -touch2.clientX,
+                touch1.clientY - touch2.clientY
+            );
+            
+            if (lastDistance > 0) {
+                const delta = distance - lastDistance;
+                // Could implement zoom or other features here
             }
-        });
-        
-        canvas.addEventListener('touchend', function() {
-            lastDistance = 0;
-        });
-    }
+            
+            lastDistance = distance;
+        } else if (e.touches.length === 1) {
+            // update for single touch
+            const touch =e.touches[0];
+            lastMousePos.x = touch.clientX;
+            lastMousePos.y = touch.clientY;
+        }
+    });
+    
+    canvas.addEventListener('touchend', function() {
+        lastDistance = 0;
+    });
+}
 }
 
 // Show visual indicator for touch
@@ -2256,7 +2254,7 @@ function handlePortalPlacement(event) {
     const portal = createPortal(x, y, isEntrance);
     
     // Create glow effect for the portal
-    createGlowEffect('portal', {x, y}, portal.radius, isEntrance ? 'entrance' : 'exit');
+    createGlowEffect(portal, 'portal', portal.radius);
 }
 
 function renderPortals(context) {
@@ -2342,168 +2340,132 @@ function checkPortalTeleportation() {
     }
 }
 
-// Create a glow effect for an element
-function createGlowEffect(type, position, size, color) {
-    // Create a DOM element for the glow effect
-    const glow = document.createElement('div');
-    glow.className = `glow-effect ${type}-glow`;
-    
-    // Set size and position
-    glow.style.width = (size * 2.5) + 'px';
-    glow.style.height = (size * 2.5) + 'px';
-    glow.style.left = position.x + 'px';
-    glow.style.top = position.y + 'px';
-    
-    // Set appearance based on type
-    switch(type) {
-        case 'portal':
-            glow.style.boxShadow = `0 0 ${size/2}px ${size/2}px rgba(128, 0, 255, 0.5)`;
-            glow.style.background = 'radial-gradient(circle, rgba(128, 0, 255, 0.3) 0%, rgba(128, 0, 255, 0.1) 50%, rgba(128, 0, 255, 0) 70%)';
-            break;
-        case 'attractor':
-            glow.style.boxShadow = `0 0 ${size/3}px ${size/3}px rgba(0, 255, 255, 0.4)`;
-            glow.style.background = 'radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, rgba(0, 255, 255, 0.1) 50%, rgba(0, 255, 255, 0) 70%)';
-            break;
-        case 'shape':
-            // Use the color of the shape for its glow
-            const glowColor = color || '#ffffff';
-            const rgbColor = hexToRgb(glowColor);
-            glow.style.boxShadow = `0 0 ${size/4}px ${size/4}px rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0.3)`;
-            glow.style.background = `radial-gradient(circle, rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0.2) 0%, rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0.1) 50%, rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0) 70%)`;
-            break;
-    }
-    
-    // Add common styling
-    glow.style.position = 'absolute';
-    glow.style.borderRadius = '50%';
-    glow.style.transform = 'translate(-50%, -50%)';
-    glow.style.pointerEvents = 'none';
-    glow.style.zIndex = '0'; // Behind other elements
-    
-    // Add to DOM
-    document.body.appendChild(glow);
-    
-    // Create glow object to track
-    const glowObj = {
-        element: glow,
-        position: position,
-        size: size,
-        type: type,
-        color: color,
-        pulsePhase: Math.random() * Math.PI * 2, // Random starting phase
-        pulseSpeed: 0.03 + Math.random() * 0.02, // Slightly different speeds for each glow
-        entity: null // Reference to the associated entity (portal, attractor, etc.)
+// Create a new glow effect for an element
+function createGlowEffect(element, type) {
+    // Define colors and sizes for different types of elements
+    const glowProps = {
+        portal: { color: '#4fc3f7', size: 120, opacity: 0.6 },
+        attractor: { color: '#ff9800', size: 100, opacity: 0.5 },
+        shape: { color: '#4caf50', size: 80, opacity: 0.4 }
     };
     
-    // Add to appropriate collection
-    switch(type) {
-        case 'portal':
-            glowElements.portals.push(glowObj);
-            break;
-        case 'attractor':
-            glowElements.attractors.push(glowObj);
-            break;
-        case 'shape':
-            glowElements.shapes.push(glowObj);
-            break;
-    }
+    // Use default props if type is not recognized
+    const props = glowProps[type] || { color: '#ffffff', size: 80, opacity: 0.4 };
     
-    return glowObj;
+    // Create DOM element for the glow
+    const glowElement = document.createElement('div');
+    glowElement.className = `glow-effect ${type}-glow`;
+    glowElement.style.position = 'absolute';
+    glowElement.style.width = `${props.size}px`;
+    glowElement.style.height = `${props.size}px`;
+    glowElement.style.borderRadius = '50%';
+    glowElement.style.pointerEvents = 'none';
+    glowElement.style.opacity = props.opacity.toString();
+    glowElement.style.boxShadow = `0 0 ${props.size/4}px ${props.size/2}px ${props.color}`;
+    glowElement.style.zIndex = '-1'; // Position behind physics objects
+    
+    // Position the glow element
+    const pos = element.position || (element.body ? element.body.position : { x: 0, y: 0 });
+    glowElement.style.left = `${pos.x - props.size/2}px`;
+    glowElement.style.top = `${pos.y - props.size/2}px`;
+    
+    // Append to the container
+    document.getElementById('container').appendChild(glowElement);
+    
+    // Create glow object with randomized phase for varied animation
+    const glowObject = {
+        element: element,
+        domElement: glowElement,
+        size: props.size,
+        color: props.color,
+        opacity: props.opacity,
+        pulseSpeed: 1 + Math.random() * 0.5, // Random speed between 1 and 1.5
+        pulsePhase: Math.random() * Math.PI * 2 // Random phase offset
+    };
+    
+    // Add to glow elements collection
+    if (!glowElements[type]) {
+        glowElements[type] = [];
+    }
+    glowElements[type].push(glowObject);
+    
+    return glowObject;
 }
 
+// update all glow effects
 function updateGlowEffects() {
-    // Update time for pulsing effects
-    const time = Date.now() / 1000;
+    const time = performance.now() / 1000; // Current time in seconds for animation
     
-    // Update portal glows
-    glowElements.portals.forEach((glow, index) => {
-        // Update pulse phase
-        glow.pulsePhase += glow.pulseSpeed;
-        if (glow.pulsePhase > Math.PI * 2) glow.pulsePhase -= Math.PI * 2;
-        
-        // Calculate pulse effect
-        const pulse = 1 + Math.sin(glow.pulsePhase) * 0.2;
-        
-        // Apply pulse effect
-        glow.element.style.transform = `translate(-50%, -50%) scale(${pulse})`;
-        glow.element.style.opacity = 0.7 + Math.sin(glow.pulsePhase) * 0.3;
-        
-        // Check if portal still exists, if not remove the glow
-        const portalExists = portals.some(portal => 
-            (portal.entrance.x === glow.position.x && portal.entrance.y === glow.position.y) ||
-            (portal.exit.x === glow.position.x && portal.exit.y === glow.position.y)
-        );
-        
-        if (!portalExists) {
-            // Remove the glow element
-            if (glow.element && glow.element.parentNode) {
-                glow.element.parentNode.removeChild(glow.element);
+    // Update portal glow effects
+    if (glowElements.portal) {
+        glowElements.portal.forEach(glow => {
+            if (glow.element && glow.domElement) {
+                const portalPos = glow.element.position;
+                // Update position
+                glow.domElement.style.left = `${portalPos.x - glow.size/2}px`;
+                glow.domElement.style.top = `${portalPos.y - glow.size/2}px`;
+                
+                // Pulsing animation with sine wave
+                const pulseValue = 0.8 + Math.sin(time * glow.pulseSpeed + glow.pulsePhase) * 0.2;
+                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+                
+                // Slight size oscillation
+                const sizeScale = 0.9 + Math.sin(time * glow.pulseSpeed * 0.7 + glow.pulsePhase) * 0.1;
+                const currentSize = glow.size * sizeScale;
+                glow.domElement.style.width = `${currentSize}px`;
+                glow.domElement.style.height = `${currentSize}px`;
+                glow.domElement.style.left = `${portalPos.x - currentSize/2}px`;
+                glow.domElement.style.top = `${portalPos.y - currentSize/2}px`;
             }
-            // Remove from array
-            glowElements.portals.splice(index, 1);
-        }
-    });
-    
-    // Update attractor glows
-    glowElements.attractors.forEach((glow, index) => {
-        // Update pulse phase
-        glow.pulsePhase += glow.pulseSpeed;
-        if (glow.pulsePhase > Math.PI * 2) glow.pulsePhase -= Math.PI * 2;
-        
-        // Calculate pulse effect
-        const pulse = 1 + Math.sin(glow.pulsePhase) * 0.15;
-        
-        // Apply pulse effect
-        glow.element.style.transform = `translate(-50%, -50%) scale(${pulse})`;
-        glow.element.style.opacity = 0.6 + Math.sin(glow.pulsePhase) * 0.4;
-        
-        // Check if attractor still exists, if not remove the glow
-        const attractorExists = attractors.some(attr => 
-            attr.position.x === glow.position.x && attr.position.y === glow.position.y
-        );
-        
-        if (!attractorExists) {
-            // Remove the glow element
-            if (glow.element && glow.element.parentNode) {
-                glow.element.parentNode.removeChild(glow.element);
-            }
-            // Remove from array
-            glowElements.attractors.splice(index, 1);
-        }
-    });
-    
-    // Update shape glows - these will fade out over time
-    glowElements.shapes.forEach((glow, index) => {
-        // Shapes glow should fade over time
-        const opacity = parseFloat(glow.element.style.opacity) || 0.5;
-        if (opacity > 0.05) {
-            glow.element.style.opacity = opacity - 0.005;
-        } else {
-            // Remove the glow element when it becomes too faint
-            if (glow.element && glow.element.parentNode) {
-                glow.element.parentNode.removeChild(glow.element);
-            }
-            // Remove from array
-            glowElements.shapes.splice(index, 1);
-        }
-    });
-}
-
-// Helper function to convert hex to RGB
-function hexToRgb(hex) {
-    // Default fallback color
-    if (!hex || typeof hex !== 'string') {
-        return { r: 255, g: 255, b: 255 };
+        });
     }
     
-    // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-    hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+    // Update attractor glow effects
+    if (glowElements.attractor) {
+        glowElements.attractor.forEach(glow => {
+            if (glow.element && glow.domElement) {
+                const attractorPos = glow.element.position;
+                // Update position
+                glow.domElement.style.left = `${attractorPos.x - glow.size/2}px`;
+                glow.domElement.style.top = `${attractorPos.y - glow.size/2}px`;
+                
+                // Pulsing animation with cosine for different phase than portals
+                const pulseValue = 0.85 + Math.cos(time * glow.pulseSpeed * 1.2 + glow.pulsePhase) * 0.15;
+                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+                
+                // More pronounced size oscillation for attractors
+                const sizeScale = 0.85 + Math.cos(time * glow.pulseSpeed + glow.pulsePhase) * 0.15;
+                const currentSize = glow.size * sizeScale;
+                glow.domElement.style.width = `${currentSize}px`;
+                glow.domElement.style.height = `${currentSize}px`;
+                glow.domElement.style.left = `${attractorPos.x - currentSize/2}px`;
+                glow.domElement.style.top = `${attractorPos.y - currentSize/2}px`;
+            }
+        });
+    }
     
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-    } : { r: 255, g: 255, b: 255 };
+    // Update shape glow effects
+    if (glowElements.shape) {
+        glowElements.shape.forEach(glow => {
+            if (glow.element && glow.element.body && glow.domElement) {
+                const shapePos = glow.element.body.position;
+                // Update position
+                glow.domElement.style.left = `${shapePos.x - glow.size/2}px`;
+                glow.domElement.style.top = `${shapePos.y - glow.size/2}px`;
+                
+                // Subtle pulsing for shapes
+                const pulseValue = 0.9 + Math.sin(time * glow.pulseSpeed * 0.8 + glow.pulsePhase) * 0.1;
+                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+                
+                // Minimal size oscillation for shapes
+                const sizeScale = 0.95 + Math.sin(time * glow.pulseSpeed * 0.5 + glow.pulsePhase) * 0.05;
+                const currentSize = glow.size * sizeScale;
+                glow.domElement.style.width = `${currentSize}px`;
+                glow.domElement.style.height = `${currentSize}px`;
+                glow.domElement.style.left = `${shapePos.x - currentSize/2}px`;
+                glow.domElement.style.top = `${shapePos.y - currentSize/2}px`;
+            }
+        });
+    }
 }
+```

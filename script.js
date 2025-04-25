@@ -236,18 +236,25 @@ function setupMouseControl() {
         } else if (portalMode) {
             handlePortalPlacement(event);
         } else {
-
             const activeButtonId = document.querySelector('.shape-button.active')?.id;
             
             if (activeButtonId) {
                 switch(activeButtonId) {
-                    case 'add-circle': addCircle(); break;
-                    case 'add-square': addSquare(); break;
-                    case 'add-triangle': addTriangle(); break;
-                    case 'add-star': addStar(); break;
+                    case 'add-circle': 
+                        addCircle(event.clientX, event.clientY); 
+                        break;
+                    case 'add-square': 
+                        addSquare(event.clientX, event.clientY); 
+                        break;
+                    case 'add-triangle': 
+                        addTriangle(event.clientX, event.clientY); 
+                        break;
+                    case 'add-star': 
+                        addStar(event.clientX, event.clientY); 
+                        break;
                     case 'add-sand': 
                         for (let i = 0; i < 20; i++) {
-                            addSandParticle();
+                            addSandParticle(event.clientX, event.clientY);
                         }
                         break;
                     case 'add-text':
@@ -386,19 +393,26 @@ function setupEventListeners() {
         button.classList.add('shape-button');
         
         button.addEventListener('click', () => {
-            // if already active, deactivate it
+            // Toggle active state
             if (button.classList.contains('active')) {
                 button.classList.remove('active');
                 return;
             }
             
-            // clear active state from all buttons that shoud toggle
+            // Clear active state from all buttons
             clearActiveState(allActionButtons);
             
-            // activate this button
+            // Activate this button
             button.classList.add('active');
             
-            showFloatingMessage(`Now click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
+            // Clear other modes
+            attractorMode = false;
+            explosionMode = false;
+            gravityZoneMode = false;
+            portalMode = false;
+            
+            // Update user feedback
+            showFloatingMessage(`Click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
         });
     });
 
@@ -797,12 +811,16 @@ function setupUpdateLoop() {
 }
 
 // SHAPE CREATION FUNCTIONS
-function addCircle() {
+function addCircle(x, y) {
+    // Use provided coordinates or fall back to lastMousePos
+    const posX = x || lastMousePos.x;
+    const posY = y || lastMousePos.y;
+    
     const radius = 20 + Math.random() * 30;
     const color = getRandomColorFromTheme();
     const circle = Bodies.circle(
-        lastMousePos.x,
-        lastMousePos.y,
+        posX,
+        posY,
         radius,
         {
             restitution: defaultBounciness,
@@ -826,11 +844,15 @@ function addCircle() {
     return circle;
 }
 
-function addSquare() {
+function addSquare(x, y) {
+    // Use provided coordinates or fall back to lastMousePos
+    const posX = x || lastMousePos.x;
+    const posY = y || lastMousePos.y;
+    
     const size = 20 + Math.random() * 40;
     const square = Bodies.rectangle(
-        lastMousePos.x,
-        lastMousePos.y,
+        posX,
+        posY,
         size,
         size,
         {
@@ -851,7 +873,11 @@ function addSquare() {
     return square;
 }
 
-function addTriangle() {
+function addTriangle(x, y) {
+    // Use provided coordinates or fall back to lastMousePos
+    const posX = x || lastMousePos.x;
+    const posY = y || lastMousePos.y;
+    
     const size = 25 + Math.random() * 40;
     const height = size * Math.sqrt(3) / 2;
     
@@ -862,8 +888,8 @@ function addTriangle() {
     ];
     
     const triangle = Bodies.fromVertices(
-        lastMousePos.x,
-        lastMousePos.y,
+        posX,
+        posY,
         [vertices],
         {
             restitution: defaultBounciness,
@@ -883,7 +909,11 @@ function addTriangle() {
     return triangle;
 }
 
-function addStar() {
+function addStar(x, y) {
+    // Use provided coordinates or fall back to lastMousePos
+    const posX = x || lastMousePos.x;
+    const posY = y || lastMousePos.y;
+    
     const outerRadius = 25 + Math.random() * 20;
     const innerRadius = outerRadius * 0.4;
     const points = 5;
@@ -898,8 +928,8 @@ function addStar() {
     }
     
     const star = Bodies.fromVertices(
-        lastMousePos.x,
-        lastMousePos.y,
+        posX,
+        posY,
         [vertices],
         {
             restitution: defaultBounciness,
@@ -919,13 +949,17 @@ function addStar() {
     return star;
 }
 
-function addSandParticle() {
+function addSandParticle(x, y) {
+    // Use provided coordinates or fall back to lastMousePos
+    const posX = x || lastMousePos.x;
+    const posY = y || lastMousePos.y;
+    
     const size = 5 + Math.random() * 5;
-    const x = lastMousePos.x + (Math.random() - 0.5) * 30;
-    const y = lastMousePos.y + (Math.random() - 0.5) * 30;
+    const particleX = posX + (Math.random() - 0.5) * 30;
+    const particleY = posY + (Math.random() - 0.5) * 30;
     
     const particle = Bodies.circle(
-        x, y, size,
+        particleX, particleY, size,
         {
             restitution: 0.3,
             friction: 0.8,
@@ -2120,19 +2154,22 @@ function initMobileSupport() {
         if (!document.querySelector('meta[name="viewport"]')) {
             const meta = document.createElement('meta');
             meta.name = 'viewport';
+            meta.content = 'width```javascript
             meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
             document.head.appendChild(meta);
         }
-        
+
+
+
         // better touch handling for the canvas
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                lastMousePos.x = touch.clientX;
+                lastMousePos.x =touch.clientX;
                 lastMousePos.y = touch.clientY;
                 
                 // show the user where they touched
-                showTouchIndicator(touch.clientX,ttouch.clientY);
+                showTouchIndicator(touch.clientX,touch.clientY);
             }
         });
         
@@ -2341,4 +2378,116 @@ function checkPortalTeleportation() {
             }
         });
     }
+}
+
+// array of all interactive buttons to help with toggling
+const allActionButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text', 
+                         'add-attractor', 'add-gravity-zone', 'create-explosion', 'add-portal'];
+
+// toggle an action button and cancel other modes
+function toggleButtonMode(buttonId) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    
+    // if already active, deactivate it
+    if (button.classList.contains('active')) {
+        button.classList.remove('active');
+        return false; // return false to indicate it was turned off
+    }
+    
+    // clear active state from all buttons
+    clearActiveState(allActionButtons);
+    
+    // activate this button
+    button.classList.add('active');
+    return true; // return true to indicate it was turned on
+}
+
+// helper to clear active state from multiple buttons
+function clearActiveState(buttonIds) {
+    buttonIds.forEach(id => {
+        const button = document.getElementById(id);
+        if (button) {
+            button.classList.remove('active');
+        }
+    });
+}
+
+// Function to create glow effects for various elements
+function createGlowEffect(type, target, options = {}) {
+    const size = options.size || 30;
+    const color = options.color || (type === 'portal' ? target.color : 
+                                   type === 'attractor' ? '#FFD700' : 
+                                   getRandomColorFromTheme());
+    
+    const glowElement = {
+        target: target,
+        type: type,
+        size: size,
+        color: color,
+        lastUpdate: Date.now(),
+        phase: Math.random() * Math.PI * 2 // Random initial phase for variation
+    };
+    
+    // Add to appropriate collection
+    if (type === 'portal') {
+        glowElements.portals.push(glowElement);
+    } else if (type === 'attractor') {
+        glowElements.attractors.push(glowElement);
+    } else if (type === 'shape') {
+        glowElements.shapes.push(glowElement);
+    }
+    
+    return glowElement;
+}
+
+// Update glow effects
+function updateGlowEffects(now) {
+    // Portal glows
+    glowElements.portals = glowElements.portals.filter(glow => {
+        const portal = glow.target;
+        if (!portal || !portals.includes(portal)) return false;
+        
+        // Animate portal glow
+        glow.phase += 0.02;
+        const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.2);
+        
+        // Create CSS box-shadow for glow
+        portal.element = portal.element || {};
+        portal.element.style = portal.element.style || {};
+        portal.element.style.boxShadow = `0 0 ${pulseSize}px ${pulseSize/2}px ${portal.color}`;
+        
+        return true;
+    });
+    
+    // Attractor glows
+    glowElements.attractors = glowElements.attractors.filter(glow => {
+        const attractor = glow.target;
+        if (!attractor || !attractors.includes(attractor)) return false;
+        
+        // Animate attractor glow
+        glow.phase += 0.03;
+        const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.15);
+        
+        if (attractor.element) {
+            attractor.element.style.boxShadow = `0 0 ${pulseSize}px ${pulseSize/2}px rgba(255, 215, 0, 0.6)`;
+        }
+        
+        return true;
+    });
+    
+    // Shape glows - these are temporary effects that fade
+    glowElements.shapes = glowElements.shapes.filter(glow => {
+        const body = glow.target;
+        if (!body || !Composite.get(engine.world, body.id, 'body')) return false;
+        
+        const elapsed = now - glow.lastUpdate;
+        
+        // Fade out glow over time
+        if (elapsed > 1000) {
+            return false;
+        }
+        
+        return true;
+    });
 }

@@ -1,4 +1,5 @@
-// grab all da matter.js stuf we need
+// grab all the matter.js functions we need
+// and make sure to use the same version as the one in the HTML file
 const { 
     Engine, 
     Render, 
@@ -29,15 +30,15 @@ let attractor = null;
 let isDarkMode = false;
 let lastClickTime = 0;
 let doubleClickThreshold = 300; // 300ms for double-click detection
-let isPaused = false; // Track if simulation is paused
-let timeScale = 1.0; // For slow-motion effects
-let collisionEffectType = 0; // Track current collision effect type
-let explosionMode = false; // Track if explosion mode is enabled
-let portalMode = false; // Track if portal placement mode is enabled
-let portals = []; // Array to store portal pairs
+let isPaused = false; // track if simulation is paused
+let timeScale = 1.0; // for slow-motion effects
+let collisionEffectType = 0; // track current collision effect type
+let explosionMode = false; // track if explosion mode is enabled
+let portalMode = false; // track if portal placement mode is enabled
+let portals = []; // array to store portal pairs
 
-// Theming variables
-let currentTheme = 'boutique'; // Match the HTML default
+// theming variables
+let currentTheme = 'boutique'; // match the HTML default
 const themes = {
     boutique: {
         sparkColors: ['#FF5252', '#2196F3', '#4CAF50', '#FFC107', '#9C27B0']
@@ -55,7 +56,7 @@ const themes = {
 
 let boutiqueColors = themes.boutique;
 
-// Attractor system
+// attractor system
 let attractors = [];
 let attractorMode = false;
 let windEnabled = false;
@@ -63,14 +64,14 @@ let windStrength = 0.1;
 let defaultBounciness = 0.7;
 let collisionEffectsEnabled = true;
 
-// Sand particles
+// sand particles
 let sandParticles = [];
 
-// Performance tracking
+// performance tracking
 let lastFrameTime = null;
 let frameRateHistory = Array(30).fill(60);
 
-// Engine variables
+// engine variables
 let engine, render, runner, mouse, mouseConstraint, canvas;
 let draggedBody = null;
 let ground, leftWall, rightWall, ceiling, basePlatform;
@@ -86,11 +87,11 @@ const glowElements = {
     shapes: []
 };
 
- // Make sure all buttons get properly initialized
+ // make sure all buttons get properly initialized
 document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
     setupEventListeners();
-    // Make sure to initialize all buttons after setupEventListeners
+    // make sure to initialize all buttons after setupEventListeners
     initButtonsClasses();
     addDecorativeElements();
     setupCursorAndTouchEvents();
@@ -107,9 +108,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Initialize all buttons with proper classes
+// initialize all buttons with proper classes
 function initButtonsClasses() {
-    // Add 'shape-button' class to all shape buttons
+    // add 'shape-button' class to all shape buttons
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     shapeButtons.forEach(id => {
         const button = document.getElementById(id);
@@ -379,25 +380,25 @@ function setupEventListeners() {
         button.classList.add('shape-button');
         
         button.addEventListener('click', () => {
-            // Toggle active state
+            // toggle active state
             if (button.classList.contains('active')) {
                 button.classList.remove('active');
                 return;
             }
             
-            // Clear active state from all buttons
+            // clear active state from all buttons
             clearActiveState(allActionButtons);
             
-            // Activate this button
+            // activate this button
             button.classList.add('active');
             
-            // Clear other modes
+            // clear other modes
             attractorMode = false;
             explosionMode = false;
             gravityZoneMode = false;
             portalMode = false;
             
-            // Update user feedback
+            // update user feedback
             showFloatingMessage(`Click anywhere on the canvas to add ${buttonId.replace('add-', '')}`);
         });
     });
@@ -434,7 +435,7 @@ function setupEventListeners() {
             case 'p':
                 togglePause();
                 break;
-            case ' ': // Space key for explosion
+            case ' ': // space key for explosion
                 createExplosion(lastMousePos);
                 break;
             case 'enter':
@@ -573,46 +574,46 @@ function setupEventListeners() {
     
    
     document.getElementById('toggle-pause').addEventListener('click', function() {
-        // Toggle pause state
+        // toggle pause state
         togglePause();
         
-        // Update active class to match state
+        // update active class to match state
         this.classList.toggle('active', isPaused);
     });
     
-    // Clear button
+    // clear button
     document.getElementById('clear').addEventListener('click', function() {
-        // Clear all non-static bodies
+        // clear all non-static bodies
         clearNonStaticBodies();
         
-        // Clear all attractors
+        // clear all attractors
         while (attractors.length > 0) {
             removeAttractor(attractors[0]);
         }
         
-        // Reset modes
+        // reset modes
         attractorMode = false;
         explosionMode = false;
         gravityZoneMode = false;
         portalMode = false;
         
-        // Reset button texts
+        // reset button texts
         document.getElementById('add-attractor').textContent = 'Add Attractor';
         document.getElementById('create-explosion').textContent = 'Explosion';
         document.getElementById('toggle-wind').textContent = 'Toggle Wind';
         
-        // Deactivate all buttons
+        // deactivate all buttons
         clearActiveState(allActionButtons);
         
         showFloatingMessage('All cleared!');
     });
 
-    // Theme selector
+    // theme selector
     document.getElementById('theme-select').addEventListener('change', function() {
         setTheme(this.value);
     });
 
-    // Sliders
+    // sliders
     document.getElementById('gravity-slider').addEventListener('input', function() {
         engine.world.gravity.y = parseFloat(this.value);
     });
@@ -629,7 +630,7 @@ function setupEventListeners() {
         timeScale = parseFloat(this.value);
         engine.timing.timeScale = timeScale;
         
-        // Show visual feedback
+        // show visual feedback
         const speedText = timeScale < 1 ? 'Slow Motion' : 
                           timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
         showFloatingMessage(`Time: ${speedText} (${timeScale.toFixed(1)}x)`);
@@ -641,7 +642,7 @@ function setupEventListeners() {
         }
     });
 
-    // Save and load buttons
+    // save and load buttons
     document.getElementById('save-state').addEventListener('click', function() {
         savePlaygroundState();
     });
@@ -650,14 +651,14 @@ function setupEventListeners() {
         loadPlaygroundState();
     });
 
-    // Window resize handler
+    // window resize handler
     window.addEventListener('resize', debounce(function() {
         render.options.width = window.innerWidth;
         render.options.height = window.innerHeight;
         render.canvas.width = window.innerWidth;
         render.canvas.height = window.innerHeight;
         
-        // Adjust boundaries to match new window size
+        // adjust boundaries to match new window size
         Body.setPosition(ground, { x: window.innerWidth / 2, y: window.innerHeight });
         Body.setPosition(leftWall, { x: 0, y: window.innerHeight / 2 });
         Body.setPosition(rightWall, { x: window.innerWidth, y: window.innerHeight / 2 });
@@ -798,7 +799,7 @@ function setupUpdateLoop() {
 
 // SHAPE CREATION FUNCTIONS
 function addCircle(x, y) {
-    // Use provided coordinates or fall back to lastMousePos
+    // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
     const posY = y || lastMousePos.y;
     
@@ -824,14 +825,14 @@ function addCircle(x, y) {
     
     Composite.add(engine.world, circle);
     
-    // Create subtle glow effect for the shape
+    // create subtle glow effect for the shape
     createGlowEffect('shape', circle, { size: radius });
     
     return circle;
 }
 
 function addSquare(x, y) {
-    // Use provided coordinates or fall back to lastMousePos
+    // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
     const posY = y || lastMousePos.y;
     
@@ -860,7 +861,7 @@ function addSquare(x, y) {
 }
 
 function addTriangle(x, y) {
-    // Use provided coordinates or fall back to lastMousePos
+    // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
     const posY = y || lastMousePos.y;
     
@@ -896,7 +897,7 @@ function addTriangle(x, y) {
 }
 
 function addStar(x, y) {
-    // Use provided coordinates or fall back to lastMousePos
+    // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
     const posY = y || lastMousePos.y;
     
@@ -936,7 +937,7 @@ function addStar(x, y) {
 }
 
 function addSandParticle(x, y) {
-    // Use provided coordinates or fall back to lastMousePos
+    // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
     const posY = y || lastMousePos.y;
     
@@ -958,7 +959,7 @@ function addSandParticle(x, y) {
         }
     );
     
-    // Add to world and track
+    // add to world and track
     Composite.add(engine.world, particle);
     sandParticles.push(particle);
     
@@ -1022,7 +1023,7 @@ function createAttractor(x, y) {
     // reference the DOM element
     attractor.element = element;
     
-    // Create glow effect for the attractor
+    // create glow effect for the attractor
     createGlowEffect('attractor', attractor, { size: radius });
     
     return attractor;

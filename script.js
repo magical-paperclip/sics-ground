@@ -1580,7 +1580,6 @@ function loadPlaygroundState() {
         defaultBounciness = state.settings.bounciness || 0.7;
         document.getElementById('bounce-slider').value = defaultBounciness;
         
-        \
         if (state.settings.theme) {
             setTheme(state.settings.theme);
             document.getElementById('theme-select').value = state.settings.theme;
@@ -2150,18 +2149,18 @@ function initMobileSupport() {
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                lastMousePos.x                lastMousePos.x = touch.clientX;
+                lastMousePos.x = touch.clientX;
                 lastMousePos.y = touch.clientY;
                 
                 // show the user where they touched
-                showTouchIndicator(touch.clientX, touch.clientY);
+                showTouchIndicator(touch.clientX, touchY);
             }
         });
         
         // handle mobile pinch-zoom
         let lastDistance = 0;
         canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault(); // Prevent default touch actions
+            e.preventDefault(); // prevent default touch actions
             
             if (e.touches.length === 2) {
                 const touch1 = e.touches[0];
@@ -2192,7 +2191,7 @@ function initMobileSupport() {
     }
 }
 
-// Show visual indicator for touch
+// show visual indicator for touch
 function showTouchIndicator(x, y) {
     const indicator = document.createElement('div');
     indicator.style.position = 'absolute';
@@ -2208,7 +2207,7 @@ function showTouchIndicator(x, y) {
     indicator.style.opacity = '0.8';
     document.body.appendChild(indicator);
     
-    // Animate and remove
+    // animate and remove
     indicator.animate([
         { transform: 'translate(-50%, -50%) scale(0.8)', opacity: 0.8 },
         { transform: 'translate(-50%, -50%) scale(1.5)', opacity: 0 }
@@ -2218,9 +2217,9 @@ function showTouchIndicator(x, y) {
     }).onfinish = () => indicator.remove();
 }
 
-// Call the setup functions when DOM is loaded
+// call the setup functions when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Add our new setup functions to the initialization
+    // add our new setup functions to the initialization
     const originalInit = window.onload || function(){};
     window.onload = function() {
         if (typeof originalInit === 'function') originalInit();
@@ -2229,20 +2228,20 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Function to create a portal
+// function to create a portal
 function createPortal(x, y, isEntrance) {
-    const portalColor = isEntrance ? '#3498db' : '#e74c3c'; // Blue for entrance, red for exit
+    const portalColor = isEntrance ? '#3498db' : '#e74c3c'; // blue for entrance, red for exit
     const portal = {
         x: x,
         y: y,
         radius: 30,
         isEntrance: isEntrance,
         color: portalColor,
-        partner: null, // Will be linked to its partner portal
+        partner: null, // will be linked to its partner portal
         particleTimer: 0
     };
     
-    // If we have an odd number of portals, link the last two as a pair
+    // odd portals = link the last two as a pair
     if (portals.length % 2 === 1) {
         const lastPortal = portals[portals.length - 1];
         portal.partner = lastPortal;
@@ -2262,11 +2261,11 @@ function handlePortalPlacement(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    // Create entrance (odd index) or exit (even index) portal
+    // create entrance (odd index) or exit (even index) portal
     const isEntrance = portals.length % 2 === 0;
     const portal = createPortal(x, y, isEntrance);
     
-    // Create glow effect for the portal
+    // create glow effect for the portal
     createGlowEffect('portal', portal, { size: portal.radius });
 }
 
@@ -2310,7 +2309,7 @@ function renderPortals(context) {
 function checkPortalTeleportation() {
     if (portals.length < 2) return;
     
-    // Process portal pairs (entrance and exit)
+    // process portal pairs (entrance and exit)
     for (let i = 0; i < portals.length; i += 2) {
         if (i + 1 >= portals.length) continue;
         
@@ -2319,7 +2318,7 @@ function checkPortalTeleportation() {
         
         if (!entrancePortal || !exitPortal) continue;
         
-        // Check for bodies near the entrance portal
+        // check for bodies near the entrance portal
         const bodies = Composite.allBodies(engine.world);
         bodies.forEach(body => {
             if (body.isStatic) return;
@@ -2328,30 +2327,30 @@ function checkPortalTeleportation() {
             const dy = body.position.y - entrancePortal.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            // If body is inside entrance portal
+            // if body is inside entrance portal
             const bodyRadius = body.circleRadius || Math.sqrt(body.area / Math.PI);
             if (distance < entrancePortal.radius + bodyRadius) {
-                // Save current velocity
+                // save current velocity and angular velocity
                 const velX = body.velocity.x;
                 const velY = body.velocity.y;
                 const angularVel = body.angularVelocity;
                 
-                // Teleport body to exit portal
+                // teleport body to exit portal
                 Body.setPosition(body, {
                     x: exitPortal.x,
                     y: exitPortal.y
                 });
                 
-                // Maintain velocity direction but give a slight boost
+                // maintain velocity direction but give a slight boost
                 Body.setVelocity(body, {
                     x: velX * 1.1,
                     y: velY * 1.1
                 });
                 
-                // Maintain angular velocity
+                // maintain angular velocity
                 Body.setAngularVelocity(body, angularVel);
                 
-                // Create particles at exit portal
+                // create particles at exit portal
                 for (let j = 0; j < 5; j++) {
                     createCollisionParticle(
                         {x: exitPortal.x, y: exitPortal.y}, 
@@ -2397,7 +2396,7 @@ function clearActiveState(buttonIds) {
     });
 }
 
-// Function to create glow effects for various elements
+// function to create glow effects for various elements
 function createGlowEffect(type, target, options = {}) {
     const size = options.size || 30;
     const color = options.color || (type === 'portal' ? target.color : 
@@ -2410,10 +2409,10 @@ function createGlowEffect(type, target, options = {}) {
         size: size,
         color: color,
         lastUpdate: Date.now(),
-        phase: Math.random() * Math.PI * 2 // Random initial phase for variation
+        phase: Math.random() * Math.PI * 2 // random initial phase for variation
     };
     
-    // Add to appropriate collection
+    // add to appropriate collection
     if (type === 'portal') {
         glowElements.portals.push(glowElement);
     } else if (type === 'attractor') {
@@ -2425,18 +2424,18 @@ function createGlowEffect(type, target, options = {}) {
     return glowElement;
 }
 
-// Update glow effects
+// update glow effects
 function updateGlowEffects(now) {
-    // Portal glows
+    // portal glows
     glowElements.portals = glowElements.portals.filter(glow => {
         const portal = glow.target;
         if (!portal || !portals.includes(portal)) return false;
         
-        // Animate portal glow
+        // animate portal glow
         glow.phase += 0.02;
         const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.2);
         
-        // Create CSS box-shadow for glow
+        // CSS box-shadow for glow
         portal.element = portal.element || {};
         portal.element.style = portal.element.style || {};
         portal.element.style.boxShadow = `0 0 ${pulseSize}px ${pulseSize/2}px ${portal.color}`;
@@ -2444,12 +2443,12 @@ function updateGlowEffects(now) {
         return true;
     });
     
-    // Attractor glows
+    // attractor glows
     glowElements.attractors = glowElements.attractors.filter(glow => {
         const attractor = glow.target;
         if (!attractor || !attractors.includes(attractor)) return false;
         
-        // Animate attractor glow
+        // animate attractor glow
         glow.phase += 0.03;
         const pulseSize = glow.size * (1 + Math.sin(glow.phase) * 0.15);
         
@@ -2460,7 +2459,7 @@ function updateGlowEffects(now) {
         return true;
     });
     
-    // Shape glows - these are temporary effects that fade
+    // shape glows - temporary effects that fade
     glowElements.shapes = glowElements.shapes.filter(glow => {
         const body = glow.target;
         if (!body || !Composite.get(engine.world, body.id, 'body')) return false;

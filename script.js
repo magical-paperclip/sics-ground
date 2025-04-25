@@ -37,9 +37,9 @@ let portalMode = false; // Track if portal placement mode is enabled
 let portals = []; // Array to store portal pairs
 
 // Theming variables
-let currentTheme = 'default';
+let currentTheme = 'boutique'; // Match the HTML default
 const themes = {
-    default: {
+    boutique: {
         sparkColors: ['#FF5252', '#2196F3', '#4CAF50', '#FFC107', '#9C27B0']
     },
     neon: {
@@ -53,7 +53,7 @@ const themes = {
     }
 };
 
-let boutiqueColors = themes.default;
+let boutiqueColors = themes.boutique;
 
 // Attractor system
 let attractors = [];
@@ -91,6 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
     setupEventListeners();
     addDecorativeElements();
+    setupCursorAndTouchEvents();
+    initMobileSupport();
     
     // populate with some initial shapes
     for (let i = 0; i < 5; i++) {
@@ -115,16 +117,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // portal Button
-    document.getElementById('portalBtn').addEventListener('click', function() {
+    document.getElementById('add-portal').addEventListener('click', function() {
+        clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
+        
         portalMode = !portalMode;
         this.classList.toggle('active', portalMode);
-        setCurrentMode('portal');
+        
+        attractorMode = false;
+        gravityZoneMode = false;
+        explosionMode = false;
+        
+        if (portalMode) {
+            showFloatingMessage('Click to place portal pairs. First click creates entrance, second creates exit.');
+        }
     });
 });
 
 // initialize physics engine and environment
 function initPhysics() {
-    // fire up da physics engien
+    // create the physics enginen
     engine = Engine.create();
     engine.world.gravity.y = 1;
     engine.timing.timeScale = 0.9;
@@ -154,13 +165,10 @@ function initPhysics() {
     // set up mouse control
     setupMouseControl();
     
-
     createBoundaries();
     
-
     setupCollisionEvents();
     
- 
     setupUpdateLoop();
 }
 
@@ -367,24 +375,8 @@ function createBoundaries() {
 
 
 function setupEventListeners() {
-    // all buttons that need to be tracked for active state
-    const allActionButtons = [
-        'add-circle', 'add-square', 'add-triangle', 'add-star', 
-        'add-sand', 'add-text', 'add-gravity-zone', 'toggle-wind', 
-        'add-attractor', 'toggle-collision-sparks', 'create-explosion',
-        'add-portal', 'toggle-pause', 'clear'
-    ];
-    
     // shape buttons (these should toggle as a group)
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
-    
-    // function to clear active state frm specific button groups
-    function clearActiveState(buttonGroup) {
-        buttonGroup.forEach(id => {
-            const button = document.getElementById(id);
-            if (button) button.classList.remove('active');
-        });
-    }
     
     // setup shape buttons
     shapeButtons.forEach(buttonId => {
@@ -545,13 +537,10 @@ function setupEventListeners() {
 
     // portal button
     document.getElementById('add-portal').addEventListener('click', function() {
-        /
         clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
-        
         
         portalMode = !portalMode;
         this.classList.toggle('active', portalMode);
-        
         
         attractorMode = false;
         gravityZoneMode = false;
@@ -567,6 +556,7 @@ function setupEventListeners() {
        
         clearActiveState(allActionButtons.filter(id => id !== 'create-explosion'));
         
+
 
         explosionMode = !explosionMode;
         this.textContent = explosionMode ? 'Cancel Explosion' : 'Explosion';
@@ -1581,6 +1571,7 @@ function loadPlaygroundState() {
             let body;
             
 
+
             switch (bodyData.type) {
                 case 'circle':
                     body = Bodies.circle(
@@ -2129,7 +2120,7 @@ function initMobileSupport() {
         if (!document.querySelector('meta[name="viewport"]')) {
             const meta = document.createElement('meta');
             meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
             document.head.appendChild(meta);
         }
         
@@ -2141,44 +2132,43 @@ function initMobileSupport() {
                 lastMousePos.y = touch.clientY;
                 
                 // show the user where they touched
-                showTouchIndicator(touch.clientX, touch.clientY);
+                showTouchIndicator(touch.clientX,ttouch.clientY);
             }
         });
         
         // handle mobile pinch-zoom
         let lastDistance = 0;
         canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault(); // Prevent```javascript
-            // handle pinch zoom (can be used for future features)
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
+            e.preventDefault(); // Preventdefault touch actions
             
-```javascript
-            if (!touch2) return; // Only one finger, exit
+            if (e.touches.length === 2) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                
+                const distance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                
+                if (lastDistance > 0) {
+                    const delta = distance - lastDistance;
+                    // Could implement zoom or other features here
+                }
+                
 
-            const distance = Math.hypot(
-                touch1.clientX -touch2.clientX,
-                touch1.clientY - touch2.clientY
-            );
-            
-            if (lastDistance > 0) {
-                const delta = distance - lastDistance;
-                // Could implement zoom or other features here
+                lastDistance = distance;
+            } else if (e.touches.length === 1) {
+                // update for single touch
+                const touch =e.touches[0];
+                lastMousePos.x = touch.clientX;
+                lastMousePos.y = touch.clientY;
             }
-            
-            lastDistance = distance;
-        } else if (e.touches.length === 1) {
-            // update for single touch
-            const touch =e.touches[0];
-            lastMousePos.x = touch.clientX;
-            lastMousePos.y = touch.clientY;
-        }
-    });
-    
-    canvas.addEventListener('touchend', function() {
-        lastDistance = 0;
-    });
-}
+        });
+        
+        canvas.addEventListener('touchend', function() {
+            lastDistance = 0;
+        });
+    }
 }
 
 // Show visual indicator for touch
@@ -2299,7 +2289,7 @@ function renderPortals(context) {
 function checkPortalTeleportation() {
     if (portals.length < 2) return;
     
-
+    // Process portal pairs (entrance and exit)
     for (let i = 0; i < portals.length; i += 2) {
         if (i + 1 >= portals.length) continue;
         
@@ -2308,7 +2298,7 @@ function checkPortalTeleportation() {
         
         if (!entrancePortal || !exitPortal) continue;
         
-   
+        // Check for bodies near the entrance portal
         const bodies = Composite.allBodies(engine.world);
         bodies.forEach(body => {
             if (body.isStatic) return;
@@ -2317,190 +2307,38 @@ function checkPortalTeleportation() {
             const dy = body.position.y - entrancePortal.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance < entrancePortal.radius + body.circleRadius) {
-               
+            // If body is inside entrance portal
+            const bodyRadius = body.circleRadius || Math.sqrt(body.area / Math.PI);
+            if (distance < entrancePortal.radius + bodyRadius) {
+                // Save current velocity
                 const velX = body.velocity.x;
                 const velY = body.velocity.y;
-                const speed = Math.sqrt(velX * velX + velY * velY);
+                const angularVel = body.angularVelocity;
                 
-                
+                // Teleport body to exit portal
                 Body.setPosition(body, {
                     x: exitPortal.x,
                     y: exitPortal.y
                 });
                 
-                
+                // Maintain velocity direction but give a slight boost
                 Body.setVelocity(body, {
                     x: velX * 1.1,
                     y: velY * 1.1
                 });
                 
+                // Maintain angular velocity
+                Body.setAngularVelocity(body, angularVel);
                 
-                createExplosion(exitPortal.x, exitPortal.y, 10, exitPortal.color, 3);
+                // Create particles at exit portal
+                for (let j = 0; j < 5; j++) {
+                    createCollisionParticle(
+                        {x: exitPortal.x, y: exitPortal.y}, 
+                        5 + Math.random() * 5, 
+                        exitPortal.color
+                    );
+                }
             }
         });
     }
 }
-
-// Create a new glow effect for a given element
-function createGlowEffect(elementType, element, options = {}) {
-    // Default configuration based on element type
-    const defaults = {
-        size: elementType === 'portal' ? 70 : elementType === 'attractor' ? 60 : 40,
-        color: elementType === 'portal' ? (element.isEntrance ? '#3498db' : '#e74c3c') : 
-               elementType === 'attractor' ? '#ff4500' : getRandomColorFromTheme(),
-        opacity: elementType === 'portal' ? 0.6 : elementType === 'attractor' ? 0.5 : 0.4,
-        pulseSpeed: elementType === 'portal' ? 2.0 : elementType === 'attractor' ? 1.8 : 1.5,
-        pulsePhase: Math.random() * Math.PI * 2 // Random phase for variety
-    };
-
-    // Merge defaults with options
-    const config = { ...defaults, ...options };
-    
-    // Create DOM element for glow
-    const glowElement = document.createElement('div');
-    glowElement.className = `glow-effect ${elementType}-glow`;
-    glowElement.style.position = 'absolute';
-    glowElement.style.width = `${config.size * 2}px`;
-    glowElement.style.height = `${config.size * 2}px`;
-    glowElement.style.borderRadius = '50%';
-    glowElement.style.backgroundColor = 'transparent';
-    glowElement.style.boxShadow = `0 0 ${config.size/2}px ${config.size/4}px ${config.color}`;
-    glowElement.style.opacity = config.opacity.toString();
-    glowElement.style.pointerEvents = 'none'; // Don't intercept mouse events
-    glowElement.style.zIndex = '0'; // Place behind other elements
-    glowElement.style.filter = 'blur(8px)';
-    glowElement.style.transform = 'translate(-50%, -50%)';
-    
-    // Initial position based on element type
-    let position;
-    if (elementType === 'portal') {
-        position = { x: element.x, y: element.y };
-    } else if (elementType === 'attractor') {
-        position = element.position;
-    } else {
-        // For shapes
-        position = element.position;
-    }
-    
-    glowElement.style.left = `${position.x}px`;
-    glowElement.style.top = `${position.y}px`;
-    
-    // Add to DOM
-    document.body.appendChild(glowElement);
-    
-    // Add to glowElements tracking
-    const glowData = {
-        element: element,
-        domElement: glowElement,
-        size: config.size,
-        color: config.color,
-        opacity: config.opacity,
-        pulseSpeed: config.pulseSpeed,
-        pulsePhase: config.pulsePhase
-    };
-    
-    glowElements[elementType].push(glowData);
-    return glowData;
-}
-
-// update all glow effects
-function updateGlowEffects(timestamp) {
-    const time = timestamp / 1000; // Convert to seconds for smoother animation
-    
-    // Update portal glow effects
-    if (glowElements.portals && glowElements.portals.length > 0) {
-        glowElements.portals.forEach((glow, index) => {
-            if (!glow || !glow.domElement) {
-                // Remove invalid entries
-                glowElements.portals.splice(index, 1);
-                return;
-            }
-            
-            const portal = glow.element;
-            if (!portal) return;
-            
-            // Update position
-            glow.domElement.style.left = `${portal.x - glow.size/2}px`;
-            glow.domElement.style.top = `${portal.y - glow.size/2}px`;
-            
-            // Pulsing animation with sine wave
-            const pulseValue = 0.8 + Math.sin(time * glow.pulseSpeed + glow.pulsePhase) * 0.2;
-            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-            
-            // Slight size oscillation
-            const sizeScale = 0.9 + Math.sin(time * glow.pulseSpeed * 0.7 + glow.pulsePhase) * 0.1;
-            const currentSize = glow.size * sizeScale;
-            glow.domElement.style.width = `${currentSize}px`;
-            glow.domElement.style.height = `${currentSize}px`;
-            glow.domElement.style.left = `${portal.x - currentSize/2}px`;
-            glow.domElement.style.top = `${portal.y - currentSize/2}px`;
-        });
-    }
-    
-    // Update attractor glow effects
-    if (glowElements.attractors && glowElements.attractors.length > 0) {
-        glowElements.attractors.forEach((glow, index) => {
-            if (!glow || !glow.domElement) {
-                // Remove invalid entries
-                glowElements.attractors.splice(index, 1);
-                return;
-            }
-            
-            const attractor = glow.element;
-            if (!attractor || !attractor.position) return;
-            
-            // Update position
-            glow.domElement.style.left = `${attractor.position.x - glow.size/2}px`;
-            glow.domElement.style.top = `${attractor.position.y - glow.size/2}px`;
-            
-            // Pulsing animation with cosine for different phase than portals
-            const pulseValue = 0.85 + Math.cos(time * glow.pulseSpeed * 1.2 + glow.pulsePhase) * 0.15;
-            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-            
-            // More pronounced size oscillation for attractors
-            const sizeScale = 0.85 + Math.cos(time * glow.pulseSpeed + glow.pulsePhase) * 0.15;
-            const currentSize = glow.size * sizeScale;
-            glow.domElement.style.width = `${currentSize}px`;
-            glow.domElement.style.height = `${currentSize}px`;
-            glow.domElement.style.left = `${attractor.position.x - currentSize/2}px`;
-            glow.domElement.style.top = `${attractor.position.y - currentSize/2}px`;
-        });
-    }
-    
-    // Update shape glow effects
-    if (glowElements.shapes && glowElements.shapes.length > 0) {
-        glowElements.shapes.forEach((glow, index) => {
-            if (!glow || !glow.domElement) {
-                // Remove invalid entries
-                glowElements.shapes.splice(index, 1);
-                return;
-            }
-            
-            const body = glow.element;
-            if (!body || !body.position) return;
-            
-            // Update position
-            glow.domElement.style.left = `${body.position.x - glow.size/2}px`;
-            glow.domElement.style.top = `${body.position.y - glow.size/2}px`;
-            
-            // Subtle pulsing for shapes
-            const pulseValue = 0.9 + Math.sin(time * glow.pulseSpeed * 0.8 + glow.pulsePhase) * 0.1;
-            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-            
-            // Minimal size oscillation for shapes
-            const sizeScale = 0.95 + Math.sin(time * glow.pulseSpeed * 0.5 + glow.pulsePhase) * 0.05;
-            const currentSize = glow.size * sizeScale;
-            glow.domElement.style.width = `${currentSize}px`;
-            glow.domElement.style.height = `${currentSize}px`;
-            glow.domElement.style.left = `${body.position.x - currentSize/2}px`;
-            glow.domElement.style.top = `${body.position.y - currentSize/2}px`;
-            
-            // Update rotation for shapes if they have it
-            if (body.angle !== undefined) {
-                glow.domElement.style.transform = `translate(-50%, -50%) rotate(${body.angle}rad)`;
-            }
-        });
-    }
-}
-```

@@ -831,7 +831,7 @@ function addCircle() {
     Composite.add(engine.world, circle);
     
     // Create subtle glow effect for the shape
-    createGlowEffect(circle, 'shape', radius);
+    createGlowEffect('shape', circle, { size: radius });
     
     return circle;
 }
@@ -1013,7 +1013,7 @@ function createAttractor(x, y) {
     attractor.element = element;
     
     // Create glow effect for the attractor
-    createGlowEffect(attractor, 'attractor', radius);
+    createGlowEffect('attractor', attractor, { size: radius });
     
     return attractor;
 }
@@ -2153,7 +2153,9 @@ function initMobileSupport() {
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             
-            const distance = Math.h```javascript
+```javascript
+            if (!touch2) return; // Only one finger, exit
+
             const distance = Math.hypot(
                 touch1.clientX -touch2.clientX,
                 touch1.clientY - touch2.clientY
@@ -2254,7 +2256,7 @@ function handlePortalPlacement(event) {
     const portal = createPortal(x, y, isEntrance);
     
     // Create glow effect for the portal
-    createGlowEffect(portal, 'portal', portal.radius);
+    createGlowEffect('portal', portal, { size: portal.radius });
 }
 
 function renderPortals(context) {
@@ -2340,130 +2342,163 @@ function checkPortalTeleportation() {
     }
 }
 
-// Create a new glow effect for an element
-function createGlowEffect(element, type) {
-    // Define colors and sizes for different types of elements
-    const glowProps = {
-        portal: { color: '#4fc3f7', size: 120, opacity: 0.6 },
-        attractor: { color: '#ff9800', size: 100, opacity: 0.5 },
-        shape: { color: '#4caf50', size: 80, opacity: 0.4 }
+// Create a new glow effect for a given element
+function createGlowEffect(elementType, element, options = {}) {
+    // Default configuration based on element type
+    const defaults = {
+        size: elementType === 'portal' ? 70 : elementType === 'attractor' ? 60 : 40,
+        color: elementType === 'portal' ? (element.isEntrance ? '#3498db' : '#e74c3c') : 
+               elementType === 'attractor' ? '#ff4500' : getRandomColorFromTheme(),
+        opacity: elementType === 'portal' ? 0.6 : elementType === 'attractor' ? 0.5 : 0.4,
+        pulseSpeed: elementType === 'portal' ? 2.0 : elementType === 'attractor' ? 1.8 : 1.5,
+        pulsePhase: Math.random() * Math.PI * 2 // Random phase for variety
     };
+
+    // Merge defaults with options
+    const config = { ...defaults, ...options };
     
-    // Use default props if type is not recognized
-    const props = glowProps[type] || { color: '#ffffff', size: 80, opacity: 0.4 };
-    
-    // Create DOM element for the glow
+    // Create DOM element for glow
     const glowElement = document.createElement('div');
-    glowElement.className = `glow-effect ${type}-glow`;
+    glowElement.className = `glow-effect ${elementType}-glow`;
     glowElement.style.position = 'absolute';
-    glowElement.style.width = `${props.size}px`;
-    glowElement.style.height = `${props.size}px`;
+    glowElement.style.width = `${config.size * 2}px`;
+    glowElement.style.height = `${config.size * 2}px`;
     glowElement.style.borderRadius = '50%';
-    glowElement.style.pointerEvents = 'none';
-    glowElement.style.opacity = props.opacity.toString();
-    glowElement.style.boxShadow = `0 0 ${props.size/4}px ${props.size/2}px ${props.color}`;
-    glowElement.style.zIndex = '-1'; // Position behind physics objects
+    glowElement.style.backgroundColor = 'transparent';
+    glowElement.style.boxShadow = `0 0 ${config.size/2}px ${config.size/4}px ${config.color}`;
+    glowElement.style.opacity = config.opacity.toString();
+    glowElement.style.pointerEvents = 'none'; // Don't intercept mouse events
+    glowElement.style.zIndex = '0'; // Place behind other elements
+    glowElement.style.filter = 'blur(8px)';
+    glowElement.style.transform = 'translate(-50%, -50%)';
     
-    // Position the glow element
-    const pos = element.position || (element.body ? element.body.position : { x: 0, y: 0 });
-    glowElement.style.left = `${pos.x - props.size/2}px`;
-    glowElement.style.top = `${pos.y - props.size/2}px`;
+    // Initial position based on element type
+    let position;
+    if (elementType === 'portal') {
+        position = { x: element.x, y: element.y };
+    } else if (elementType === 'attractor') {
+        position = element.position;
+    } else {
+        // For shapes
+        position = element.position;
+    }
     
-    // Append to the container
-    document.getElementById('container').appendChild(glowElement);
+    glowElement.style.left = `${position.x}px`;
+    glowElement.style.top = `${position.y}px`;
     
-    // Create glow object with randomized phase for varied animation
-    const glowObject = {
+    // Add to DOM
+    document.body.appendChild(glowElement);
+    
+    // Add to glowElements tracking
+    const glowData = {
         element: element,
         domElement: glowElement,
-        size: props.size,
-        color: props.color,
-        opacity: props.opacity,
-        pulseSpeed: 1 + Math.random() * 0.5, // Random speed between 1 and 1.5
-        pulsePhase: Math.random() * Math.PI * 2 // Random phase offset
+        size: config.size,
+        color: config.color,
+        opacity: config.opacity,
+        pulseSpeed: config.pulseSpeed,
+        pulsePhase: config.pulsePhase
     };
     
-    // Add to glow elements collection
-    if (!glowElements[type]) {
-        glowElements[type] = [];
-    }
-    glowElements[type].push(glowObject);
-    
-    return glowObject;
+    glowElements[elementType].push(glowData);
+    return glowData;
 }
 
 // update all glow effects
-function updateGlowEffects() {
-    const time = performance.now() / 1000; // Current time in seconds for animation
+function updateGlowEffects(timestamp) {
+    const time = timestamp / 1000; // Convert to seconds for smoother animation
     
     // Update portal glow effects
-    if (glowElements.portal) {
-        glowElements.portal.forEach(glow => {
-            if (glow.element && glow.domElement) {
-                const portalPos = glow.element.position;
-                // Update position
-                glow.domElement.style.left = `${portalPos.x - glow.size/2}px`;
-                glow.domElement.style.top = `${portalPos.y - glow.size/2}px`;
-                
-                // Pulsing animation with sine wave
-                const pulseValue = 0.8 + Math.sin(time * glow.pulseSpeed + glow.pulsePhase) * 0.2;
-                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-                
-                // Slight size oscillation
-                const sizeScale = 0.9 + Math.sin(time * glow.pulseSpeed * 0.7 + glow.pulsePhase) * 0.1;
-                const currentSize = glow.size * sizeScale;
-                glow.domElement.style.width = `${currentSize}px`;
-                glow.domElement.style.height = `${currentSize}px`;
-                glow.domElement.style.left = `${portalPos.x - currentSize/2}px`;
-                glow.domElement.style.top = `${portalPos.y - currentSize/2}px`;
+    if (glowElements.portals && glowElements.portals.length > 0) {
+        glowElements.portals.forEach((glow, index) => {
+            if (!glow || !glow.domElement) {
+                // Remove invalid entries
+                glowElements.portals.splice(index, 1);
+                return;
             }
+            
+            const portal = glow.element;
+            if (!portal) return;
+            
+            // Update position
+            glow.domElement.style.left = `${portal.x - glow.size/2}px`;
+            glow.domElement.style.top = `${portal.y - glow.size/2}px`;
+            
+            // Pulsing animation with sine wave
+            const pulseValue = 0.8 + Math.sin(time * glow.pulseSpeed + glow.pulsePhase) * 0.2;
+            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+            
+            // Slight size oscillation
+            const sizeScale = 0.9 + Math.sin(time * glow.pulseSpeed * 0.7 + glow.pulsePhase) * 0.1;
+            const currentSize = glow.size * sizeScale;
+            glow.domElement.style.width = `${currentSize}px`;
+            glow.domElement.style.height = `${currentSize}px`;
+            glow.domElement.style.left = `${portal.x - currentSize/2}px`;
+            glow.domElement.style.top = `${portal.y - currentSize/2}px`;
         });
     }
     
     // Update attractor glow effects
-    if (glowElements.attractor) {
-        glowElements.attractor.forEach(glow => {
-            if (glow.element && glow.domElement) {
-                const attractorPos = glow.element.position;
-                // Update position
-                glow.domElement.style.left = `${attractorPos.x - glow.size/2}px`;
-                glow.domElement.style.top = `${attractorPos.y - glow.size/2}px`;
-                
-                // Pulsing animation with cosine for different phase than portals
-                const pulseValue = 0.85 + Math.cos(time * glow.pulseSpeed * 1.2 + glow.pulsePhase) * 0.15;
-                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-                
-                // More pronounced size oscillation for attractors
-                const sizeScale = 0.85 + Math.cos(time * glow.pulseSpeed + glow.pulsePhase) * 0.15;
-                const currentSize = glow.size * sizeScale;
-                glow.domElement.style.width = `${currentSize}px`;
-                glow.domElement.style.height = `${currentSize}px`;
-                glow.domElement.style.left = `${attractorPos.x - currentSize/2}px`;
-                glow.domElement.style.top = `${attractorPos.y - currentSize/2}px`;
+    if (glowElements.attractors && glowElements.attractors.length > 0) {
+        glowElements.attractors.forEach((glow, index) => {
+            if (!glow || !glow.domElement) {
+                // Remove invalid entries
+                glowElements.attractors.splice(index, 1);
+                return;
             }
+            
+            const attractor = glow.element;
+            if (!attractor || !attractor.position) return;
+            
+            // Update position
+            glow.domElement.style.left = `${attractor.position.x - glow.size/2}px`;
+            glow.domElement.style.top = `${attractor.position.y - glow.size/2}px`;
+            
+            // Pulsing animation with cosine for different phase than portals
+            const pulseValue = 0.85 + Math.cos(time * glow.pulseSpeed * 1.2 + glow.pulsePhase) * 0.15;
+            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+            
+            // More pronounced size oscillation for attractors
+            const sizeScale = 0.85 + Math.cos(time * glow.pulseSpeed + glow.pulsePhase) * 0.15;
+            const currentSize = glow.size * sizeScale;
+            glow.domElement.style.width = `${currentSize}px`;
+            glow.domElement.style.height = `${currentSize}px`;
+            glow.domElement.style.left = `${attractor.position.x - currentSize/2}px`;
+            glow.domElement.style.top = `${attractor.position.y - currentSize/2}px`;
         });
     }
     
     // Update shape glow effects
-    if (glowElements.shape) {
-        glowElements.shape.forEach(glow => {
-            if (glow.element && glow.element.body && glow.domElement) {
-                const shapePos = glow.element.body.position;
-                // Update position
-                glow.domElement.style.left = `${shapePos.x - glow.size/2}px`;
-                glow.domElement.style.top = `${shapePos.y - glow.size/2}px`;
-                
-                // Subtle pulsing for shapes
-                const pulseValue = 0.9 + Math.sin(time * glow.pulseSpeed * 0.8 + glow.pulsePhase) * 0.1;
-                glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
-                
-                // Minimal size oscillation for shapes
-                const sizeScale = 0.95 + Math.sin(time * glow.pulseSpeed * 0.5 + glow.pulsePhase) * 0.05;
-                const currentSize = glow.size * sizeScale;
-                glow.domElement.style.width = `${currentSize}px`;
-                glow.domElement.style.height = `${currentSize}px`;
-                glow.domElement.style.left = `${shapePos.x - currentSize/2}px`;
-                glow.domElement.style.top = `${shapePos.y - currentSize/2}px`;
+    if (glowElements.shapes && glowElements.shapes.length > 0) {
+        glowElements.shapes.forEach((glow, index) => {
+            if (!glow || !glow.domElement) {
+                // Remove invalid entries
+                glowElements.shapes.splice(index, 1);
+                return;
+            }
+            
+            const body = glow.element;
+            if (!body || !body.position) return;
+            
+            // Update position
+            glow.domElement.style.left = `${body.position.x - glow.size/2}px`;
+            glow.domElement.style.top = `${body.position.y - glow.size/2}px`;
+            
+            // Subtle pulsing for shapes
+            const pulseValue = 0.9 + Math.sin(time * glow.pulseSpeed * 0.8 + glow.pulsePhase) * 0.1;
+            glow.domElement.style.opacity = (glow.opacity * pulseValue).toString();
+            
+            // Minimal size oscillation for shapes
+            const sizeScale = 0.95 + Math.sin(time * glow.pulseSpeed * 0.5 + glow.pulsePhase) * 0.05;
+            const currentSize = glow.size * sizeScale;
+            glow.domElement.style.width = `${currentSize}px`;
+            glow.domElement.style.height = `${currentSize}px`;
+            glow.domElement.style.left = `${body.position.x - currentSize/2}px`;
+            glow.domElement.style.top = `${body.position.y - currentSize/2}px`;
+            
+            // Update rotation for shapes if they have it
+            if (body.angle !== undefined) {
+                glow.domElement.style.transform = `translate(-50%, -50%) rotate(${body.angle}rad)`;
             }
         });
     }

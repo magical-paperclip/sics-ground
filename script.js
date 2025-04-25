@@ -503,7 +503,8 @@ function setupEventListeners() {
         
         // show info modal for attractor mode
         if (attractorMode) {
-            document.getElementById('info-modal').style.display = 'flex';
+            const modal = document.getElementById('info-modal');
+            modal.classList.add('active');
         }
         
         // turn off other modes
@@ -514,7 +515,7 @@ function setupEventListeners() {
     
     // Modal close button
     document.querySelector('.close-modal').addEventListener('click', function() {
-        document.getElementById('info-modal').style.display = 'none';
+        document.getElementById('info-modal').classList.remove('active');
     });
 
     // gravity zone button
@@ -1494,14 +1495,14 @@ function savePlaygroundState() {
             velocity: body.velocity,
             angularVelocity: body.angularVelocity,
             angle: body.angle,
-            // Store the type based on vertices count
+          
             type: body.vertices.length === 8 ? 'star' :
                   body.vertices.length === 3 ? 'triangle' :
                   body.vertices.length === 4 ? 'square' : 'circle',
-            // Store size based on type
+            
             size: body.type === 'circle' ? body.circleRadius :
                  Math.abs(body.vertices[0].x - body.vertices[2].x) / 2,
-            // Store color
+          
             color: body.render.fillStyle
         })),
         attractors: attractors.map(a => ({
@@ -1520,7 +1521,7 @@ function savePlaygroundState() {
     
     localStorage.setItem('playgroundState', JSON.stringify(saveData));
     
-    // Provide feedback
+    // provide feedback
     showSavedMessage();
 }
 
@@ -1540,7 +1541,7 @@ function showSavedMessage() {
     message.textContent = 'State saved';
     document.body.appendChild(message);
     
-    // Fade out and remove
+    // fade out and remove
     setTimeout(() => {
         message.style.opacity = '0';
         message.style.transition = 'opacity 0.5s ease';
@@ -1554,10 +1555,10 @@ function loadPlaygroundState() {
     
     const state = JSON.parse(savedState);
     
-    // Clear current bodies except static ones
+    // clear current bodies except static ones
     clearNonStaticBodies();
     
-    // Clear attractors
+    // clear attractors
     attractors.forEach(a => {
         if (a.element && a.element.parentNode) {
             a.element.parentNode.removeChild(a.element);
@@ -1565,7 +1566,7 @@ function loadPlaygroundState() {
     });
     attractors = [];
     
-    // Apply settings
+
     if (state.settings) {
         engine.world.gravity.y = state.settings.gravity || 1;
         document.getElementById('gravity-slider').value = engine.world.gravity.y;
@@ -1579,14 +1580,14 @@ function loadPlaygroundState() {
         defaultBounciness = state.settings.bounciness || 0.7;
         document.getElementById('bounce-slider').value = defaultBounciness;
         
-        // Set theme
+        \
         if (state.settings.theme) {
             setTheme(state.settings.theme);
             document.getElementById('theme-select').value = state.settings.theme;
         }
     }
     
-    // Create bodies
+
     if (state.bodies) {
         state.bodies.forEach(bodyData => {
             let body;
@@ -2145,24 +2146,22 @@ function initMobileSupport() {
             document.head.appendChild(meta);
         }
 
-
-
         // better touch handling for the canvas
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                lastMousePos.x =touch.clientX;
+                lastMousePos.x                lastMousePos.x = touch.clientX;
                 lastMousePos.y = touch.clientY;
                 
-                // show                // show the user where they touched
-                showTouchIndicator(touch.clientX,touch.clientY);
+                // show the user where they touched
+                showTouchIndicator(touch.clientX, touch.clientY);
             }
         });
         
         // handle mobile pinch-zoom
         let lastDistance = 0;
         canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault(); // Preventdefault touch actions
+            e.preventDefault(); // Prevent default touch actions
             
             if (e.touches.length === 2) {
                 const touch1 = e.touches[0];
@@ -2175,14 +2174,13 @@ function initMobileSupport() {
                 
                 if (lastDistance > 0) {
                     const delta = distance - lastDistance;
-                    // Could implement zoom or other features here
+                    // could implement zoom or other features here
                 }
                 
-
                 lastDistance = distance;
             } else if (e.touches.length === 1) {
                 // update for single touch
-                const touch =e.touches[0];
+                const touch = e.touches[0];
                 lastMousePos.x = touch.clientX;
                 lastMousePos.y = touch.clientY;
             }

@@ -205,25 +205,40 @@ button.active {
 }
 
 /* Override for specific buttons that need special styling */
-.boutique-theme #add-circle { 
+.boutique-theme #add-circle.active { 
     background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
     color: white;
     background-size: 200% 200%;
     animation: gradientShift 5s ease infinite;
 }
 
-.neon-theme #add-circle {
+.boutique-theme #add-circle {
+    background: rgba(60, 60, 60, 0.8);
+    animation: none;
+}
+
+.neon-theme #add-circle.active {
     background: linear-gradient(45deg, #00E0FF 0%, #FF00E4 100%);
     color: white;
     background-size: 200% 200%;
     animation: gradientShift 5s ease infinite;
 }
 
-.pastel-theme #add-circle {
+.neon-theme #add-circle {
+    background: rgba(60, 60, 60, 0.8);
+    animation: none;
+}
+
+.pastel-theme #add-circle.active {
     background: linear-gradient(45deg, #FFB6C1 0%, #87CEFA 100%);
     color: white;
     background-size: 200% 200%;
     animation: gradientShift 5s ease infinite;
+}
+
+.pastel-theme #add-circle {
+    background: rgba(60, 60, 60, 0.8);
+    animation: none;
 }
 
 /* Button gradients: only show for the active theme */

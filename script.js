@@ -521,7 +521,7 @@ function setupEventListeners() {
         portalMode = false;
     });
     
-    // Modal close button
+    // modal close button
     document.querySelector('.close-modal').addEventListener('click', function() {
         document.getElementById('info-modal').classList.remove('active');
     });
@@ -806,7 +806,7 @@ function setupUpdateLoop() {
     });
 }
 
-// SHAPE CREATION FUNCTIONS
+// SHAPE CREATION FUNCTIONS!!
 function addCircle(x, y) {
     // use provided coordinates or fall back to lastMousePos
     const posX = x || lastMousePos.x;
@@ -814,14 +814,19 @@ function addCircle(x, y) {
     
     const radius = 20 + Math.random() * 30;
     const color = getRandomColorFromTheme();
+    
+    // Create circle with non-overlap properties
     const circle = Bodies.circle(
         posX,
         posY,
         radius,
         {
-            restitution: defaultBounciness,
+            restitution: 0.9,           // higher bounce to prevent sticking
             friction: 0.1,
+            frictionStatic: 0.5,        // higher static friction
             frictionAir: 0.001,
+            slop: 0.01,                 // reduce allowed overlap
+            density: 0.1,               // lower density prevents penetration
             render: {
                 fillStyle: color,
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
@@ -852,9 +857,13 @@ function addSquare(x, y) {
         size,
         size,
         {
-            restitution: defaultBounciness,
+            restitution: 0.9,           // higher bounce to prevent sticking
             friction: 0.1,
+            frictionStatic: 0.5,        // higher static friction
             frictionAir: 0.001,
+            slop: 0.01,                 // reduce allowed overlap
+            density: 0.1,               // lower density prevents penetration
+            chamfer: { radius: 2 },     // slightly round corners to prevent snagging
             render: {
                 fillStyle: getRandomColorFromTheme(),
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
@@ -888,9 +897,12 @@ function addTriangle(x, y) {
         posY,
         [vertices],
         {
-            restitution: defaultBounciness,
+            restitution: 0.9,           // Higher bounce to prevent sticking
             friction: 0.1,
+            frictionStatic: 0.5,        // Higher static friction
             frictionAir: 0.001,
+            slop: 0.01,                 // Reduce allowed overlap
+            density: 0.1,               // Lower density prevents penetration
             render: {
                 fillStyle: getRandomColorFromTheme(),
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
@@ -928,9 +940,12 @@ function addStar(x, y) {
         posY,
         [vertices],
         {
-            restitution: defaultBounciness,
+            restitution: 0.9,           // higher bounce to prevent sticking
             friction: 0.1,
+            frictionStatic: 0.5,        // higher static friction
             frictionAir: 0.001,
+            slop: 0.01,                 // reduce allowed overlap
+            density: 0.1,               // lower density prevents penetration
             render: {
                 fillStyle: getRandomColorFromTheme(),
                 strokeStyle: 'rgba(255, 255, 255, 0.3)',
@@ -1094,14 +1109,18 @@ function createGravityZone(x, y) {
     // create visual element
     const element = document.createElement('div');
     element.className = 'gravity-zone';
+    element.style.position = 'absolute';
     element.style.width = (radius * 2) + 'px';
     element.style.height = (radius * 2) + 'px';
-    element.style.left = (x - radius) + 'px';
-    element.style.top = (y - radius) + 'px';
+    element.style.left = x + 'px';
+    element.style.top = y + 'px';
+    element.style.transform = 'translate(-50%, -50%)';
     element.style.background = strength > 0 ? 
         'radial-gradient(circle, rgba(100,200,255,0.15) 0%, rgba(50,100,255,0.1) 40%, rgba(0,30,100,0) 80%)' : 
         'radial-gradient(circle, rgba(255,100,100,0.15) 0%, rgba(255,50,50,0.1) 40%, rgba(100,0,0,0) 80%)';
     element.style.border = `2px dashed ${strength > 0 ? 'rgba(100,150,255,0.3)' : 'rgba(255,100,100,0.3)'}`;
+    element.style.borderRadius = '50%';
+    element.style.pointerEvents = 'none';
     document.body.appendChild(element);
     
     // reference the DOM element
@@ -2119,7 +2138,8 @@ function showCursorEffect(e) {
     // After a moment, reduce size but keep active
     setTimeout(() => {
         cursorFollower.style.width = '30px';
-        cursorFollower.style.height = '30px';
+        cursorFollower```javascript
+.style.height = '30px';
     }, 150);
 }
 
@@ -2139,7 +2159,7 @@ function isMobile() {
 function initMobileSupport() {
     // add special handling for mobile devices
     if (isMobile()) {
-        // make buttons larger on mobile
+        // make buttonslarger on mobile
         document.querySelectorAll('.buttons button').forEach(button => {
             button.style.padding = '12px 16px';
             button.style.fontSize = '16px';
@@ -2153,8 +2173,6 @@ function initMobileSupport() {
             document.head.appendChild(meta);
         }
 
-        // better touch handling for the canvas
-        canvas```javascript
         // better touch handling for the canvas
         canvas.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {
@@ -2227,17 +2245,6 @@ function showTouchIndicator(x, y) {
     }).onfinish = () => indicator.remove();
 }
 
-// call the setup functions when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // add our new setup functions to the initialization
-    const originalInit = window.onload || function(){};
-    window.onload = function() {
-        if (typeof originalInit === 'function') originalInit();
-        setupCursorAndTouchEvents();
-        initMobileSupport();
-    };
-});
-
 // function to create a portal
 function createPortal(x, y, isEntrance) {
     const portalColor = isEntrance ? '#3498db' : '#e74c3c'; // blue for entrance, red for exit
@@ -2266,16 +2273,18 @@ function createPortal(x, y, isEntrance) {
 function handlePortalPlacement(event) {
     if (!portalMode) return;
     
-    const canvas = document.getElementById('physics-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    // Use client coordinates directly to place the portal at the exact cursor position
+    const x = event.clientX;
+    const y = event.clientY;
     
-    // create entrance (odd index) or exit (even index) portal
+    // Create entrance (odd index) or exit (even index) portal
     const isEntrance = portals.length % 2 === 0;
     const portal = createPortal(x, y, isEntrance);
     
-    // create glow effect for the portal
+    // Show user feedback about portal placement
+    showFloatingMessage(isEntrance ? 'Entrance portal created - click again to place exit' : 'Exit portal created');
+    
+    // Create glow effect for the portal
     createGlowEffect('portal', portal, { size: portal.radius });
 }
 
@@ -2484,4 +2493,3 @@ function updateGlowEffects(now) {
         return true;
     });
 }
-```

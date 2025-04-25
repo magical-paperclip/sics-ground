@@ -86,10 +86,12 @@ const glowElements = {
     shapes: []
 };
 
-// wait for DOM to be fully loaded bfr initializing
+ // Make sure all buttons get properly initialized
 document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
     setupEventListeners();
+    // Make sure to initialize all buttons after setupEventListeners
+    initButtonsClasses();
     addDecorativeElements();
     setupCursorAndTouchEvents();
     initMobileSupport();
@@ -103,35 +105,19 @@ document.addEventListener('DOMContentLoaded', function() {
             addStar();
         }, i * 200);
     }
-    
-    // gravity zone mode
-    document.getElementById('add-gravity-zone').addEventListener('click', function() {
-        toggleButtonMode('add-gravity-zone');
-        gravityZoneMode = !gravityZoneMode;
-        attractorMode = false; // ensure other modes r off
-        sandMode = false;
-        
-        if (gravityZoneMode) {
-            showFloatingMessage('Click to place a gravity zone');
-        }
-    });
-    
-    // portal Button
-    document.getElementById('add-portal').addEventListener('click', function() {
-        clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
-        
-        portalMode = !portalMode;
-        this.classList.toggle('active', portalMode);
-        
-        attractorMode = false;
-        gravityZoneMode = false;
-        explosionMode = false;
-        
-        if (portalMode) {
-            showFloatingMessage('Click to place portal pairs. First click creates entrance, second creates exit.');
-        }
-    });
 });
+
+// Initialize all buttons with proper classes
+function initButtonsClasses() {
+    // Add 'shape-button' class to all shape buttons
+    const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
+    shapeButtons.forEach(id => {
+        const button = document.getElementById(id);
+        if (button) {
+            button.classList.add('shape-button');
+        }
+    });
+}
 
 // initialize physics engine and environment
 function initPhysics() {
@@ -2154,7 +2140,6 @@ function initMobileSupport() {
         if (!document.querySelector('meta[name="viewport"]')) {
             const meta = document.createElement('meta');
             meta.name = 'viewport';
-            meta.content = 'width```javascript
             meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
             document.head.appendChild(meta);
         }
@@ -2168,7 +2153,7 @@ function initMobileSupport() {
                 lastMousePos.x =touch.clientX;
                 lastMousePos.y = touch.clientY;
                 
-                // show the user where they touched
+                // show                // show the user where they touched
                 showTouchIndicator(touch.clientX,touch.clientY);
             }
         });

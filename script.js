@@ -126,7 +126,7 @@ function initPhysics() {
     engine.velocityIterations = 8;  
     engine.enableSleeping = true;
 
-\
+
     canvas = document.getElementById('physics-canvas');
     
   

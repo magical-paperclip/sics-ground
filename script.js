@@ -1,5 +1,3 @@
-// grab all the matter.js functions we need
-// and make sure to use the same version as the one in the HTML file
 const { 
     Engine, 
     Render, 
@@ -15,7 +13,7 @@ const {
     Vertices
 } = Matter;
 
-// Global variables for the physics engine
+
 let currentMode = 'playground';
 let lastMousePos = { x: 0, y: 0 };
 let windForce = 0;
@@ -29,16 +27,16 @@ let isAttractorActive = false;
 let attractor = null;
 let isDarkMode = false;
 let lastClickTime = 0;
-let doubleClickThreshold = 300; // 300ms for double-click detection
-let isPaused = false; // track if simulation is paused
-let timeScale = 1.0; // for slow-motion effects
-let collisionEffectType = 0; // track current collision effect type
-let explosionMode = false; // track if explosion mode is enabled
-let portalMode = false; // track if portal placement mode is enabled
-let portals = []; // array to store portal pairs
+let doubleClickThreshold = 300; 
+let isPaused = false;
+let timeScale = 1.0; 
+let collisionEffectType = 0; 
+let explosionMode = false;
+let portalMode = false; 
+let portals = []; 
 
-// theming variables
-let currentTheme = 'boutique'; // match the HTML default
+
+let currentTheme = 'boutique'; 
 const themes = {
     boutique: {
         sparkColors: ['#FF5252', '#2196F3', '#4CAF50', '#FFC107', '#9C27B0']
@@ -56,7 +54,6 @@ const themes = {
 
 let boutiqueColors = themes.boutique;
 
-// attractor system
 let attractors = [];
 let attractorMode = false;
 let windEnabled = false;
@@ -64,40 +61,37 @@ let windStrength = 0.1;
 let defaultBounciness = 0.7;
 let collisionEffectsEnabled = true;
 
-// sand particles
 let sandParticles = [];
 
-// performance tracking
+
 let lastFrameTime = null;
 let frameRateHistory = Array(30).fill(60);
 
-// engine variables
+
 let engine, render, runner, mouse, mouseConstraint, canvas;
 let draggedBody = null;
 let ground, leftWall, rightWall, ceiling, basePlatform;
 
-// gravity zone variables
 let gravityZones = [];
 let gravityZoneMode = false;
 
-// glow effects tracking
+
 const glowElements = {
     portals: [],
     attractors: [],
     shapes: []
 };
 
- // make sure all buttons get properly initialized
 document.addEventListener('DOMContentLoaded', function() {
     initPhysics();
     setupEventListeners();
-    // make sure to initialize all buttons after setupEventListeners
+  
     initButtonsClasses();
     addDecorativeElements();
     setupCursorAndTouchEvents();
     initMobileSupport();
     
-    // populate with some initial shapes
+    
     for (let i = 0; i < 5; i++) {
         setTimeout(() => {
             addCircle();
@@ -108,9 +102,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// initialize all buttons with proper classes
+
 function initButtonsClasses() {
-    // add 'shape-button' class to all shape buttons
+   
     const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
     shapeButtons.forEach(id => {
         const button = document.getElementById(id);
@@ -120,22 +114,22 @@ function initButtonsClasses() {
     });
 }
 
-// initialize physics engine and environment
+
 function initPhysics() {
-    // create the physics engine
+    
     engine = Engine.create();
     engine.world.gravity.y = 1;
     engine.timing.timeScale = 0.9;
     
-    // configure collision resolution to prevent overlapping
-    engine.positionIterations = 12; // increase from default (6) for more accurate collision resolution
-    engine.velocityIterations = 8;  // increase from default (4) for better collision response
+  
+    engine.positionIterations = 12; 
+    engine.velocityIterations = 8;  
     engine.enableSleeping = true;
 
-    // set up our canvas
+\
     canvas = document.getElementById('physics-canvas');
     
-    // make sure canvas is properly sized to window dimensions
+  
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
@@ -353,12 +347,11 @@ function createBoundaries() {
 
 
     const platformHeight = 20;
-    const platformY = window.innerHeight - 100; // position 100px from bottom
-    
+    const platformY = window.innerHeight - 100; 
     basePlatform = Bodies.rectangle(
         window.innerWidth / 2,
         platformY,
-        window.innerWidth * 0.8, // 80% of screen width
+        window.innerWidth * 0.8,
         platformHeight,
         {
             isStatic: true,

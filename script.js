@@ -83,22 +83,34 @@ const glowElements = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if Matter.js is properly loaded
+   
+    const allActionButtons = [
+        'add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text',
+        'toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion',
+        'add-portal', 'toggle-pause', 'add-gravity-zone'
+    ];
+    
+    // Ensure Matter.js is loaded
     if (typeof Matter === 'undefined') {
-        console.error('Matter.js is not loaded! Please check the script inclusion.');
-        alert('Error: Physics engine (Matter.js) failed to load. Please try refreshing the page.');
+        console.error('Matter.js is not loaded! Check script inclusion.');
+        alert('Error: Physics engine failed to load. Try refreshing the page.');
         return;
     }
 
     try {
+        // Initialize the physics engine
         initPhysics();
+        
+        // Set up button event listeners first to ensure they're ready
         setupEventListeners();
+        
+        // Rest of initialization
         initButtonsClasses();
-        addDecorativeElements();
         setupCursorAndTouchEvents();
         initMobileSupport();
+        addDecorativeElements();
         
-        // Add some initial shapes
+        // Add initial shapes
         for (let i = 0; i < 5; i++) {
             setTimeout(() => {
                 addCircle();
@@ -109,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     } catch (error) {
         console.error('Error initializing physics playground:', error);
-        alert('An error occurred while initializing the physics playground. Check console for details.');
+        alert('Error initializing the physics playground: ' + error.message);
     }
 });
 
@@ -2286,38 +2298,4 @@ function updateGlowEffects(timestamp) {
         glow.element.style.left = glow.object.position.x + 'px';
         glow.element.style.top = glow.object.position.y + 'px';
     });
-}
-
-// Define missing allActionButtons array
-const allActionButtons = [
-    'add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text',
-    'toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion',
-    'add-portal', 'toggle-pause', 'add-gravity-zone'
-];
-
-// Function to clear active state from buttons
-function clearActiveState(buttonIds) {
-    buttonIds.forEach(id => {
-        const button = document.getElementById(id);
-        if (button) {
-            button.classList.remove('active');
-        }
-    });
-}
-
-// Portal handling functions
-function handlePortalPlacement(event) {
-    // Implement basic portal placement logic
-    const x = event.clientX;
-    const y = event.clientY;
-    
-    showFloatingMessage('Portal feature coming soon!');
-}
-
-function renderPortals(context) {
-    // Placeholder for portal rendering
-}
-
-function checkPortalTeleportation() {
-    // Placeholder for portal teleportation logic
 }

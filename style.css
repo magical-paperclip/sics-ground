@@ -266,6 +266,48 @@ body.pastel-theme button.active {
     100% { background-position: 0% 50% }
 }
 
+@keyframes gravity-zone-pulse {
+    0% {
+        opacity: 0.4;
+        transform: translate(-50%, -50%) scale(0.95);
+    }
+    100% {
+        opacity: 0.7;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+@keyframes attractor-pulse {
+    0% {
+        opacity: 0.3;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    100% {
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+}
+
+@keyframes portal-rotate {
+    0% {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    100% {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+@keyframes portal-pulse {
+    0% {
+        opacity: 0.4;
+        transform: translate(-50%, -50%) scale(0.95);
+    }
+    100% {
+        opacity: 0.7;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
 @media (max-width: 768px) {
     .controls {
         max-width: 250px;
@@ -518,7 +560,7 @@ input[type="range"]:hover {
 }
 
 /* Styles for slow motion effect */
-body.slow-motion {
+body
     animation: slow-motion-pulse 2s infinite alternate;
 }
 

@@ -181,7 +181,7 @@ function initPhysics() {
 function setupMouseControl() {
     console.log("Setting up mouse control");
     
-    // Create mouse and mouse constraint
+    
     mouse = Mouse.create(render.canvas);
     mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
@@ -1266,6 +1266,9 @@ function setupEventListeners() {
                 removeGravityZone(gravityZones[0]);
             }
             
+            // Clear all portals
+            clearAllPortals();
+            
             // Reset modes
             attractorMode = false;
             explosionMode = false;
@@ -1583,432 +1586,98 @@ function clearNonStaticBodies() {
     sandParticles = [];
 }
 
-// Function to remove gravity zones
-function removeGravityZone(zone) {
-    const index = gravityZones.indexOf(zone);
-    if (index !== -1) {
-        gravityZones.splice(index, 1);
-    }
-    
-    if (zone.element && zone.element.parentNode) {
-        zone.element.parentNode.removeChild(zone.element);
-    }
-    
-    showFloatingMessage('Gravity zone removed');
-}
-
-// Function to create a text object
-function createTextObject(text, position) {
-    // Create a measurement element to get text dimensions
-    const measureElement = document.createElement('div');
-    measureElement.style.position = 'absolute';
-    measureElement.style.visibility = 'hidden';
-    measureElement.style.fontSize = '20px';
-    measureElement.style.fontFamily = 'Arial, sans-serif';
-    measureElement.style.fontWeight = 'bold';
-    measureElement.style.padding = '5px';
-    measureElement.textContent = text;
-    document.body.appendChild(measureElement);
-    
-    // Get dimensions
-    const width = measureElement.offsetWidth;
-    const height = measureElement.offsetHeight;
-    
-    // Clean up measurement element
-    measureElement.remove();
-    
-    // Create text body
-    const textBody = Bodies.rectangle(
-        position.x,
-        position.y,
-        width,
-        height,
-        {
-            restitution: defaultBounciness,
-            friction: 0.2,
-            frictionAir: 0.01,
-            render: {
-                fillStyle: getRandomColorFromTheme(),
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            }
+// Clear button
+const clearButton = document.getElementById('clear');
+if (clearButton) {
+    clearButton.addEventListener('click', function() {
+        clearNonStaticBodies();
+        
+        // Remove all attractors
+        while (attractors.length > 0) {
+            removeAttractor(attractors[0]);
         }
-    );
-    
-    // Add text properties
-    textBody.textContent = text;
-    textBody.isTextObject = true;
-    textBody.fontSize = 20;
-    textBody.fontColor = '#FFFFFF';
-    textBody.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
-    
-    Composite.add(engine.world, textBody);
-    
-    return textBody;
-}
-
-// Function to add a sand particle
-function addSandParticle(x, y) {
-    const posX = x;
-    const posY = y;
-    const size = 3 + Math.random() * 4;
-    
-    const particle = Bodies.circle(
-        posX, posY, size,
-        {
-            restitution: 0.3,
-            friction: 0.8,
-            frictionAir: 0.02,
-            render: {
-                fillStyle: getRandomColorFromTheme(),
-                strokeStyle: 'rgba(255, 255, 255, 0.1)',
-                lineWidth: 1
-            }
+        
+        // Remove all gravity zones
+        while (gravityZones.length > 0) {
+            removeGravityZone(gravityZones[0]);
         }
-    );
-    
-    Composite.add(engine.world, particle);
-    sandParticles.push(particle);
-    
-    return particle;
-}
-
-// Create collision particle effect
-function createCollisionParticle(position, size, color) {
-    switch (collisionEffectType) {
-        case 0: // Standard particles
-            createStandardParticle(position, size, color);
-            break;
-        case 1: // Star burst
-            createStarBurstParticle(position, size, color);
-            break;
-        case 2: // Trails
-            createTrailParticle(position, size, color);
-            break;
-        case 3: // Glow
-            createGlowParticle(position, size, color);
-            break;
-        case 4: // Ripples
-            createRippleEffect(position, size, color);
-            break;
-    }
-}
-
-// Standard particle effect
-function createStandardParticle(position, size, color) {
-    const particle = document.createElement('div');
-    particle.className = 'collision-particle';
-    particle.style.position = 'absolute';
-    particle.style.left = position.x + 'px';
-    particle.style.top = position.y + 'px';
-    particle.style.width = (size * 2) + 'px';
-    particle.style.height = (size * 2) + 'px';
-    particle.style.backgroundColor = color || '#fff';
-    particle.style.borderRadius = '50%';
-    particle.style.transform = 'translate(-50%, -50%)';
-    particle.style.zIndex = '5';
-    particle.style.pointerEvents = 'none';
-    document.body.appendChild(particle);
-    
-    // Animate the particle
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 1 + Math.random() * 2;
-    
-    let x = position.x;
-    let y = position.y;
-    let opacity = 1;
-    let currentSize = size;
-    
-    function animate() {
-        x += Math.cos(angle) * speed;
-        y += Math.sin(angle) * speed;
-        y += 0.5; // Slight gravity
-        opacity -= 0.03;
-        currentSize *= 0.95;
         
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.opacity = opacity;
-        particle.style.width = (currentSize * 2) + 'px';
-        particle.style.height = (currentSize * 2) + 'px';
+        // Clear all portals
+        clearAllPortals();
         
-        if (opacity > 0) {
-            requestAnimationFrame(animate);
-        } else {
-            particle.remove();
-        }
-    }
-    
-    requestAnimationFrame(animate);
-}
-
-// Star burst particle effect
-function createStarBurstParticle(position, size, color) {
-    const particle = document.createElement('div');
-    particle.className = 'collision-particle';
-    particle.style.position = 'absolute';
-    particle.style.left = position.x + 'px';
-    particle.style.top = position.y + 'px';
-    particle.style.width = (size * 2) + 'px';
-    particle.style.height = (size * 2) + 'px';
-    particle.style.background = color || '#fff';
-    particle.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
-    particle.style.transform = 'translate(-50%, -50%)';
-    particle.style.zIndex = '5';
-    particle.style.pointerEvents = 'none';
-    document.body.appendChild(particle);
-    
-    // Animate with rotation
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 1 + Math.random() * 2;
-    
-    let x = position.x;
-    let y = position.y;
-    let opacity = 1;
-    let currentSize = size;
-    let rotation = 0;
-    
-    function animate() {
-        x += Math.cos(angle) * speed;
-        y += Math.sin(angle) * speed;
-        y += 0.5; // Slight gravity
-        opacity -= 0.03;
-        currentSize *= 1.01;
-        rotation += 3;
+        // Reset modes
+        attractorMode = false;
+        explosionMode = false;
+        gravityZoneMode = false;
+        portalMode = false;
         
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.opacity = opacity;
-        particle.style.width = (currentSize * 2) + 'px';
-        particle.style.height = (currentSize * 2) + 'px';
-        particle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        // Reset button states
+        clearActiveState(allActionButtons);
         
-        if (opacity > 0) {
-            requestAnimationFrame(animate);
-        } else {
-            particle.remove();
-        }
-    }
-    
-    requestAnimationFrame(animate);
-}
-
-// Trail particle effect
-function createTrailParticle(position, size, color) {
-    // Create several particles with delay
-    for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-            const particle = document.createElement('div');
-            particle.className = 'collision-particle trail-particle';
-            particle.style.position = 'absolute';
-            particle.style.left = position.x + 'px';
-            particle.style.top = position.y + 'px';
-            particle.style.width = (size * 0.8) + 'px';
-            particle.style.height = (size * 0.8) + 'px';
-            particle.style.backgroundColor = color || '#fff';
-            particle.style.borderRadius = '50%';
-            particle.style.transform = 'translate(-50%, -50%)';
-            particle.style.zIndex = '5';
-            particle.style.pointerEvents = 'none';
-            particle.style.boxShadow = `0 0 ${size/2}px ${color || '#fff'}`;
-            document.body.appendChild(particle);
-            
-            // Create curved trail
-            const baseAngle = Math.random() * Math.PI * 2;
-            const curveFactor = Math.random() * 0.05 - 0.025;
-            let curX = position.x;
-            let curY = position.y;
-            let t = 0;
-            let opacity = 0.7;
-            
-            function animateTrail() {
-                t += 0.05;
-                const angle = baseAngle + curveFactor * t;
-                curX += Math.cos(angle) * 2;
-                curY += Math.sin(angle) * 2;
-                opacity -= 0.01;
-                
-                particle.style.left = curX + 'px';
-                particle.style.top = curY + 'px';
-                particle.style.opacity = opacity;
-                
-                if (opacity > 0 && t < 20) {
-                    requestAnimationFrame(animateTrail);
-                } else {
-                    particle.remove();
-                }
-            }
-            
-            requestAnimationFrame(animateTrail);
-        }, i * 70);
-    }
-}
-
-// Glow particle effect
-function createGlowParticle(position, size, color) {
-    const particle = document.createElement('div');
-    particle.className = 'collision-particle glow-particle';
-    particle.style.position = 'absolute';
-    particle.style.left = position.x + 'px';
-    particle.style.top = position.y + 'px';
-    particle.style.width = (size * 2) + 'px';
-    particle.style.height = (size * 2) + 'px';
-    particle.style.background = 'transparent';
-    particle.style.borderRadius = '50%';
-    particle.style.boxShadow = `0 0 ${size*2}px ${size}px ${color || '#fff'}`;
-    particle.style.transform = 'translate(-50%, -50%)';
-    particle.style.zIndex = '5';
-    particle.style.pointerEvents = 'none';
-    document.body.appendChild(particle);
-    
-    // Animate glow expansion
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.5 + Math.random() * 1;
-    
-    let x = position.x;
-    let y = position.y;
-    let opacity = 1;
-    let currentSize = size;
-    
-    function animate() {
-        x += Math.cos(angle) * speed;
-        y += Math.sin(angle) * speed;
-        y += 0.2; // Slight gravity
-        opacity -= 0.02;
-        currentSize *= 1.03;
-        
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.opacity = opacity;
-        particle.style.boxShadow = `0 0 ${currentSize*2}px ${currentSize}px ${color || '#fff'}`;
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animate);
-        } else {
-            particle.remove();
-        }
-    }
-    
-    requestAnimationFrame(animate);
-}
-
-// Ripple effect
-function createRippleEffect(position, size, color) {
-    const ripple = document.createElement('div');
-    ripple.className = 'collision-particle ripple-effect';
-    ripple.style.position = 'absolute';
-    ripple.style.left = position.x + 'px';
-    ripple.style.top = position.y + 'px';
-    ripple.style.width = (size * 2) + 'px';
-    ripple.style.height = (size * 2) + 'px';
-    ripple.style.borderRadius = '50%';
-    ripple.style.border = `2px solid ${color || '#fff'}`;
-    ripple.style.transform = 'translate(-50%, -50%)';
-    ripple.style.zIndex = '9';
-    ripple.style.pointerEvents = 'none';
-    document.body.appendChild(ripple);
-    
-    // Animate ripple expansion
-    let currentSize = size;
-    let opacity = 0.7;
-    
-    function animate() {
-        currentSize *= 1.05;
-        opacity -= 0.01;
-        
-        ripple.style.width = (currentSize * 2) + 'px';
-        ripple.style.height = (currentSize * 2) + 'px';
-        ripple.style.opacity = opacity;
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animate);
-        } else {
-            ripple.remove();
-        }
-    }
-    
-    requestAnimationFrame(animate);
-}
-
-// Create explosion effect
-function createExplosion(position, radius = 200, strength = 0.05) {
-    console.log(`Creating explosion at (${position.x}, ${position.y})`);
-    
-    // Visual explosion effect
-    const explosion = document.createElement('div');
-    explosion.className = 'explosion';
-    explosion.style.position = 'absolute';
-    explosion.style.left = position.x + 'px';
-    explosion.style.top = position.y + 'px';
-    explosion.style.width = '0';
-    explosion.style.height = '0';
-    explosion.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-    explosion.style.borderRadius = '50%';
-    explosion.style.transform = 'translate(-50%, -50%)';
-    explosion.style.zIndex = '10';
-    explosion.style.boxShadow = '0 0 30px 10px rgba(255, 200, 100, 0.8)';
-    document.body.appendChild(explosion);
-    
-    // Explosion animation
-    let size = 0;
-    let opacity = 1;
-    
-    function animateExplosion() {
-        size += (radius * 2 - size) * 0.2;
-        opacity -= 0.03;
-        
-        explosion.style.width = size + 'px';
-        explosion.style.height = size + 'px';
-        explosion.style.opacity = opacity;
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animateExplosion);
-        } else {
-            explosion.remove();
-        }
-    }
-    
-    requestAnimationFrame(animateExplosion);
-    
-    // Apply force to bodies
-    const bodies = Composite.allBodies(engine.world);
-    
-    bodies.forEach(body => {
-        if (body.isStatic) return;
-        
-        const dx = body.position.x - position.x;
-        const dy = body.position.y - position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < radius) {
-            // Force decreases with distance
-            const forceFactor = 1 - (distance / radius);
-            const forceMagnitude = strength * forceFactor * body.mass;
-            
-            // Direction away from explosion center
-            const angle = Math.atan2(dy, dx);
-            
-            Body.applyForce(body, body.position, {
-                x: Math.cos(angle) * forceMagnitude,
-                y: Math.sin(angle) * forceMagnitude
-            });
-            
-            // Add some angular velocity for fun
-            Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * 0.1);
-        }
+        showFloatingMessage('All items cleared');
     });
+}
+
+// Function to clear all portals
+function clearAllPortals() {
+    // Clear portals array
+    while (portals.length > 0) {
+        removePortal(portals[0]);
+    }
     
-    // Create particles
-    for (let i = 0; i < 30; i++) {
-        setTimeout(() => {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = Math.random() * radius * 0.7;
-            const particlePosition = {
-                x: position.x + Math.cos(angle) * distance,
-                y: position.y + Math.sin(angle) * distance
-            };
-            
-            createCollisionParticle(particlePosition, 5 + Math.random() * 5, getRandomColorFromTheme());
-        }, i * 20);
+    // Clear PORTAL_PAIRS array and their DOM elements
+    while (PORTAL_PAIRS.length > 0) {
+        const pair = PORTAL_PAIRS[0];
+        
+        // Remove entrance portal element
+        if (pair.entrance && pair.entrance.element) {
+            pair.entrance.element.remove();
+        }
+        
+        // Remove entrance portal glow element
+        if (pair.entrance && pair.entrance.glowElement) {
+            pair.entrance.glowElement.remove();
+        }
+        
+        // Remove exit portal element
+        if (pair.exit && pair.exit.element) {
+            pair.exit.element.remove();
+        }
+        
+        // Remove exit portal glow element
+        if (pair.exit && pair.exit.glowElement) {
+            pair.exit.glowElement.remove();
+        }
+        
+        PORTAL_PAIRS.splice(0, 1);
+    }
+    
+    // Reset pending portal if any
+    if (pendingPortal) {
+        if (pendingPortal.element) {
+            pendingPortal.element.remove();
+        }
+        if (pendingPortal.glowElement) {
+            pendingPortal.glowElement.remove();
+        }
+        pendingPortal = null;
+    }
+}
+
+// Function to remove a portal
+function removePortal(portal) {
+    const index = portals.indexOf(portal);
+    if (index !== -1) {
+        portals.splice(index, 1);
+    }
+    
+    // Remove entrance portal
+    if (portal.entranceElement && portal.entranceElement.parentNode) {
+        portal.entranceElement.parentNode.removeChild(portal.entranceElement);
+    }
+    
+    // Remove exit portal
+    if (portal.exitElement && portal.exitElement.parentNode) {
+        portal.exitElement.parentNode.removeChild(portal.exitElement);
     }
 }

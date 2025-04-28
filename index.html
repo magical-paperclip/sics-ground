@@ -3,97 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PhysiFlair | Elegant Physics Playground</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap">
+    <title>SICS Ground - Physics Playground</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="lib/matter.min.js"></script>
 </head>
-<body>
-    
-    <div class="controls">
-        
-        <!-- tab navigation -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="playground">Playground</button>
-        </div>
-        
-        
-        <div class="tab-content active" id="playground-tab">
-            <div class="buttons">
-                <button id="add-circle">Add Circle</button>
-                <button id="add-square">Add Square</button>
-                <button id="add-triangle">Add Triangle</button>
-                <button id="add-star">Add Star</button>
-                <button id="add-sand">Add Sand</button>
-                <button id="add-text">Add Text</button>
-                <button id="add-gravity-zone" title="Create zones with altered gravity">Gravity Zone</button>
-            </div>
-            
-            <div class="buttons">
-                <button id="toggle-wind">Toggle Wind</button>
-                <button id="add-attractor">Add Attractor</button>
-                <button id="toggle-collision-sparks">Collision Effects</button>
-                <button id="create-explosion">Explosion</button>
-                <button id="add-portal">Add Portal</button>
-                <button id="toggle-pause">Pause</button>
-                <button id="clear">Clear All</button>
-            </div>
-            
-            <div class="theme-selector">
-                <label>Theme</label>
-                <select id="theme-select">
-                    <option value="boutique">Boutique</option>
-                    <option value="neon">Neon Night</option>
-                    <option value="pastel">Soft Pastel</option>
-                    <option value="minimal">Minimal</option>
-                </select>
-            </div>
-            
-            <div class="sliders">
-                <label>
-                    Gravity
-                    <input type="range" id="gravity-slider" min="-1" max="2" step="0.1" value="1">
-                </label>
-                <label>
-                    Wind Strength
-                    <input type="range" id="wind-slider" min="0" max="1" step="0.05" value="0.2">
-                </label>
-                <label>
-                    Bounciness
-                    <input type="range" id="bounce-slider" min="0" max="1" step="0.1" value="0.7">
-                </label>
-                <label>
-                    Time Speed
-                    <input type="range" id="time-slider" min="0.1" max="2" step="0.1" value="1">
-                </label>
-            </div>
-            
-            <div class="save-controls">
-                <button id="save-state">Save Scene</button>
-                <button id="load-state">Load Scene</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- decorative elements -->
-    <div class="decoration top-right"></div>
-    <div class="decoration bottom-left"></div>
-    
-    <div class="footer">PhysiFlair</div>
-    
-    <!-- info modal for attractors -->
-    <div id="info-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h3>PhysiFlair × Attractor Mode</h3>
-            <p>Click anywhere to place an attractor that will pull objects toward it.</p>
-            <p>Use the mouse wheel to adjust its strength.</p>
-        </div>
-    </div>
-    
+<body class="theme-modern-dark">
     <canvas id="physics-canvas"></canvas>
     
-   
-    <script src="lib/matter.min.js"></script>
+    <!-- Added visible base indicator as fallback -->
+    <div class="physics-base-indicator"></div>
+    
+    <div class="controls-panel">
+        <div class="header">
+            <div class="logo-text">sics ground</div>
+            <div class="subtitle">physics playground</div>
+        </div>
+        
+        <div class="position-toggle">
+            <button id="toggle-position" class="control-button">Toggle Panel Position</button>
+        </div>
+        
+        <!-- Theme dropdown with arrow -->
+        <div class="dropdown" id="theme-dropdown">
+            <div class="dropdown-toggle">
+                <span>Theme: Dark</span>
+                <div class="arrow"></div>
+            </div>
+            <div class="dropdown-menu">
+                <div class="dropdown-item active" data-theme="theme-modern-dark">Dark</div>
+                <div class="dropdown-item" data-theme="theme-modern-blue">Blue</div>
+                <div class="dropdown-item" data-theme="theme-modern-purple">Purple</div>
+                <div class="dropdown-item" data-theme="theme-modern-mint">Mint</div>
+                <div class="dropdown-item" data-theme="theme-modern-sunset">Sunset</div>
+            </div>
+        </div>
+        
+        <!-- Accent color customization -->
+        <div class="button-color-picker">
+            <div class="color-picker-header">
+                <label for="button-color">Accent Color</label>
+                <input type="color" id="button-color" value="#4285F4">
+            </div>
+            <div class="color-presets">
+                <div class="color-preset" style="background-color: #EA4335;" data-color="#EA4335"></div>
+                <div class="color-preset" style="background-color: #4285F4;" data-color="#4285F4"></div>
+                <div class="color-preset" style="background-color: #34A853;" data-color="#34A853"></div>
+                <div class="color-preset" style="background-color: #FBBC05;" data-color="#FBBC05"></div>
+                <div class="color-preset" style="background-color: #ffffff;" data-color="#ffffff"></div>
+            </div>
+        </div>
+        
+        <hr>
+        
+        <!-- Gravity slider -->
+        <div class="slider-container gravity-slider">
+            <div class="slider-header">
+                <label for="gravity-slider">Gravity Strength</label>
+                <span class="slider-value">1.0</span>
+            </div>
+            <input type="range" id="gravity-slider" min="0" max="2" step="0.1" value="1.0">
+        </div>
+        
+        <button id="toggle-wind" class="control-button">Toggle Wind</button>
+        <div class="slider-container">
+            <div class="slider-header">
+                <label for="wind-slider">Wind Strength</label>
+                <span class="slider-value">0.3</span>
+            </div>
+            <input type="range" id="wind-slider" min="0" max="1" step="0.01" value="0.3">
+        </div>
+        <button id="clear-all" class="control-button danger">Clear All</button>
+        <hr>
+        <div class="mode-controls">
+            <button id="cursor-mode" class="mode-button active">Cursor</button>
+            <button id="toggle-attractor" class="mode-button">Attractor</button>
+            <button id="toggle-portal" class="mode-button">Portal</button>
+            <button id="create-explosion" class="mode-button">Explosion</button>
+        </div>
+        <hr>
+        <div class="shape-controls">
+            <button id="add-circle" class="shape-button active" onclick="setShapeMode('circle')">Circle</button>
+            <button id="add-square" class="shape-button" onclick="setShapeMode('square')">Square</button>
+            <button id="add-rectangle" class="shape-button" onclick="setShapeMode('rectangle')">Rectangle</button>
+            <button id="add-star" class="shape-button" onclick="setShapeMode('star')">Star</button>
+            <button id="add-polygon" class="shape-button" onclick="setShapeMode('polygon')">Polygon</button>
+        </div>
+        <div class="color-picker">
+            <div class="color-picker-header">
+                <label for="shape-color">Shape Color</label>
+                <input type="color" id="shape-color" value="#EA4335">
+            </div>
+            <div class="color-presets">
+                <div class="color-preset" style="background-color: #EA4335;" data-color="#EA4335"></div>
+                <div class="color-preset" style="background-color: #4285F4;" data-color="#4285F4"></div>
+                <div class="color-preset" style="background-color: #34A853;" data-color="#34A853"></div>
+                <div class="color-preset" style="background-color: #FBBC05;" data-color="#FBBC05"></div>
+                <div class="color-preset" style="background-color: #ffffff;" data-color="#ffffff"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Size preview element for resize mode -->
+    <div id="size-preview" class="size-preview"></div>
+    
+    <!-- Wind indicator -->
+    <div class="wind-indicator">
+        <div class="wind-arrow"></div>
+    </div>
+    
+    <!-- Simple script for direct shape mode setting -->
+    <script>
+        function setShapeMode(type) {
+            // Update current mode
+            window.currentMode = 'add-' + type;
+            
+            // Update button states
+            document.querySelectorAll('.shape-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById('add-' + type).classList.add('active');
+            
+            // Deactivate other modes
+            window.cursorMode = false;
+            window.attractorMode = false;
+            window.portalMode = false;
+            window.explosionMode = false;
+            
+            // Remove active state from other mode buttons
+            document.getElementById('cursor-mode').classList.remove('active');
+            document.getElementById('toggle-attractor').classList.remove('active');
+            document.getElementById('toggle-portal').classList.remove('active');
+            document.getElementById('create-explosion').classList.remove('active');
+        }
+    </script>
+    
     <script src="script.js"></script>
 </body>
 </html>

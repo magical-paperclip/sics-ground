@@ -1,1683 +1,1352 @@
-// Define Matter.js modules without destructuring to avoid potential issues
-let Engine, Render, Runner, Body, Bodies, Composite, Mouse, MouseConstraint, Events, Vector, Common, Vertices;
+// Global variables for physics and interaction that need to be exposed to inline functions
+window.world = null;
+window.Matter = Matter;
+window.currentMode = 'add-circle'; // Default shape mode
+window.cursorMode = false;
+window.attractorMode = false;
+window.portalMode = false;
+window.explosionMode = false;
+window.gravityZoneMode = false;
+window.lastMousePos = { x: 0, y: 0 }; 
 
-// Global variables
-let currentMode = 'playground';
-let lastMousePos = { x: 0, y: 0 };
-let windForce = 0;
-let windDirection = 1;
-let isWindActive = false;
-let windInterval;
-let gravity = 1;
-let attractorRadius = 100;
-let attractorStrength = 0.001;
-let isAttractorActive = false;
-let attractor = null;
-let isDarkMode = false;
-let lastClickTime = 0;
-let doubleClickThreshold = 300; 
-let isPaused = false;
-let timeScale = 1.0; 
-let collisionEffectType = 0; 
-let explosionMode = false;
-let portalMode = false; 
-let portals = []; 
-
-// Define allActionButtons early
-const allActionButtons = [
-    'add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text',
-    'toggle-wind', 'add-attractor', 'toggle-collision-sparks', 'create-explosion',
-    'add-portal', 'toggle-pause', 'add-gravity-zone'
-];
-
-// Theme definitions
-let currentTheme = 'boutique'; 
-const themes = {
-    boutique: {
-        sparkColors: ['#FF5252', '#2196F3', '#4CAF50', '#FFC107', '#9C27B0']
-    },
-    neon: {
-        sparkColors: ['#00E0FF', '#FF00E4', '#00FF8B', '#FFEB3B', '#FF9800']
-    },
-    pastel: {
-        sparkColors: ['#FFB6C1', '#87CEFA', '#98FB98', '#FFDAB9', '#D8BFD8']
-    },
-    minimal: {
-        sparkColors: ['#333333', '#777777', '#AAAAAA', '#CCCCCC', '#EEEEEE']
-    }
-};
-
-let boutiqueColors = themes.boutique;
-
-// More globals
-let attractors = [];
-let attractorMode = false;
-let windEnabled = false;
-let windStrength = 0.1;
-let defaultBounciness = 0.7;
-let collisionEffectsEnabled = true;
-let sandParticles = [];
-let lastFrameTime = null;
-let frameRateHistory = Array(30).fill(60);
-let engine, render, runner, mouse, mouseConstraint, canvas;
+let selectedBody = null;
 let draggedBody = null;
-let ground, leftWall, rightWall, ceiling, basePlatform;
-let gravityZones = [];
-let gravityZoneMode = false;
-let glowElements = {
-    portals: [],
-    attractors: [],
-    shapes: []
-};
+let resizing = false;
+let initialResizeDistance = 0;
+let initialScale = 1;
+let lastClickTime = 0;
+const doubleClickThreshold = 300;
+let sizePreviewElement;
 
-// Wait for DOM before initializing
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM loaded, initializing physics...");
-    
-    // First, make sure Matter.js is available
-    if (typeof Matter === 'undefined') {
-        console.error("ERROR: Matter.js library not found!");
-        alert("Error: Physics engine failed to load. Please check your internet connection and refresh the page.");
-        return;
-    }
-    
-    try {
-        // Assign all Matter.js modules
-        Engine = Matter.Engine;
-        Render = Matter.Render;
-        Runner = Matter.Runner;
-        Body = Matter.Body;
-        Bodies = Matter.Bodies;
-        Composite = Matter.Composite;
-        Mouse = Matter.Mouse;
-        MouseConstraint = Matter.MouseConstraint;
-        Events = Matter.Events;
-        Vector = Matter.Vector;
-        Common = Matter.Common;
-        Vertices = Matter.Vertices;
-        
-        console.log("Matter.js modules initialized");
-        
-        // Initialize physics engine
-        initPhysics();
-        console.log("Physics initialized");
-        
-        // Set up event listeners and UI
-        setupEventListeners();
-        initButtonsClasses();
-        setupCursorAndTouchEvents();
-        initMobileSupport();
-        addDecorativeElements();
-        console.log("UI setup complete");
-        
-        // Initial shapes
-        setTimeout(function() {
-            console.log("Adding initial shapes");
-            for (let i = 0; i < 3; i++) {
-                addCircle(window.innerWidth/2 - 100 + i*100, 100);
-                addSquare(window.innerWidth/2 - 100 + i*100, 200);
-            }
-        }, 1000);
-    } catch (error) {
-        console.error("Initialization error:", error);
-        alert("An error occurred during initialization: " + error.message);
-    }
+// Variables for wind
+let windEnabled = false;
+let windStrength = 0.3;
+let windDirection = 1;
+let windVariability = 0.2;
+let windForce = 0;
+let windInterval = null;
+
+// Variables for special modes
+let attractor = null;
+let portal = { source: null, destination: null };
+let attractorStrength = 0.05;
+
+// Initialize matter.js engine, world, runner and renderer
+const engine = Matter.Engine.create({
+    gravity: {
+        x: 0,
+        y: 0.6  // Lower gravity for more realistic falling speed
+    },
+    positionIterations: 10,   // Increased for better collision detection
+    velocityIterations: 8,    // Increased for better collision detection
+    constraintIterations: 4,  // Increased for stability
+    enableSleeping: true      // Allow objects to sleep when they stop moving
 });
 
-function initPhysics() {
-    console.log("Initializing physics engine...");
-    
+// Add collision detection enhancement for high-speed objects
+Matter.Resolver._restingThresh = 0.001; // Lower threshold for better collision detection
 
-    engine = Engine.create();
-    engine.world.gravity.y = 1;
-    engine.timing.timeScale = 0.9;
-    
-    // Set higher quality physics simulation
-    engine.positionIterations = 12; 
-    engine.velocityIterations = 8;  
-    engine.enableSleeping = true;
+window.world = engine.world; // Expose world to global scope
+const world = engine.world;  // Keep local reference for convenience
+const runner = Matter.Runner.create({
+    isFixed: true,           // Fixed time step
+    delta: 1000/60           // 60 FPS for smooth simulation
+});
 
-    // Get canvas element
-    canvas = document.getElementById('physics-canvas');
-    
-    // Set canvas dimensions
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    // Create renderer
-    render = Render.create({
-        canvas: canvas,
+// Wait for DOM to be ready before creating the renderer
+let render;
+document.addEventListener('DOMContentLoaded', function() {
+    // Create the renderer now that the DOM is ready
+    render = Matter.Render.create({
+        canvas: document.getElementById('physics-canvas'),
         engine: engine,
         options: {
             width: window.innerWidth,
             height: window.innerHeight,
             wireframes: false,
-            background: 'transparent',
-            pixelRatio: Math.min(window.devicePixelRatio, 2),
-            showSleeping: false
+            background: 'transparent'
         }
     });
 
-    // Start engine and renderer
-    runner = Runner.create();
-    Runner.run(runner, engine);
-    Render.run(render);
+    // Start the engine, runner and renderer in order
+    Matter.Runner.run(runner, engine);
+    Matter.Render.run(render);
+    
+    // Setup physics environment
+    setupPhysics();
+    setupCursorMode();
+    setupWind();
+    setupShapeCreation();
+    setupSpecialModes();
+    setupGravityZoneMode();
+    createStaticBase(); // Create the base
+    
+    // Debug: Create a test shape to verify physics is working
+    setTimeout(function() {
+        createCircle({x: window.innerWidth/2, y: 100}, '#EA4335');
+        console.log("Test shape created on startup");
+    }, 1000);
+    
+    // Add event listeners for window resize
+    window.addEventListener('resize', function() {
+        render.options.width = window.innerWidth;
+        render.options.height = window.innerHeight;
+        render.canvas.width = window.innerWidth;
+        render.canvas.height = window.innerHeight;
+        
+        // Update the base position when window is resized
+        updateBasePosition();
+    });
+});
 
-    // Set up mouse control
-    setupMouseControl();
+// Set up wind and gravity
+function setupPhysics() {
+    // Default gravity
+    engine.world.gravity.y = 1;
     
-    // Create boundaries
-    createBoundaries();
+    // Initialize wind indicator
+    const windIndicator = document.querySelector('.wind-indicator');
+    const windArrow = document.querySelector('.wind-arrow');
     
-    // Setup collision events
-    setupCollisionEvents();
+    // Size preview element
+    sizePreviewElement = document.getElementById('size-preview');
     
-    // Setup update loop
-    setupUpdateLoop();
+    // Set up gravity slider
+    const gravitySlider = document.getElementById('gravity-slider');
+    const gravityValueDisplay = document.querySelector('.gravity-slider .slider-value');
     
-    console.log("Physics initialization complete");
-}
-
-function setupMouseControl() {
-    console.log("Setting up mouse control");
-    
-    
-    mouse = Mouse.create(render.canvas);
-    mouseConstraint = MouseConstraint.create(engine, {
-        mouse: mouse,
-        constraint: {
-            stiffness: 0.2,
-            render: {
-                visible: false
-            }
-        }
+    gravitySlider.addEventListener('input', function() {
+        const gravityValue = parseFloat(this.value);
+        engine.world.gravity.y = gravityValue;
+        gravityValueDisplay.textContent = gravityValue.toFixed(1);
     });
     
-    // Track dragged body
-    Events.on(mouseConstraint, 'startdrag', function(event) {
-        draggedBody = event.body;
-        if (draggedBody) {
-            draggedBody.render.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            draggedBody.render.lineWidth = 2;
-        }
-    });
-    
-    Events.on(mouseConstraint, 'enddrag', function(event) {
-        if (draggedBody) {
-            draggedBody.render.strokeStyle = draggedBody.originalStrokeStyle || 'rgba(255, 255, 255, 0.3)';
-            draggedBody.render.lineWidth = 1;
-            draggedBody = null;
-        }
-    });
-    
-    // Add to world
-    Composite.add(engine.world, mouseConstraint);
-    
-    // Ensure mouse coordinates map properly
-    render.mouse = mouse;
-}
-
-function setupCollisionEvents() {
-    console.log("Setting up collision events");
-    
-    Events.on(engine, 'collisionStart', function(event) {
-        if (!collisionEffectsEnabled) return;
-        
-        const pairs = event.pairs;
-        
-        for (let i = 0; i < pairs.length; i++) {
-            const pair = pairs[i];
-            
-            // Skip collisions with static bodies
-            if (pair.bodyA.isStatic || pair.bodyB.isStatic) continue;
-            
-            // Calculate relative velocity
-            const velA = pair.bodyA.velocity;
-            const velB = pair.bodyB.velocity;
-            const relativeVelocity = Math.sqrt(
-                Math.pow(velA.x - velB.x, 2) + 
-                Math.pow(velA.y - velB.y, 2)
-            );
-            
-            // Skip low-energy collisions
-            if (relativeVelocity < 3) continue;
-            
-            // Get collision position
-            const collision = pair.collision;
-            const pos = collision.supports && collision.supports[0] ? 
-                collision.supports[0] : 
-                { 
-                    x: (pair.bodyA.position.x + pair.bodyB.position.x) / 2,
-                    y: (pair.bodyA.position.y + pair.bodyB.position.y) / 2
-                };
-            
-            // Create particles based on velocity
-            const sparkCount = Math.min(10, Math.floor(relativeVelocity / 2));
-            const sparkColor = getRandomColorFromTheme();
-            
-            for (let j = 0; j < sparkCount; j++) {
-                createCollisionParticle(pos, relativeVelocity / 3, sparkColor);
-            }
-        }
-    });
-}
-
-function setupUpdateLoop() {
-    console.log("Setting up update loop");
-    
-    // Override the render function to add custom rendering
-    const originalRender = render.render;
-    render.render = function() {
-        // Call the original render function
-        originalRender.apply(this, arguments);
-        
-        // Add custom rendering
-        const context = render.context;
-        
-        // Render portals with swirl effects
-        if (typeof renderPortals === 'function') {
-            renderPortals(context);
-        }
-        
-        // Render any text objects
-        const bodies = Composite.allBodies(engine.world);
+    // Add event listener for clearing all objects
+    document.getElementById('clear-all').addEventListener('click', function() {
+        const bodies = Matter.Composite.allBodies(world);
         bodies.forEach(body => {
-            if (body.isTextObject) {
-                context.save();
-                context.translate(body.position.x, body.position.y);
-                context.rotate(body.angle);
-                context.fillStyle = body.fontColor || '#FFFFFF';
-                context.textAlign = 'center';
-                context.textBaseline = 'middle';
-                context.font = `${body.fontSize || 20}px Arial, sans-serif`;
-                context.fillText(body.textContent, 0, 0);
-                context.restore();
+            if (!body.isStatic || body.label === 'attractor' || body.label === 'portal') {
+                Matter.Composite.remove(world, body);
             }
         });
-    };
-    
-    // Set up before update event handler
-    Events.on(engine, 'beforeUpdate', function() {
-        const now = performance.now();
         
-        // Skip updates if paused
-        if (isPaused) return;
-        
-        // Calculate FPS
-        if (lastFrameTime) {
-            const fps = 1000 / (now - lastFrameTime);
-            frameRateHistory.push(fps);
-            frameRateHistory.shift();
+        // Reset special modes
+        if (attractor) {
+            Matter.Composite.remove(world, attractor);
+            attractor = null;
         }
-        lastFrameTime = now;
-        
-        // Check for teleportation through portals
-        if (typeof checkPortalTeleportation === 'function') {
-            checkPortalTeleportation();
-        }
-        
-        // Apply wind forces if enabled
-        if (windEnabled) {
-            applyWind();
-        }
-        
-        // Apply attractor forces
-        if (attractors.length > 0) {
-            applyAttractorForces();
-        }
-        
-        // Apply gravity zone forces
-        if (gravityZones.length > 0) {
-            applyGravityZoneForces();
-        }
+        portal = { source: null, destination: null };
     });
 }
 
-function showFloatingMessage(text) {
-    console.log("Message:", text);
+// Create the resize functionality for cursor mode
+function setupCursorMode() {
+    const canvas = document.getElementById('physics-canvas');
+    const cursorModeButton = document.getElementById('cursor-mode');
     
-    const message = document.createElement('div');
-    message.style.position = 'absolute';
-    message.style.top = '80px';
-    message.style.left = '50%';
-    message.style.transform = 'translateX(-50%)';
-    message.style.background = 'rgba(0, 0, 0, 0.7)';
-    message.style.color = 'white';
-    message.style.padding = '10px 20px';
-    message.style.borderRadius = '20px';
-    message.style.zIndex = '100';
-    message.style.fontWeight = '500';
-    message.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-    message.textContent = text;
-    document.body.appendChild(message);
-    
-    // Fade out and remove
-    setTimeout(() => {
-        message.style.opacity = '0';
-        message.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => message.remove(), 500);
-    }, 1500);
-}
-
-function initButtonsClasses() {
-    console.log("Initializing button classes");
-   
-    const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
-    shapeButtons.forEach(id => {
-        const button = document.getElementById(id);
-        if (button) {
-            button.classList.add('shape-button');
+    cursorModeButton.addEventListener('click', function() {
+        // Toggle cursor mode
+        cursorMode = !cursorMode;
+        this.classList.toggle('active');
+        
+        if (cursorMode) {
+            // Deactivate other modes
+            attractorMode = false;
+            portalMode = false;
+            explosionMode = false;
+            gravityZoneMode = false;
+            currentMode = 'cursor-mode';
+            
+            // Update UI to reflect mode change
+            document.getElementById('toggle-attractor').classList.remove('active');
+            document.getElementById('toggle-portal').classList.remove('active');
+            document.getElementById('create-explosion').classList.remove('active');
+            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
+            
+            // Add cursor mode class to body
+            document.body.classList.add('cursor-mode-active');
         } else {
-            console.warn(`Button #${id} not found`);
+            // Remove cursor mode class
+            document.body.classList.remove('cursor-mode-active');
+            currentMode = 'add-circle'; // Default back to add-circle mode
         }
     });
-}
 
-// Simple function stubs for cursor follower functionality
-function setupCursorAndTouchEvents() {
-    console.log("Setting up cursor and touch events");
-    
-    const cursorFollower = document.createElement('div');
-    cursorFollower.className = 'cursor-follower';
-    document.body.appendChild(cursorFollower);
-    
-    document.addEventListener('mousemove', function(e) {
-        cursorFollower.style.left = e.clientX + 'px';
-        cursorFollower.style.top = e.clientY + 'px';
+    // Handle mouse down for object selection
+    canvas.addEventListener('mousedown', function(event) {
+        if (!cursorMode) return;
         
-        // Update last mouse position
-        lastMousePos.x = e.clientX;
-        lastMousePos.y = e.clientY;
-    });
-    
-    // Show/hide on click
-    document.addEventListener('mousedown', function() {
-        cursorFollower.classList.add('active');
-    });
-    
-    document.addEventListener('mouseup', function() {
-        setTimeout(() => {
-            cursorFollower.classList.remove('active');
-        }, 500);
-    });
-}
-
-function initMobileSupport() {
-    console.log("Initializing mobile support");
-    
-    // Check if the device is mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // Add mobile-specific class
-        document.body.classList.add('mobile');
-        
-        // Adjust physics parameters for mobile
-        engine.timing.timeScale = 0.8;
-    }
-}
-
-function addDecorativeElements() {
-    console.log("Adding decorative elements");
-    
-    // Add a few decorative elements in the background
-    const decorCount = 5;
-    
-    for (let i = 0; i < decorCount; i++) {
-        const x = Math.random() * window.innerWidth;
-        const y = Math.random() * window.innerHeight;
-        const size = 5 + Math.random() * 10;
-        
-        const element = document.createElement('div');
-        element.className = 'decoration';
-        element.style.width = size + 'px';
-        element.style.height = size + 'px';
-        element.style.borderRadius = '50%';
-        element.style.background = 'rgba(255, 255, 255, 0.2)';
-        element.style.position = 'absolute';
-        element.style.left = x + 'px';
-        element.style.top = y + 'px';
-        element.style.pointerEvents = 'none';
-        
-        document.body.appendChild(element);
-    }
-}
-
-function setTheme(theme) {
-    console.log("Setting theme to:", theme);
-    
-    // Make sure the theme exists, default to 'boutique' if it doesn't
-    if (!themes[theme]) {
-        console.warn("Invalid theme:", theme);
-        theme = 'boutique';
-    }
-    
-    // Update the theme colors for particles and effects
-    boutiqueColors = themes[theme];
-    
-    // Remove all existing theme classes
-    document.body.className = '';
-    
-    // Add the new theme class
-    document.body.classList.add(theme + '-theme');
-    console.log("Applied theme class:", theme + '-theme');
-    
-    // Update any active elements to match the new theme
-    const activeButtons = document.querySelectorAll('button.active');
-    activeButtons.forEach(button => {
-        // Reset and re-apply active class to trigger CSS changes
-        button.classList.remove('active');
-        setTimeout(() => button.classList.add('active'), 10);
-    });
-    
-    // Store the current theme
-    currentTheme = theme;
-    
-    // Update the theme selector to match
-    const themeSelect = document.getElementById('theme-select');
-    if (themeSelect) {
-        themeSelect.value = theme;
-    }
-    
-    // Show user feedback
-    showFloatingMessage(`Theme changed to ${theme}`);
-}
-
-// Function to clear active state from buttons
-function clearActiveState(buttonIds) {
-    buttonIds.forEach(id => {
-        const button = document.getElementById(id);
-        if (button) {
-            button.classList.remove('active');
-        }
-    });
-}
-
-function addCircle(x, y) {
-    const posX = x || window.innerWidth/2;
-    const posY = y || 100;
-    
-    const radius = 20 + Math.random() * 30;
-    const color = getRandomColorFromTheme();
-    
-    console.log(`Creating circle at (${posX}, ${posY})`);
-    
-    const circle = Bodies.circle(
-        posX,
-        posY,
-        radius,
-        {
-            restitution: defaultBounciness,
-            friction: 0.1,
-            frictionStatic: 0.5,
-            frictionAir: 0.001,
-            density: 0.1,
-            render: {
-                fillStyle: color,
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            }
-        }
-    );
-    
-    circle.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
-    Composite.add(engine.world, circle);
-    
-    return circle;
-}
-
-function addSquare(x, y) {
-    const posX = x || window.innerWidth/2;
-    const posY = y || 100;
-    
-    const size = 20 + Math.random() * 40;
-    const color = getRandomColorFromTheme();
-    
-    console.log(`Creating square at (${posX}, ${posY})`);
-    
-    const square = Bodies.rectangle(
-        posX,
-        posY,
-        size,
-        size,
-        {
-            restitution: defaultBounciness,
-            friction: 0.1,
-            frictionStatic: 0.5,
-            frictionAir: 0.001,
-            chamfer: { radius: 2 },
-            render: {
-                fillStyle: color,
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            }
-        }
-    );
-    
-    square.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
-    Composite.add(engine.world, square);
-    
-    return square;
-}
-
-function addTriangle(x, y) {
-    const posX = x || window.innerWidth/2;
-    const posY = y || 100;
-    
-    const size = 25 + Math.random() * 40;
-    const height = size * Math.sqrt(3) / 2;
-    const color = getRandomColorFromTheme();
-    
-    console.log(`Creating triangle at (${posX}, ${posY})`);
-    
-    const vertices = [
-        { x: 0, y: -height / 2 },
-        { x: -size / 2, y: height / 2 },
-        { x: size / 2, y: height / 2 }
-    ];
-    
-    const triangle = Bodies.fromVertices(
-        posX,
-        posY,
-        [vertices],
-        {
-            restitution: defaultBounciness,
-            friction: 0.1,
-            frictionStatic: 0.5,
-            frictionAir: 0.001,
-            render: {
-                fillStyle: color,
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            }
-        }
-    );
-    
-    triangle.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
-    Composite.add(engine.world, triangle);
-    
-    return triangle;
-}
-
-function addStar(x, y) {
-    const posX = x || window.innerWidth/2;
-    const posY = y || 100;
-    
-    const outerRadius = 25 + Math.random() * 20;
-    const innerRadius = outerRadius * 0.4;
-    const points = 5;
-    const color = getRandomColorFromTheme();
-    
-    console.log(`Creating star at (${posX}, ${posY})`);
-    
-    const vertices = [];
-    for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI / points) * i;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        vertices.push({ x, y });
-    }
-    
-    const star = Bodies.fromVertices(
-        posX,
-        posY,
-        [vertices],
-        {
-            restitution: defaultBounciness,
-            friction: 0.1,
-            frictionStatic: 0.5,
-            frictionAir: 0.001,
-            render: {
-                fillStyle: color,
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            }
-        }
-    );
-    
-    star.originalStrokeStyle = 'rgba(255, 255, 255, 0.3)';
-    Composite.add(engine.world, star);
-    
-    return star;
-}
-
-function getRandomColorFromTheme() {
-    const colors = boutiqueColors.sparkColors;
-    return colors[Math.floor(Math.random() * colors.length)];
-}
-
-function createBoundaries() {
-    console.log("Creating boundaries");
-    
-    const wallThickness = 50;
-    
-    ground = Bodies.rectangle(
-        window.innerWidth / 2, 
-        window.innerHeight, 
-        window.innerWidth, 
-        wallThickness, 
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: 'transparent',
-                strokeStyle: 'rgba(255, 255, 255, 0.2)',
-                lineWidth: 1
-            }
-        }
-    );
-
-    leftWall = Bodies.rectangle(
-        0, 
-        window.innerHeight / 2, 
-        wallThickness, 
-        window.innerHeight, 
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: 'transparent',
-                strokeStyle: 'rgba(255, 255, 255, 0.2)',
-                lineWidth: 1
-            }
-        }
-    );
-
-    rightWall = Bodies.rectangle(
-        window.innerWidth, 
-        window.innerHeight / 2, 
-        wallThickness, 
-        window.innerHeight, 
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: 'transparent',
-                strokeStyle: 'rgba(255, 255, 255, 0.2)',
-                lineWidth: 1
-            }
-        }
-    );
-
-    ceiling = Bodies.rectangle(
-        window.innerWidth / 2, 
-        0, 
-        window.innerWidth, 
-        wallThickness, 
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: 'transparent',
-                strokeStyle: 'rgba(255, 255, 255, 0.2)',
-                lineWidth: 1
-            }
-        }
-    );
-    
-    Composite.add(engine.world, [ground, leftWall, rightWall, ceiling]);
-}
-
-// Portal system variables
-const PORTAL_RADIUS = 40;
-const PORTAL_COOLDOWN = 500; // ms cooldown to prevent immediate re-teleportation
-const PORTAL_PAIRS = [];
-let pendingPortal = null; // Store first portal of a pair while waiting for second placement
-let portalColors = {
-    entrance: '#3498db', // Blue for entrance
-    exit: '#e74c3c'      // Red for exit
-};
-
-// Handle portal placement
-function handlePortalPlacement(event) {
-    const x = event.clientX;
-    const y = event.clientY;
-    
-    // Show floating message about portal placement
-    if (!pendingPortal) {
-        // First portal of a pair (entrance)
-        pendingPortal = {
-            type: 'entrance',
-            position: { x, y },
-            radius: PORTAL_RADIUS,
-            color: portalColors.entrance,
-            bodies: [] // Bodies that have recently teleported (to prevent loops)
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY
         };
         
-        createPortalVisual(pendingPortal);
-        showFloatingMessage('Entrance portal created. Click again to place exit portal.');
-    } else {
-        // Second portal of a pair (exit)
-        const exitPortal = {
-            type: 'exit',
-            position: { x, y },
-            radius: PORTAL_RADIUS,
-            color: portalColors.exit,
-            bodies: [] // Bodies that have recently teleported (to prevent loops)
-        };
+        // Check for double click to delete an object
+        const currentTime = new Date().getTime();
+        const isDoubleClick = (currentTime - lastClickTime < doubleClickThreshold);
+        lastClickTime = currentTime;
         
-        createPortalVisual(exitPortal);
+        // Get body under cursor
+        const bodyUnderCursor = getBodyAtPosition(mousePosition);
         
-        // Create the portal pair
-        const portalPair = {
-            entrance: pendingPortal,
-            exit: exitPortal,
-            active: true
-        };
-        
-        PORTAL_PAIRS.push(portalPair);
-        pendingPortal = null;
-        
-        showFloatingMessage('Portal pair created!');
-    }
-}
-
-// Create visual representation of portal
-function createPortalVisual(portal) {
-    // Create portal DOM element
-    const element = document.createElement('div');
-    element.className = 'portal';
-    element.style.position = 'absolute';
-    element.style.left = portal.position.x + 'px';
-    element.style.top = portal.position.y + 'px';
-    element.style.width = portal.radius * 2 + 'px';
-    element.style.height = portal.radius * 2 + 'px';
-    element.style.borderRadius = '50%';
-    element.style.transform = 'translate(-50%, -50%)';
-    element.style.backgroundColor = 'transparent';
-    element.style.border = `3px solid ${portal.color}`;
-    element.style.boxShadow = `0 0 15px ${portal.color}, inset 0 0 15px ${portal.color}`;
-    element.style.zIndex = '10';
-    element.style.pointerEvents = 'none';
-    
-    // Add rotating animation
-    element.style.animation = 'portal-rotate 8s linear infinite';
-    
-    // Add to document
-    document.body.appendChild(element);
-    
-    // Store reference to DOM element
-    portal.element = element;
-    
-    // Create glow effect
-    createPortalGlow(portal);
-    
-    return element;
-}
-
-// Create glow effect for portal
-function createPortalGlow(portal) {
-    // Create radial gradient for portal
-    const glow = document.createElement('div');
-    glow.className = 'portal-glow';
-    glow.style.position = 'absolute';
-    glow.style.left = portal.position.x + 'px';
-    glow.style.top = portal.position.y + 'px';
-    glow.style.width = portal.radius * 3 + 'px';
-    glow.style.height = portal.radius * 3 + 'px';
-    glow.style.background = `radial-gradient(circle, ${portal.color}40 0%, ${portal.color}10 60%, transparent 70%)`;
-    glow.style.borderRadius = '50%';
-    glow.style.transform = 'translate(-50%, -50%)';
-    glow.style.zIndex = '5';
-    glow.style.pointerEvents = 'none';
-    
-    // Add pulsing animation
-    glow.style.animation = 'portal-pulse 2s ease-in-out infinite alternate';
-    
-    // Add to document
-    document.body.appendChild(glow);
-    
-    // Store reference to glow element
-    portal.glowElement = glow;
-}
-
-// Check if any bodies should teleport through portals
-function checkPortalTeleportation() {
-    if (PORTAL_PAIRS.length === 0) return;
-    
-    const bodies = Composite.allBodies(engine.world).filter(body => !body.isStatic);
-    
-    PORTAL_PAIRS.forEach(pair => {
-        if (!pair.active) return;
-        
-        const entrance = pair.entrance;
-        const exit = pair.exit;
-        
-        bodies.forEach(body => {
-            // Skip bodies that recently teleported through this portal pair
-            if (entrance.bodies.includes(body.id) || exit.bodies.includes(body.id)) return;
-            
-            // Check if body is near entrance portal
-            const distanceToEntrance = Math.sqrt(
-                Math.pow(body.position.x - entrance.position.x, 2) + 
-                Math.pow(body.position.y - entrance.position.y, 2)
-            );
-            
-            if (distanceToEntrance < entrance.radius) {
-                // Teleport body to exit portal
-                
-                // Calculate vector from entrance to body
-                const entranceVector = {
-                    x: body.position.x - entrance.position.x,
-                    y: body.position.y - entrance.position.y
-                };
-                
-                // Normalize direction vector
-                const distance = Math.sqrt(entranceVector.x * entranceVector.x + entranceVector.y * entranceVector.y);
-                const direction = {
-                    x: entranceVector.x / distance,
-                    y: entranceVector.y / distance
-                };
-                
-                // Teleport to corresponding position at exit
-                const newPosition = {
-                    x: exit.position.x + direction.x * (exit.radius + 10),
-                    y: exit.position.y + direction.y * (exit.radius + 10)
-                };
-                
-                // Move body to new position
-                Body.setPosition(body, newPosition);
-                
-                // Create teleport effect
-                createTeleportEffect(body, entrance, exit);
-                
-                // Add to recently teleported list to prevent immediate re-teleportation
-                entrance.bodies.push(body.id);
-                exit.bodies.push(body.id);
-                
-                // Remove from list after cooldown
-                setTimeout(() => {
-                    entrance.bodies = entrance.bodies.filter(id => id !== body.id);
-                    exit.bodies = exit.bodies.filter(id => id !== body.id);
-                }, PORTAL_COOLDOWN);
-            }
-        });
-    });
-}
-
-// Create visual effect for teleportation
-function createTeleportEffect(body, fromPortal, toPortal) {
-    // Create particles at both portals
-    for (let i = 0; i < 10; i++) {
-        // Entrance portal particles
-        createPortalParticle(fromPortal.position, fromPortal.color);
-        
-        // Exit portal particles
-        createPortalParticle(toPortal.position, toPortal.color);
-    }
-    
-    // Flash portals
-    flashPortal(fromPortal);
-    flashPortal(toPortal);
-}
-
-// Create particle effect for portal
-function createPortalParticle(position, color) {
-    const particle = document.createElement('div');
-    particle.className = 'portal-particle';
-    particle.style.position = 'absolute';
-    particle.style.left = position.x + 'px';
-    particle.style.top = position.y + 'px';
-    particle.style.width = '6px';
-    particle.style.height = '6px';
-    particle.style.backgroundColor = color;
-    particle.style.borderRadius = '50%';
-    particle.style.transform = 'translate(-50%, -50%)';
-    particle.style.zIndex = '11';
-    particle.style.pointerEvents = 'none';
-    
-    document.body.appendChild(particle);
-    
-    // Random direction
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 2 + Math.random() * 3;
-    
-    // Animate particle
-    let x = position.x;
-    let y = position.y;
-    let opacity = 1;
-    let size = 6;
-    
-    const animate = () => {
-        x += Math.cos(angle) * speed;
-        y += Math.sin(angle) * speed;
-        opacity -= 0.05;
-        size += 0.2;
-        
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.opacity = opacity;
-        particle.style.width = size + 'px';
-        particle.style.height = size + 'px';
-        
-        if (opacity > 0) {
-            requestAnimationFrame(animate);
-        } else {
-            particle.remove();
-        }
-    };
-    
-    requestAnimationFrame(animate);
-}
-
-// Flash portal effect
-function flashPortal(portal) {
-    const originalBorder = portal.element.style.border;
-    const originalShadow = portal.element.style.boxShadow;
-    
-    // Flash effect
-    portal.element.style.border = `5px solid white`;
-    portal.element.style.boxShadow = `0 0 30px white, inset 0 0 30px white`;
-    
-    // Return to normal
-    setTimeout(() => {
-        portal.element.style.border = originalBorder;
-        portal.element.style.boxShadow = originalShadow;
-    }, 200);
-}
-
-// Implement wind force effect
-function applyWind() {
-    const bodies = Composite.allBodies(engine.world);
-    
-    // Create a sinusoidal wind pattern
-    const time = Date.now() / 1000;
-    const windX = Math.sin(time * 0.3) * windStrength;
-    
-    bodies.forEach(body => {
-        if (body.isStatic || body === draggedBody) return;
-        
-        // Wind is stronger at the top of the screen
-        const heightFactor = 1 - (body.position.y / window.innerHeight);
-        const force = {
-            x: windX * heightFactor * body.area * 0.0005,
-            y: 0
-        };
-        
-        Body.applyForce(body, body.position, force);
-    });
-}
-
-// Create attractor
-function createAttractor(x, y) {
-    console.log(`Creating attractor at (${x}, ${y})`);
-    
-    const strength = 0.1;
-    const radius = 100;
-    
-    // Create the attractor object
-    const attractor = {
-        position: { x, y },
-        strength: strength,
-        radius: radius
-    };
-    
-    // Add to attractors array
-    attractors.push(attractor);
-    
-    // Create visual representation
-    const element = document.createElement('div');
-    element.className = 'attractor';
-    element.style.width = (radius * 2) + 'px';
-    element.style.height = (radius * 2) + 'px';
-    element.style.left = x + 'px';
-    element.style.top = y + 'px';
-    element.style.transform = 'translate(-50%, -50%)';
-    document.body.appendChild(element);
-    
-    // Store reference to DOM element
-    attractor.element = element;
-    
-    // Add glow effect
-    createAttractorGlow(attractor);
-    
-    showFloatingMessage('Attractor created! Double click to remove.');
-    
-    return attractor;
-}
-
-// Create glow effect for attractor
-function createAttractorGlow(attractor) {
-    const glow = document.createElement('div');
-    glow.className = 'attractor-glow';
-    glow.style.position = 'absolute';
-    glow.style.left = attractor.position.x + 'px';
-    glow.style.top = attractor.position.y + 'px';
-    glow.style.width = attractor.radius * 3 + 'px';
-    glow.style.height = attractor.radius * 3 + 'px';
-    glow.style.background = `radial-gradient(circle, rgba(255,215,0,0.3) 0%, rgba(255,215,0,0.1) 60%, transparent 70%)`;
-    glow.style.borderRadius = '50%';
-    glow.style.transform = 'translate(-50%, -50%)';
-    glow.style.zIndex = '5';
-    glow.style.pointerEvents = 'none';
-    glow.style.animation = 'attractor-pulse 2s ease-in-out infinite alternate';
-    
-    document.body.appendChild(glow);
-    
-    // Store reference to glow element
-    attractor.glowElement = glow;
-}
-
-// Remove attractor
-function removeAttractor(attractor) {
-    const index = attractors.indexOf(attractor);
-    if (index !== -1) {
-        attractors.splice(index, 1);
-    }
-    
-    // Remove DOM elements
-    if (attractor.element && attractor.element.parentNode) {
-        attractor.element.parentNode.removeChild(attractor.element);
-    }
-    
-    if (attractor.glowElement && attractor.glowElement.parentNode) {
-        attractor.glowElement.parentNode.removeChild(attractor.glowElement);
-    }
-    
-    showFloatingMessage('Attractor removed');
-}
-
-// Apply attractor forces
-function applyAttractorForces() {
-    if (attractors.length === 0) return;
-    
-    const bodies = Composite.allBodies(engine.world);
-    
-    attractors.forEach(attractor => {
-        bodies.forEach(body => {
-            if (body.isStatic) return;
-            
-            const dx = attractor.position.x - body.position.x;
-            const dy = attractor.position.y - body.position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < attractor.radius * 2) {
-                const force = attractor.strength / Math.max(distance, 10);
-                const forceMagnitude = 0.001 * body.mass * force;
-                
-                Body.applyForce(body, body.position, {
-                    x: (dx / distance) * forceMagnitude,
-                    y: (dy / distance) * forceMagnitude
-                });
-            }
-        });
-    });
-}
-
-// Setup event listeners for buttons and other UI elements
-function setupEventListeners() {
-    console.log("Setting up event listeners");
-    
-    // Shape buttons
-    const shapeButtons = ['add-circle', 'add-square', 'add-triangle', 'add-star', 'add-sand', 'add-text'];
-    
-    shapeButtons.forEach(buttonId => {
-        const button = document.getElementById(buttonId);
-        if (!button) {
-            console.warn(`Button #${buttonId} not found`);
-            return;
-        }
-        
-        button.addEventListener('click', () => {
-            console.log(`Button clicked: ${buttonId}`);
-            
-            // Toggle active state
-            if (button.classList.contains('active')) {
-                button.classList.remove('active');
+        if (bodyUnderCursor) {
+            if (isDoubleClick) {
+                // Remove the body on double click
+                Matter.Composite.remove(world, bodyUnderCursor);
+                selectedBody = null;
                 return;
             }
             
-            // Clear active state from all buttons
-            clearActiveState(allActionButtons);
+            // Select body for dragging or resizing
+            selectedBody = bodyUnderCursor;
             
-            // Activate this button
-            button.classList.add('active');
+            // Check if mouse is near the edge for resizing
+            const distanceFromCenter = Math.sqrt(
+                Math.pow(mousePosition.x - selectedBody.position.x, 2) +
+                Math.pow(mousePosition.y - selectedBody.position.y, 2)
+            );
             
-            // Clear other modes
-            attractorMode = false;
-            explosionMode = false;
-            gravityZoneMode = false;
-            portalMode = false;
-        });
+            const bodyRadius = selectedBody.circleRadius || 
+                               Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
+                                       selectedBody.bounds.max.y - selectedBody.bounds.min.y) / 2;
+            
+            if (distanceFromCenter > bodyRadius * 0.7) {
+                // Near edge - start resizing
+                resizing = true;
+                initialResizeDistance = distanceFromCenter;
+                initialScale = selectedBody.render.sprite ? selectedBody.render.sprite.xScale : 1;
+                
+                // Show size preview
+                sizePreviewElement.style.display = 'block';
+                sizePreviewElement.style.width = bodyRadius * 2 + 'px';
+                sizePreviewElement.style.height = bodyRadius * 2 + 'px';
+                sizePreviewElement.style.left = selectedBody.position.x - bodyRadius + 'px';
+                sizePreviewElement.style.top = selectedBody.position.y - bodyRadius + 'px';
+            } else {
+                // Center area - enable dragging
+                draggedBody = selectedBody;
+                Matter.Body.setStatic(draggedBody, true);
+            }
+        }
     });
+
+    // Handle mouse move for dragging and resizing
+    canvas.addEventListener('mousemove', function(event) {
+        if (!cursorMode) return;
+        
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
+        
+        // Save mouse position for other operations
+        lastMousePos = mousePosition;
+        
+        if (draggedBody) {
+            // Move the selected body
+            Matter.Body.setPosition(draggedBody, mousePosition);
+        } else if (resizing && selectedBody) {
+            // Calculate distance from center for resizing
+            const distanceFromCenter = Math.sqrt(
+                Math.pow(mousePosition.x - selectedBody.position.x, 2) +
+                Math.pow(mousePosition.y - selectedBody.position.y, 2)
+            );
+            
+            // Calculate scale factor based on distance change
+            const scaleFactor = distanceFromCenter / initialResizeDistance;
+            
+            // Update size preview element
+            const currentRadius = selectedBody.circleRadius || 
+                                 Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
+                                         selectedBody.bounds.max.y - selectedBody.bounds.min.y) / 2;
+            const newSize = currentRadius * 2 * scaleFactor;
+            
+            sizePreviewElement.style.width = newSize + 'px';
+            sizePreviewElement.style.height = newSize + 'px';
+            sizePreviewElement.style.left = selectedBody.position.x - newSize/2 + 'px';
+            sizePreviewElement.style.top = selectedBody.position.y - newSize/2 + 'px';
+        }
+    });
+
+    // Handle mouse up to stop dragging or apply resize
+    canvas.addEventListener('mouseup', function() {
+        if (draggedBody) {
+            Matter.Body.setStatic(draggedBody, false);
+            draggedBody = null;
+        }
+        
+        if (resizing && selectedBody) {
+            // Calculate new scale based on preview size
+            const previewSize = parseFloat(sizePreviewElement.style.width);
+            const currentSize = selectedBody.circleRadius ? 
+                               selectedBody.circleRadius * 2 : 
+                               Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
+                                       selectedBody.bounds.max.y - selectedBody.bounds.min.y);
+            
+            const scaleFactor = previewSize / currentSize;
+            
+            // Apply the new scale to the selected body
+            Matter.Body.scale(selectedBody, scaleFactor, scaleFactor);
+            
+            // Hide size preview
+            sizePreviewElement.style.display = 'none';
+            resizing = false;
+        }
+        
+        selectedBody = null;
+    });
+}
+
+// Get the body at a specific position
+function getBodyAtPosition(position) {
+    // Query all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
     
-    // Wind toggle button
-    const windButton = document.getElementById('toggle-wind');
-    if (windButton) {
-        windButton.addEventListener('click', function() {
-            console.log("Wind button clicked");
+    // Find the body under the cursor
+    for (let i = 0; i < bodies.length; i++) {
+        const body = bodies[i];
+        
+        if (Matter.Bounds.contains(body.bounds, position)) {
+            const vertices = body.vertices;
             
-            // Toggle wind state
-            windEnabled = !windEnabled;
-            this.textContent = windEnabled ? 'Disable Wind' : 'Toggle Wind';
-            this.classList.toggle('active', windEnabled);
-            
-            showFloatingMessage(windEnabled ? 'Wind enabled' : 'Wind disabled');
-        });
-    }
-    
-    // Collision effects button
-    const collisionEffectsButton = document.getElementById('toggle-collision-sparks');
-    if (collisionEffectsButton) {
-        collisionEffectsButton.addEventListener('click', function() {
-            console.log("Collision effects button clicked");
-            
-            if (!collisionEffectsEnabled) {
-                collisionEffectsEnabled = true;
+            // Check if position is inside polygon
+            if (body.circleRadius) {
+                // For circles, check if distance to center is less than radius
+                const distance = Math.sqrt(
+                    Math.pow(position.x - body.position.x, 2) +
+                    Math.pow(position.y - body.position.y, 2)
+                );
+                
+                if (distance <= body.circleRadius) {
+                    return body;
+                }
             } else {
-                collisionEffectType = (collisionEffectType + 1) % 5;
+                // For polygons, check if point is inside
+                if (Matter.Vertices.contains(vertices, position)) {
+                    return body;
+                }
             }
-            
-            const effectNames = ['Classic Particles', 'Star Burst', 'Trails', 'Glow', 'Ripples'];
-            this.textContent = `Effect: ${effectNames[collisionEffectType]}`;
-            this.classList.toggle('active', collisionEffectsEnabled);
-            
-            showFloatingMessage(`Collision effect: ${effectNames[collisionEffectType]}`);
-        });
+        }
     }
     
-    // Attractor button
-    const attractorButton = document.getElementById('add-attractor');
-    if (attractorButton) {
-        attractorButton.addEventListener('click', function() {
-            console.log("Attractor button clicked");
-            
-            // Clear active state from all buttons except this one
-            clearActiveState(allActionButtons.filter(id => id !== 'add-attractor'));
-            
-            // Toggle attractor mode
-            attractorMode = !attractorMode;
-            this.textContent = attractorMode ? 'Cancel Attractor' : 'Add Attractor';
-            this.classList.toggle('active', attractorMode);
-            
-            // Clear other modes
-            gravityZoneMode = false;
-            explosionMode = false;
-            portalMode = false;
-            
-            showFloatingMessage(attractorMode ? 'Click to place an attractor' : 'Attractor mode disabled');
-        });
-    }
-    
-    // Gravity zone button
-    const gravityZoneButton = document.getElementById('add-gravity-zone');
-    if (gravityZoneButton) {
-        gravityZoneButton.addEventListener('click', function() {
-            console.log("Gravity zone button clicked");
-            
-            // Clear active state from all buttons except this one
-            clearActiveState(allActionButtons.filter(id => id !== 'add-gravity-zone'));
-            
-            // Toggle gravity zone mode
-            gravityZoneMode = !gravityZoneMode;
-            this.classList.toggle('active', gravityZoneMode);
-            
-            // Clear other modes
-            attractorMode = false;
-            explosionMode = false;
-            portalMode = false;
-            
-            showFloatingMessage(gravityZoneMode ? 'Click to place a gravity zone' : 'Gravity zone mode disabled');
-        });
-    }
-    
-    // Explosion button
-    const explosionButton = document.getElementById('create-explosion');
-    if (explosionButton) {
-        explosionButton.addEventListener('click', function() {
-            console.log("Explosion button clicked");
-            
-            // Clear active state from all buttons except this one
-            clearActiveState(allActionButtons.filter(id => id !== 'create-explosion'));
-            
-            // Toggle explosion mode
-            explosionMode = !explosionMode;
-            this.textContent = explosionMode ? 'Cancel Explosion' : 'Explosion';
-            this.classList.toggle('active', explosionMode);
-            
-            // Clear other modes
-            attractorMode = false;
-            gravityZoneMode = false;
-            portalMode = false;
-            
-            showFloatingMessage(explosionMode ? 'Click anywhere to create explosions' : 'Explosion mode disabled');
-        });
-    }
-    
-    // Pause button
-    const pauseButton = document.getElementById('toggle-pause');
-    if (pauseButton) {
-        pauseButton.addEventListener('click', function() {
-            togglePause();
-            this.classList.toggle('active', isPaused);
-        });
-    }
-    
-    // Clear button
-    const clearButton = document.getElementById('clear');
-    if (clearButton) {
-        clearButton.addEventListener('click', function() {
-            clearNonStaticBodies();
-            
-            // Remove all attractors
-            while (attractors.length > 0) {
-                removeAttractor(attractors[0]);
-            }
-            
-            // Remove all gravity zones
-            while (gravityZones.length > 0) {
-                removeGravityZone(gravityZones[0]);
-            }
-            
-            // Clear all portals
-            clearAllPortals();
-            
-            // Reset modes
-            attractorMode = false;
-            explosionMode = false;
-            gravityZoneMode = false;
-            portalMode = false;
-            
-            // Reset button states
-            clearActiveState(allActionButtons);
-            
-            showFloatingMessage('All items cleared');
-        });
-    }
-    
-    // Portal button
-    const portalButton = document.getElementById('add-portal');
-    if (portalButton) {
-        portalButton.addEventListener('click', function() {
-            console.log("Portal button clicked");
-            
-            // Clear active state from all buttons except this one
-            clearActiveState(allActionButtons.filter(id => id !== 'add-portal'));
-            
-            // Toggle portal mode
-            portalMode = !portalMode;
-            this.classList.toggle('active', portalMode);
-            
-            // Clear other modes
-            attractorMode = false;
-            explosionMode = false;
-            gravityZoneMode = false;
-            
-            if (portalMode) {
-                showFloatingMessage('Portal mode enabled. Click to place entrance portal, then exit portal.');
-                // Reset pending portal if any
-                pendingPortal = null;
-            } else {
-                showFloatingMessage('Portal mode disabled');
-            }
-        });
-    }
-    
-    // Theme selector
-    const themeSelect = document.getElementById('theme-select');
-    if (themeSelect) {
-        themeSelect.addEventListener('change', function() {
-            console.log(`Theme selected: ${this.value}`);
-            setTheme(this.value);
-        });
-    }
-    
-    // Slider events
-    const gravitySlider = document.getElementById('gravity-slider');
-    if (gravitySlider) {
-        gravitySlider.addEventListener('input', function() {
-            engine.world.gravity.y = parseFloat(this.value);
-            showFloatingMessage(`Gravity: ${this.value}`);
-        });
-    }
-    
+    return null;
+}
+
+// Set up wind physics
+function setupWind() {
+    const toggleWindButton = document.getElementById('toggle-wind');
     const windSlider = document.getElementById('wind-slider');
-    if (windSlider) {
+    
+    // Check if wind UI elements exist before trying to use them
+    const windValueDisplay = document.querySelector('#wind-slider + .slider-header .slider-value');
+    const windIndicator = document.querySelector('.wind-indicator');
+    const windArrow = document.querySelector('.wind-arrow');
+    
+    // Safety check - don't proceed if required UI elements are missing
+    if (!toggleWindButton || !windSlider) {
+        console.warn('Wind control elements missing from the DOM');
+        return;
+    }
+    
+    // Update wind strength display if the element exists
+    if (windSlider && windValueDisplay) {
         windSlider.addEventListener('input', function() {
             windStrength = parseFloat(this.value);
-            showFloatingMessage(`Wind strength: ${this.value}`);
+            windValueDisplay.textContent = windStrength.toFixed(2);
         });
+        
+        // Initialize wind value display
+        windValueDisplay.textContent = windSlider.value;
     }
     
-    const bounceSlider = document.getElementById('bounce-slider');
-    if (bounceSlider) {
-        bounceSlider.addEventListener('input', function() {
-            defaultBounciness = parseFloat(this.value);
-            showFloatingMessage(`Bounciness: ${this.value}`);
-        });
-    }
-    
-    const timeSlider = document.getElementById('time-slider');
-    if (timeSlider) {
-        timeSlider.addEventListener('input', function() {
-            timeScale = parseFloat(this.value);
-            engine.timing.timeScale = timeScale;
-            
-            const speedText = timeScale < 1 ? 'Slow Motion' : 
-                              timeScale > 1 ? 'Fast Forward' : 'Normal Speed';
-            showFloatingMessage(`Time: ${speedText} (${timeScale.toFixed(1)}x)`);
-            
-            if (timeScale < 0.5) {
-                document.body.classList.add('slow-motion');
-            } else {
-                document.body.classList.remove('slow-motion');
+    toggleWindButton.addEventListener('click', function() {
+        windEnabled = !windEnabled;
+        this.classList.toggle('active');
+        
+        if (windEnabled) {
+            // Show wind indicator if it exists
+            if (windIndicator) {
+                windIndicator.classList.add('visible');
             }
-        });
+            
+            // Start wind interval
+            clearInterval(windInterval);
+            windInterval = setInterval(function() {
+                // Randomly vary wind strength
+                const variation = (Math.random() * 2 - 1) * windVariability;
+                windStrength = parseFloat(windSlider.value) + variation;
+                
+                // Randomly change direction occasionally
+                if (Math.random() < 0.03) {
+                    windDirection *= -1;
+                }
+                
+                // Calculate wind force
+                windForce = windStrength * windDirection;
+                
+                // Update wind indicator if it exists
+                if (windArrow) {
+                    windArrow.style.transform = windDirection > 0 ? 'scaleX(1)' : 'scaleX(-1)';
+                    windArrow.style.width = (40 + Math.abs(windForce) * 60) + '%';
+                }
+                
+                // Apply wind force to all bodies
+                const bodies = Matter.Composite.allBodies(world);
+                for (let i = 0; i < bodies.length; i++) {
+                    const body = bodies[i];
+                    if (!body.isStatic) {
+                        const area = body.circleRadius ? 
+                                    Math.PI * body.circleRadius * body.circleRadius : 
+                                    (body.bounds.max.x - body.bounds.min.x) * (body.bounds.max.y - body.bounds.min.y);
+                        
+                        const forceMagnitude = area * 0.001 * windForce;
+                        Matter.Body.applyForce(body, body.position, { x: forceMagnitude, y: 0 });
+                    }
+                }
+            }, 100);
+        } else {
+            // Hide wind indicator if it exists
+            if (windIndicator) {
+                windIndicator.classList.remove('visible');
+            }
+            
+            // Clear wind interval
+            clearInterval(windInterval);
+            windInterval = null;
+        }
+    });
+}
+
+// Setup shape creation functions
+function setupShapeCreation() {
+    const canvas = document.getElementById('physics-canvas');
+    const colorPicker = document.getElementById('shape-color');
+    
+    // Direct function to create shapes when buttons are clicked
+    function createShapeAtCenter(shapeType) {
+        // Get center of visible area
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 3; // Higher up so it can fall
+        const position = { x: centerX, y: centerY };
+        const color = colorPicker.value;
+        
+        // Create the selected shape
+        switch(shapeType) {
+            case 'circle':
+                createCircle(position, color);
+                break;
+            case 'rectangle':
+                createRectangle(position, color);
+                break;
+            case 'polygon':
+                createPolygon(position, color);
+                break;
+            case 'square':
+                createSquare(position, color);
+                break;
+            case 'star':
+                createStar(position, color);
+                break;
+        }
     }
     
-    // Canvas click handler for adding shapes and portals
+    // Add event listeners for shape buttons with direct creation
+    document.getElementById('add-circle').addEventListener('click', function(event) {
+        // Stop event propagation
+        event.stopPropagation();
+        
+        // Set the current mode
+        cursorMode = false;
+        attractorMode = false;
+        portalMode = false;
+        explosionMode = false;
+        currentMode = 'add-circle';
+        
+        // Update UI
+        document.getElementById('cursor-mode').classList.remove('active');
+        document.getElementById('toggle-attractor').classList.remove('active');
+        document.getElementById('toggle-portal').classList.remove('active');
+        document.getElementById('create-explosion').classList.remove('active');
+        
+        // Highlight active shape button
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Create a circle immediately
+        createShapeAtCenter('circle');
+        
+        console.log('Circle created');
+    });
+    
+    document.getElementById('add-rectangle').addEventListener('click', function(event) {
+        // Stop event propagation
+        event.stopPropagation();
+        
+        // Set the current mode
+        cursorMode = false;
+        attractorMode = false;
+        portalMode = false;
+        explosionMode = false;
+        currentMode = 'add-rectangle';
+        
+        // Update UI
+        document.getElementById('cursor-mode').classList.remove('active');
+        document.getElementById('toggle-attractor').classList.remove('active');
+        document.getElementById('toggle-portal').classList.remove('active');
+        document.getElementById('create-explosion').classList.remove('active');
+        
+        // Highlight active shape button
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Create a rectangle immediately
+        createShapeAtCenter('rectangle');
+        
+        console.log('Rectangle created');
+    });
+    
+    document.getElementById('add-polygon').addEventListener('click', function(event) {
+        // Stop event propagation
+        event.stopPropagation();
+        
+        // Set the current mode
+        cursorMode = false;
+        attractorMode = false;
+        portalMode = false;
+        explosionMode = false;
+        currentMode = 'add-polygon';
+        
+        // Update UI
+        document.getElementById('cursor-mode').classList.remove('active');
+        document.getElementById('toggle-attractor').classList.remove('active');
+        document.getElementById('toggle-portal').classList.remove('active');
+        document.getElementById('create-explosion').classList.remove('active');
+        
+        // Highlight active shape button
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Create a polygon immediately
+        createShapeAtCenter('polygon');
+        
+        console.log('Polygon created');
+    });
+    
+    document.getElementById('add-square').addEventListener('click', function(event) {
+        // Stop event propagation
+        event.stopPropagation();
+        
+        // Set the current mode
+        cursorMode = false;
+        attractorMode = false;
+        portalMode = false;
+        explosionMode = false;
+        currentMode = 'add-square';
+        
+        // Update UI
+        document.getElementById('cursor-mode').classList.remove('active');
+        document.getElementById('toggle-attractor').classList.remove('active');
+        document.getElementById('toggle-portal').classList.remove('active');
+        document.getElementById('create-explosion').classList.remove('active');
+        
+        // Highlight active shape button
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Create a square immediately
+        createShapeAtCenter('square');
+        
+        console.log('Square created');
+    });
+    
+    document.getElementById('add-star').addEventListener('click', function(event) {
+        // Stop event propagation
+        event.stopPropagation();
+        
+        // Set the current mode
+        cursorMode = false;
+        attractorMode = false;
+        portalMode = false;
+        explosionMode = false;
+        currentMode = 'add-star';
+        
+        // Update UI
+        document.getElementById('cursor-mode').classList.remove('active');
+        document.getElementById('toggle-attractor').classList.remove('active');
+        document.getElementById('toggle-portal').classList.remove('active');
+        document.getElementById('create-explosion').classList.remove('active');
+        
+        // Highlight active shape button
+        document.querySelectorAll('.shape-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Create a star immediately
+        createShapeAtCenter('star');
+        
+        console.log('Star created');
+    });
+    
+    // Canvas click handler for creating additional shapes
     canvas.addEventListener('click', function(event) {
-        console.log(`Canvas clicked at (${event.clientX}, ${event.clientY})`);
+        // Check if we clicked on the control panel
+        const controlsPanel = document.querySelector('.controls-panel');
+        const rect = controlsPanel.getBoundingClientRect();
         
-        // Update mouse position
-        lastMousePos.x = event.clientX;
-        lastMousePos.y = event.clientY;
-        
-        if (portalMode) {
-            // Handle portal placement
-            handlePortalPlacement(event);
+        // Don't create shapes if we clicked on controls or are in other modes
+        if (event.clientX >= rect.left && event.clientX <= rect.right &&
+            event.clientY >= rect.top && event.clientY <= rect.bottom ||
+            cursorMode || attractorMode || portalMode || explosionMode) {
             return;
         }
+        
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
+        
+        // Create different shapes based on current mode
+        const color = colorPicker.value;
+        
+        switch (currentMode) {
+            case 'add-circle':
+                createCircle(mousePosition, color);
+                break;
+            case 'add-rectangle':
+                createRectangle(mousePosition, color);
+                break;
+            case 'add-polygon':
+                createPolygon(mousePosition, color);
+                break;
+            case 'add-square':
+                createSquare(mousePosition, color);
+                break;
+            case 'add-star':
+                createStar(mousePosition, color);
+                break;
+        }
+    });
+}
+
+// Create a circle at the specified position
+function createCircle(position, color) {
+    const radius = 30 + Math.random() * 20;
+    const circle = Matter.Bodies.circle(position.x, position.y, radius, {
+        restitution: 0.3 + Math.random() * 0.2, // Moderate bounce, varied slightly
+        friction: 0.2 + Math.random() * 0.4,    // Moderate to high friction
+        frictionAir: 0.002,                     // Slightly higher air resistance
+        density: 0.002 + Math.random() * 0.001, // Realistic density
+        render: {
+            fillStyle: color,
+            strokeStyle: '#000000',
+            lineWidth: 1
+        }
+    });
+    
+    Matter.Composite.add(world, circle);
+}
+
+// Create a rectangle at the specified position
+function createRectangle(position, color) {
+    const width = 40 + Math.random() * 40;
+    const height = 40 + Math.random() * 40;
+    const rectangle = Matter.Bodies.rectangle(position.x, position.y, width, height, {
+        restitution: 0.2 + Math.random() * 0.15, // Lower bounce for rectangles
+        friction: 0.3 + Math.random() * 0.3,     // Higher friction
+        frictionAir: 0.001 + Math.random() * 0.002, // Varied air resistance
+        density: 0.0015 + Math.random() * 0.001,    // Realistic density
+        render: {
+            fillStyle: color,
+            strokeStyle: '#000000',
+            lineWidth: 1
+        }
+    });
+    
+    Matter.Composite.add(world, rectangle);
+}
+
+// Create a polygon at the specified position
+function createPolygon(position, color) {
+    const sides = Math.floor(3 + Math.random() * 5); // 3 to 7 sides
+    const radius = 30 + Math.random() * 20;
+    const polygon = Matter.Bodies.polygon(position.x, position.y, sides, radius, {
+        restitution: 0.2 + Math.random() * 0.1, // Low bounce for polygons
+        friction: 0.4 + Math.random() * 0.3,    // High friction
+        frictionAir: 0.001 + Math.random() * 0.001, // Some air resistance
+        density: 0.002 + Math.random() * 0.002,     // Varied density
+        render: {
+            fillStyle: color,
+            strokeStyle: '#000000',
+            lineWidth: 1
+        }
+    });
+    
+    Matter.Composite.add(world, polygon);
+}
+
+// Create a square at the specified position
+function createSquare(position, color) {
+    const size = 40 + Math.random() * 20; // Size between 40-60px
+    const square = Matter.Bodies.rectangle(position.x, position.y, size, size, {
+        restitution: 0.1 + Math.random() * 0.2, // Low to moderate bounce
+        friction: 0.3 + Math.random() * 0.4,    // Moderate to high friction
+        frictionAir: 0.001,                     // Normal air resistance
+        density: 0.002 + Math.random() * 0.001, // Slightly heavier
+        render: {
+            fillStyle: color,
+            strokeStyle: '#000000',
+            lineWidth: 1
+        }
+    });
+    
+    Matter.Composite.add(world, square);
+}
+
+// Create a star shape at the specified position
+function createStar(position, color) {
+    const outerRadius = 30 + Math.random() * 15;
+    const innerRadius = outerRadius * 0.4;
+    const numPoints = 5;
+    
+    // Create vertices for a star shape
+    const vertices = [];
+    for (let i = 0; i < numPoints * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (Math.PI * i) / numPoints;
+        vertices.push({
+            x: position.x + radius * Math.sin(angle),
+            y: position.y + radius * Math.cos(angle)
+        });
+    }
+    
+    const star = Matter.Bodies.fromVertices(position.x, position.y, [vertices], {
+        restitution: 0.2,         // Low bounce
+        friction: 0.4,            // High friction due to points
+        frictionAir: 0.002,       // Higher air resistance due to shape
+        density: 0.001,           // Light
+        render: {
+            fillStyle: color,
+            strokeStyle: '#000000',
+            lineWidth: 1
+        }
+    });
+    
+    Matter.Composite.add(world, star);
+}
+
+// Setup special physics modes (attractor, portal, explosion)
+function setupSpecialModes() {
+    const canvas = document.getElementById('physics-canvas');
+    
+    // Attractor mode
+    document.getElementById('toggle-attractor').addEventListener('click', function() {
+        attractorMode = !attractorMode;
+        this.classList.toggle('active');
         
         if (attractorMode) {
-            // Create attractor at click point
-            createAttractor(event.clientX, event.clientY);
-            return;
+            // Deactivate other modes
+            cursorMode = false;
+            portalMode = false;
+            explosionMode = false;
+            currentMode = 'attractor-mode';
+            
+            // Update UI to reflect mode change
+            document.getElementById('cursor-mode').classList.remove('active');
+            document.getElementById('toggle-portal').classList.remove('active');
+            document.getElementById('create-explosion').classList.remove('active');
+            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
+            
+            // If there's an existing attractor, remove it
+            if (attractor) {
+                Matter.Composite.remove(world, attractor);
+                attractor = null;
+            }
         }
+    });
+    
+    // Portal mode
+    document.getElementById('toggle-portal').addEventListener('click', function() {
+        portalMode = !portalMode;
+        this.classList.toggle('active');
+        
+        if (portalMode) {
+            // Deactivate other modes
+            cursorMode = false;
+            attractorMode = false;
+            explosionMode = false;
+            currentMode = 'portal-mode';
+            
+            // Update UI to reflect mode change
+            document.getElementById('cursor-mode').classList.remove('active');
+            document.getElementById('toggle-attractor').classList.remove('active');
+            document.getElementById('create-explosion').classList.remove('active');
+            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
+            
+            // Reset portal points
+            portal = { source: null, destination: null };
+        }
+    });
+    
+    // Explosion mode
+    document.getElementById('create-explosion').addEventListener('click', function() {
+        explosionMode = !explosionMode;
+        this.classList.toggle('active');
         
         if (explosionMode) {
-            // Create explosion at click point
-            createExplosion({x: event.clientX, y: event.clientY});
-            return;
+            // Deactivate other modes
+            cursorMode = false;
+            attractorMode = false;
+            portalMode = false;
+            currentMode = 'explosion-mode';
+            
+            // Update UI to reflect mode change
+            document.getElementById('cursor-mode').classList.remove('active');
+            document.getElementById('toggle-attractor').classList.remove('active');
+            document.getElementById('toggle-portal').classList.remove('active');
+            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
         }
+    });
+    
+    // Handle mouse click for special modes
+    canvas.addEventListener('click', function(event) {
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
         
-        if (gravityZoneMode) {
-            // Create gravity zone at click point
-            createGravityZone(event.clientX, event.clientY);
-            return;
+        if (attractorMode) {
+            createAttractor(mousePosition);
+        } else if (portalMode) {
+            createPortal(mousePosition);
+        } else if (explosionMode) {
+            createExplosion(mousePosition);
         }
-        
-        const activeButtonId = document.querySelector('.shape-button.active')?.id;
-        
-        if (activeButtonId) {
-            switch(activeButtonId) {
-                case 'add-circle': 
-                    addCircle(event.clientX, event.clientY); 
-                    break;
-                case 'add-square': 
-                    addSquare(event.clientX, event.clientY); 
-                    break;
-                case 'add-triangle': 
-                    addTriangle(event.clientX, event.clientY); 
-                    break;
-                case 'add-star': 
-                    addStar(event.clientX, event.clientY); 
-                    break;
-                case 'add-sand':
-                    for (let i = 0; i < 20; i++) {
-                        setTimeout(() => {
-                            addSandParticle(event.clientX + (Math.random() - 0.5) * 20, event.clientY + (Math.random() - 0.5) * 20);
-                        }, i * 20);
+    });
+    
+    // Apply attractor force in update loop
+    Matter.Events.on(engine, 'beforeUpdate', function() {
+        if (attractor) {
+            const bodies = Matter.Composite.allBodies(world);
+            
+            bodies.forEach(body => {
+                if (body !== attractor && !body.isStatic) {
+                    // Calculate direction vector
+                    const direction = {
+                        x: attractor.position.x - body.position.x,
+                        y: attractor.position.y - body.position.y
+                    };
+                    
+                    // Calculate distance
+                    const distance = Math.sqrt(
+                        direction.x * direction.x + direction.y * direction.y
+                    );
+                    
+                    // Normalize direction vector
+                    if (distance > 0) {
+                        direction.x /= distance;
+                        direction.y /= distance;
                     }
-                    break;
-                case 'add-text':
-                    const text = prompt('Enter text:', 'Hello');
-                    if (text) {
-                        createTextObject(text, {x: event.clientX, y: event.clientY});
+                    
+                    // Apply force with falloff based on distance
+                    const forceMagnitude = Math.min(attractorStrength * body.mass / (distance * 0.1), 0.5);
+                    Matter.Body.applyForce(body, body.position, {
+                        x: direction.x * forceMagnitude,
+                        y: direction.y * forceMagnitude
+                    });
+                }
+            });
+        }
+    });
+    
+    // Handle portal teleportation
+    Matter.Events.on(engine, 'afterUpdate', function() {
+        if (portal.source && portal.destination) {
+            const bodies = Matter.Composite.allBodies(world);
+            
+            bodies.forEach(body => {
+                if (!body.isStatic && body !== portal.source && body !== portal.destination) {
+                    // Check if body is near source portal
+                    const distanceToSource = Math.sqrt(
+                        Math.pow(body.position.x - portal.source.position.x, 2) +
+                        Math.pow(body.position.y - portal.source.position.y, 2)
+                    );
+                    
+                    // If body is close to source portal, teleport to destination
+                    if (distanceToSource < portal.source.circleRadius * 1.2) {
+                        // Apply slight velocity change to prevent immediate teleportation back
+                        const velocityFactor = 1.05;
+                        
+                        // Set new position and adjust velocity slightly
+                        Matter.Body.setPosition(body, {
+                            x: portal.destination.position.x,
+                            y: portal.destination.position.y
+                        });
+                        
+                        Matter.Body.setVelocity(body, {
+                            x: body.velocity.x * velocityFactor,
+                            y: body.velocity.y * velocityFactor
+                        });
                     }
-                    break;
-            }
+                }
+            });
         }
     });
-    
-    // Double click to remove objects
-    canvas.addEventListener('dblclick', function(event) {
-        console.log(`Canvas double-clicked at (${event.clientX}, ${event.clientY})`);
-        
-        // Check if double click is near an attractor to remove it
-        attractors.forEach(attractor => {
-            const dx = event.clientX - attractor.position.x;
-            const dy = event.clientY - attractor.position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < attractor.radius) {
-                removeAttractor(attractor);
-            }
-        });
-        
-        // Check if double click is near a gravity zone to remove it
-        gravityZones.forEach(zone => {
-            const dx = event.clientX - zone.position.x;
-            const dy = event.clientY - zone.position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < zone.radius) {
-                removeGravityZone(zone);
-            }
-        });
-    });
 }
 
-// Create gravity zone
-function createGravityZone(x, y) {
-    console.log(`Creating gravity zone at (${x}, ${y})`);
-    
-    const radius = 150;
-    const strength = document.getElementById('gravity-slider').value * -0.5; // Inverse of current gravity
-    
-    // Create gravity zone object
-    const gravityZone = {
-        position: { x, y },
-        strength: strength,
-        radius: radius,
-        pulsePhase: 0
-    };
-    
-    // Create visual representation
-    const element = document.createElement('div');
-    element.className = 'gravity-zone';
-    element.style.position = 'absolute';
-    element.style.width = (radius * 2) + 'px';
-    element.style.height = (radius * 2) + 'px';
-    element.style.left = x + 'px';
-    element.style.top = y + 'px';
-    element.style.transform = 'translate(-50%, -50%)';
-    element.style.background = strength > 0 ? 
-        'radial-gradient(circle, rgba(100,200,255,0.15) 0%, rgba(50,100,255,0.1) 40%, rgba(0,30,100,0) 80%)' : 
-        'radial-gradient(circle, rgba(255,100,100,0.15) 0%, rgba(255,50,50,0.1) 40%, rgba(100,0,0,0) 80%)';
-    element.style.border = `2px dashed ${strength > 0 ? 'rgba(100,150,255,0.3)' : 'rgba(255,100,100,0.3)'}`;
-    element.style.borderRadius = '50%';
-    element.style.pointerEvents = 'none';
-    element.style.animation = 'gravity-zone-pulse 3s ease-in-out infinite alternate';
-    document.body.appendChild(element);
-    
-    // Store reference to DOM element
-    gravityZone.element = element;
-    
-    // Add to gravity zones array
-    gravityZones.push(gravityZone);
-    
-    showFloatingMessage(strength > 0 ? 'Pull gravity zone added' : 'Push gravity zone added');
-    
-    return gravityZone;
-}
-
-// Apply gravity zone forces
-function applyGravityZoneForces() {
-    if (gravityZones.length === 0) return;
-    
-    const bodies = Composite.allBodies(engine.world);
-    const time = Date.now() / 1000;
-    
-    gravityZones.forEach(zone => {
-        // Update pulse phase
-        zone.pulsePhase += 0.05;
-        if (zone.pulsePhase > Math.PI * 2) zone.pulsePhase -= Math.PI * 2;
-        
-        bodies.forEach(body => {
-            if (body.isStatic) return;
-            
-            const dx = zone.position.x - body.position.x;
-            const dy = zone.position.y - body.position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < zone.radius) {
-                // Apply vertical gravity modification
-                const forceMagnitude = zone.strength * 0.001 * body.mass;
-                
-                Body.applyForce(body, body.position, {
-                    x: 0,
-                    y: forceMagnitude
-                });
-                
-                // Apply slight pull toward center
-                const centerPull = 0.0001 * zone.strength;
-                Body.applyForce(body, body.position, {
-                    x: dx * centerPull,
-                    y: dy * centerPull
-                });
-            }
-        });
-    });
-}
-
-// Function to toggle pause state
-function togglePause() {
-    isPaused = !isPaused;
-    
-    if (isPaused) {
-        Runner.stop(runner);
-        
-        // Add pause indicator
-        const pauseIndicator = document.createElement('div');
-        pauseIndicator.id = 'pause-indicator';
-        pauseIndicator.textContent = 'PAUSED';
-        pauseIndicator.style.position = 'absolute';
-        pauseIndicator.style.top = '50%';
-        pauseIndicator.style.left = '50%';
-        pauseIndicator.style.transform = 'translate(-50%, -50%)';
-        pauseIndicator.style.color = 'rgba(255, 255, 255, 0.8)';
-        pauseIndicator.style.fontSize = '3rem';
-        pauseIndicator.style.fontWeight = 'bold';
-        pauseIndicator.style.zIndex = '100';
-        pauseIndicator.style.pointerEvents = 'none';
-        pauseIndicator.style.textShadow = '0 0 10px rgba(0, 0, 0, 0.5)';
-        document.body.appendChild(pauseIndicator);
-    } else {
-        Runner.start(runner, engine);
-        
-        // Remove pause indicator
-        const pauseIndicator = document.getElementById('pause-indicator');
-        if (pauseIndicator) {
-            pauseIndicator.remove();
-        }
+// Create attractor at the specified position
+function createAttractor(position) {
+    // Remove existing attractor if there is one
+    if (attractor) {
+        Matter.Composite.remove(world, attractor);
     }
     
-    showFloatingMessage(isPaused ? 'Paused' : 'Resumed');
+    // Create the attractor body
+    attractor = Matter.Bodies.circle(position.x, position.y, 25, {
+        isStatic: true,
+        collisionFilter: { group: -1 }, // No collision with other bodies
+        render: {
+            fillStyle: '#FF5722',
+            lineWidth: 0,
+            sprite: {
+                texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(255,87,34,1)" /><stop offset="100%" stop-color="rgba(255,87,34,0)" /></radialGradient><circle cx="25" cy="25" r="25" fill="url(%23grad)" /></svg>',
+                xScale: 2,
+                yScale: 2
+            }
+        },
+        label: 'attractor'
+    });
+    
+    Matter.Composite.add(world, attractor);
 }
 
-// Function to clear non-static bodies
-function clearNonStaticBodies() {
-    const bodies = Composite.allBodies(engine.world);
+// Create portal at the specified position
+function createPortal(position) {
+    if (!portal.source) {
+        // Create source portal
+        portal.source = Matter.Bodies.circle(position.x, position.y, 30, {
+            isStatic: true,
+            collisionFilter: { group: -1 }, // No collision with other bodies
+            render: {
+                fillStyle: '#3F51B5',
+                sprite: {
+                    texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(63,81,181,1)" /><stop offset="100%" stop-color="rgba(63,81,181,0.3)" /></radialGradient><circle cx="30" cy="30" r="30" fill="url(%23grad)" /></svg>',
+                    xScale: 2,
+                    yScale: 2
+                }
+            },
+            label: 'portal'
+        });
+        
+        Matter.Composite.add(world, portal.source);
+    } else if (!portal.destination) {
+        // Create destination portal
+        portal.destination = Matter.Bodies.circle(position.x, position.y, 30, {
+            isStatic: true,
+            collisionFilter: { group: -1 }, // No collision with other bodies
+            render: {
+                fillStyle: '#9C27B0',
+                sprite: {
+                    texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(156,39,176,1)" /><stop offset="100%" stop-color="rgba(156,39,176,0.3)" /></radialGradient><circle cx="30" cy="30" r="30" fill="url(%23grad)" /></svg>',
+                    xScale: 2,
+                    yScale: 2
+                }
+            },
+            label: 'portal'
+        });
+        
+        Matter.Composite.add(world, portal.destination);
+    }
+}
+
+// Create explosion at the specified position
+function createExplosion(position) {
+    const radius = 150; // Explosion radius
+    const bodies = Matter.Composite.allBodies(world);
     
+    // Create visual effect
+    const explosionEffect = document.createElement('div');
+    explosionEffect.className = 'explosion-effect';
+    explosionEffect.style.left = (position.x - radius) + 'px';
+    explosionEffect.style.top = (position.y - radius) + 'px';
+    explosionEffect.style.width = (radius * 2) + 'px';
+    explosionEffect.style.height = (radius * 2) + 'px';
+    document.body.appendChild(explosionEffect);
+    
+    // Fade out and remove the effect
+    setTimeout(() => {
+        explosionEffect.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(explosionEffect);
+        }, 500);
+    }, 100);
+    
+    // Apply force to all bodies within radius
     bodies.forEach(body => {
         if (!body.isStatic) {
-            Composite.remove(engine.world, body);
+            const distance = Math.sqrt(
+                Math.pow(body.position.x - position.x, 2) +
+                Math.pow(body.position.y - position.y, 2)
+            );
+            
+            if (distance < radius) {
+                // Calculate direction vector
+                const direction = {
+                    x: body.position.x - position.x,
+                    y: body.position.y - position.y
+                };
+                
+                // Normalize direction vector
+                const magnitude = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+                if (magnitude > 0) {
+                    direction.x /= magnitude;
+                    direction.y /= magnitude;
+                }
+                
+                // Force decreases with distance
+                const forceMagnitude = 0.15 * body.mass * (1 - distance / radius);
+                
+                // Apply explosion force
+                Matter.Body.applyForce(body, body.position, {
+                    x: direction.x * forceMagnitude,
+                    y: direction.y * forceMagnitude
+                });
+            }
+        }
+    });
+}
+
+// Setup gravity zone mode
+function setupGravityZoneMode() {
+    const canvas = document.getElementById('physics-canvas');
+    const toggleGravityZone = document.getElementById('toggle-gravity-zone');
+    
+    toggleGravityZone.addEventListener('click', function() {
+        gravityZoneMode = !gravityZoneMode;
+        this.classList.toggle('active');
+        
+        if (gravityZoneMode) {
+            // Deactivate other modes
+            cursorMode = false;
+            attractorMode = false;
+            portalMode = false;
+            explosionMode = false;
+            currentMode = 'gravity-zone-mode';
+            
+            // Update UI to reflect mode change
+            document.getElementById('cursor-mode').classList.remove('active');
+            document.getElementById('toggle-attractor').classList.remove('active');
+            document.getElementById('toggle-portal').classList.remove('active');
+            document.getElementById('create-explosion').classList.remove('active');
+            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
         }
     });
     
-    sandParticles = [];
-}
-
-// Clear button
-const clearButton = document.getElementById('clear');
-if (clearButton) {
-    clearButton.addEventListener('click', function() {
-        clearNonStaticBodies();
+    canvas.addEventListener('click', function(event) {
+        if (!gravityZoneMode) return;
         
-        // Remove all attractors
-        while (attractors.length > 0) {
-            removeAttractor(attractors[0]);
-        }
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
         
-        // Remove all gravity zones
-        while (gravityZones.length > 0) {
-            removeGravityZone(gravityZones[0]);
-        }
-        
-        // Clear all portals
-        clearAllPortals();
-        
-        // Reset modes
-        attractorMode = false;
-        explosionMode = false;
-        gravityZoneMode = false;
-        portalMode = false;
-        
-        // Reset button states
-        clearActiveState(allActionButtons);
-        
-        showFloatingMessage('All items cleared');
+        createGravityZone(mousePosition);
     });
 }
 
-// Function to clear all portals
-function clearAllPortals() {
-    // Clear portals array
-    while (portals.length > 0) {
-        removePortal(portals[0]);
-    }
+// Create a gravity zone at the specified position
+function createGravityZone(position) {
+    const radius = 100;
+    const gravityZone = Matter.Bodies.circle(position.x, position.y, radius, {
+        isStatic: true,
+        collisionFilter: { group: -1 }, // No collision with other bodies
+        render: {
+            fillStyle: 'rgba(76, 175, 80, 0.2)',
+            strokeStyle: '#4CAF50',
+            lineWidth: 2
+        },
+        label: 'gravity-zone'
+    });
     
-    // Clear PORTAL_PAIRS array and their DOM elements
-    while (PORTAL_PAIRS.length > 0) {
-        const pair = PORTAL_PAIRS[0];
-        
-        // Remove entrance portal element
-        if (pair.entrance && pair.entrance.element) {
-            pair.entrance.element.remove();
-        }
-        
-        // Remove entrance portal glow element
-        if (pair.entrance && pair.entrance.glowElement) {
-            pair.entrance.glowElement.remove();
-        }
-        
-        // Remove exit portal element
-        if (pair.exit && pair.exit.element) {
-            pair.exit.element.remove();
-        }
-        
-        // Remove exit portal glow element
-        if (pair.exit && pair.exit.glowElement) {
-            pair.exit.glowElement.remove();
-        }
-        
-        PORTAL_PAIRS.splice(0, 1);
-    }
+    // Customize gravity direction within this zone
+    gravityZone.gravityDirection = { x: Math.random() * 2 - 1, y: Math.random() * 2 - 1 };
     
-    // Reset pending portal if any
-    if (pendingPortal) {
-        if (pendingPortal.element) {
-            pendingPortal.element.remove();
+    Matter.Composite.add(world, gravityZone);
+    
+    // Add gravity zone effect to beforeUpdate event
+    Matter.Events.on(engine, 'beforeUpdate', function() {
+        const bodies = Matter.Composite.allBodies(world);
+        const gravityZones = bodies.filter(body => body.label === 'gravity-zone');
+        
+        for (const zone of gravityZones) {
+            bodies.forEach(body => {
+                if (!body.isStatic && body.label !== 'gravity-zone') {
+                    // Check if body is inside gravity zone
+                    const distance = Math.sqrt(
+                        Math.pow(body.position.x - zone.position.x, 2) +
+                        Math.pow(body.position.y - zone.position.y, 2)
+                    );
+                    
+                    if (distance < zone.circleRadius) {
+                        // Apply custom gravity force
+                        const forceMagnitude = 0.001 * body.mass;
+                        Matter.Body.applyForce(body, body.position, {
+                            x: zone.gravityDirection.x * forceMagnitude,
+                            y: zone.gravityDirection.y * forceMagnitude
+                        });
+                    }
+                }
+            });
         }
-        if (pendingPortal.glowElement) {
-            pendingPortal.glowElement.remove();
-        }
-        pendingPortal = null;
-    }
+    });
 }
 
-// Function to remove a portal
-function removePortal(portal) {
-    const index = portals.indexOf(portal);
-    if (index !== -1) {
-        portals.splice(index, 1);
-    }
+// Toggle menu position
+const togglePositionButton = document.getElementById('toggle-position');
+togglePositionButton.addEventListener('click', function() {
+    const controlsPanel = document.querySelector('.controls-panel');
+    controlsPanel.classList.toggle('left-position');
+});
+
+// Initialize theme switching
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup themes
+    setupThemes();
+    setupAccentColors();
+    setupColorPresets();
+});
+
+// Set up theme switching functionality
+function setupThemes() {
+    // Set up theme dropdown
+    const themeDropdown = document.getElementById('theme-dropdown');
+    const themeToggle = themeDropdown.querySelector('.dropdown-toggle');
+    const themeMenu = themeDropdown.querySelector('.dropdown-menu');
+    const themeItems = themeDropdown.querySelectorAll('.dropdown-item');
+    const themeNameSpan = themeToggle.querySelector('span');
     
-    // Remove entrance portal
-    if (portal.entranceElement && portal.entranceElement.parentNode) {
-        portal.entranceElement.parentNode.removeChild(portal.entranceElement);
-    }
+    // Toggle dropdown when clicked
+    themeToggle.addEventListener('click', function(event) {
+        event.stopPropagation();
+        themeDropdown.classList.toggle('open');
+    });
     
-    // Remove exit portal
-    if (portal.exitElement && portal.exitElement.parentNode) {
-        portal.exitElement.parentNode.removeChild(portal.exitElement);
-    }
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!themeDropdown.contains(event.target)) {
+            themeDropdown.classList.remove('open');
+        }
+    });
+    
+    // Handle theme selection
+    themeItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // Get theme data
+            const themeName = this.textContent;
+            const themeClass = this.getAttribute('data-theme');
+            
+            // Update dropdown toggle text
+            themeNameSpan.textContent = `Theme: ${themeName}`;
+            
+            // Remove all theme classes
+            document.body.classList.remove(
+                'theme-modern-dark',
+                'theme-modern-blue',
+                'theme-modern-purple',
+                'theme-modern-mint',
+                'theme-modern-sunset'
+            );
+            
+            // Add the selected theme class
+            document.body.classList.add(themeClass);
+            
+            // Update active state on items
+            themeItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Close the dropdown
+            themeDropdown.classList.remove('open');
+        });
+    });
+}
+
+// Set up accent color functionality
+function setupAccentColors() {
+    const buttonColorPicker = document.getElementById('button-color');
+    
+    // Add event listener for color change
+    buttonColorPicker.addEventListener('input', function() {
+        updateAccentColor(this.value);
+    });
+    
+    // Initialize with default color
+    updateAccentColor(buttonColorPicker.value);
+}
+
+// Update accent color throughout the UI
+function updateAccentColor(color) {
+    // Convert hex to rgb for CSS variables
+    const rgb = hexToRgb(color);
+    
+    // Set CSS variables
+    document.documentElement.style.setProperty('--accent-color', color);
+    document.documentElement.style.setProperty('--accent-color-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    
+    // Apply to active elements
+    document.querySelectorAll('.active').forEach(el => {
+        el.style.color = color;
+    });
+}
+
+// Set up color preset functionality for both pickers
+function setupColorPresets() {
+    // For accent color presets
+    const accentPresets = document.querySelectorAll('.button-color-picker .color-preset');
+    accentPresets.forEach(preset => {
+        preset.addEventListener('click', function() {
+            const color = this.getAttribute('data-color');
+            document.getElementById('button-color').value = color;
+            updateAccentColor(color);
+        });
+    });
+    
+    // For shape color presets
+    const shapePresets = document.querySelectorAll('.color-picker .color-preset');
+    shapePresets.forEach(preset => {
+        preset.addEventListener('click', function() {
+            const color = this.getAttribute('data-color');
+            document.getElementById('shape-color').value = color;
+        });
+    });
+}
+
+// Helper function to convert hex to rgb
+function hexToRgb(hex) {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+    
+    // Parse hex values
+    const bigint = parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    
+    return { r, g, b };
+}
+
+// Create a static base and walls to contain the shapes
+function createStaticBase() {
+    // Add console logging to debug base creation
+    console.log("Window dimensions:", window.innerWidth, "x", window.innerHeight);
+    
+    // Create a MASSIVE, can't-miss base in the MIDDLE of the screen
+    const base = Matter.Bodies.rectangle(
+        window.innerWidth / 2,          // Center horizontally
+        window.innerHeight / 2 + 200,   // Lower middle of the screen
+        window.innerWidth,              // Full width of screen
+        50,                             // Extra thick
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: '#FF00FF',   // Bright magenta (very visible)
+                strokeStyle: '#FFFF00', // Yellow outline for contrast
+                lineWidth: 5            // Extra thick outline
+            },
+            label: 'base',
+            friction: 0.5,
+            restitution: 0.3,
+            density: 10
+        }
+    );
+    
+    // Create a second backup base higher up
+    const upperBase = Matter.Bodies.rectangle(
+        window.innerWidth / 2,          // Center horizontally
+        window.innerHeight / 3,         // Upper third of screen
+        window.innerWidth / 1.5,        // 75% width
+        40,                             // Thick
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: '#00FF00',   // Bright green
+                strokeStyle: '#FF0000', // Red outline
+                lineWidth: 4            // Thick outline
+            },
+            label: 'upper-base',
+            friction: 0.4,
+            restitution: 0.4,
+            density: 10
+        }
+    );
+    
+    // Add side walls
+    const leftWall = Matter.Bodies.rectangle(
+        20,                          // Well inside screen
+        window.innerHeight / 2,
+        40,                          // Very thick wall
+        window.innerHeight,
+        {
+            isStatic: true,
+            render: {
+                fillStyle: '#00FFFF', // Cyan
+                strokeStyle: '#000000',
+                lineWidth: 2
+            },
+            label: 'wall',
+            friction: 0.3,
+            restitution: 0.3
+        }
+    );
+    
+    const rightWall = Matter.Bodies.rectangle(
+        window.innerWidth - 20,      // Well inside screen
+        window.innerHeight / 2,
+        40,                          // Very thick wall
+        window.innerHeight,
+        {
+            isStatic: true,
+            render: {
+                fillStyle: '#00FFFF', // Cyan
+                strokeStyle: '#000000',
+                lineWidth: 2
+            },
+            label: 'wall',
+            friction: 0.3,
+            restitution: 0.3
+        }
+    );
+    
+    // Add all bodies to the world
+    Matter.Composite.add(world, [base, upperBase, leftWall, rightWall]);
+    
+    // Output debug info to console
+    console.log("CREATED BASES at these positions:");
+    console.log("Main base:", window.innerHeight / 2 + 200);
+    console.log("Upper base:", window.innerHeight / 3);
+    
+    // Create a visible DOM element as a fallback indicator
+    const indicator = document.createElement('div');
+    indicator.style.position = 'absolute';
+    indicator.style.left = '50%';
+    indicator.style.top = (window.innerHeight / 2 + 200) + 'px';
+    indicator.style.transform = 'translate(-50%, -50%)';
+    indicator.style.width = '400px';
+    indicator.style.height = '30px';
+    indicator.style.backgroundColor = 'red';
+    indicator.style.border = '3px solid yellow';
+    indicator.style.zIndex = '1000';
+    indicator.style.textAlign = 'center';
+    indicator.style.color = 'white';
+    indicator.style.fontWeight = 'bold';
+    indicator.style.padding = '5px';
+    indicator.innerHTML = 'THIS IS THE BASE LOCATION';
+    document.body.appendChild(indicator);
 }

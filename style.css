@@ -1,570 +1,543 @@
+/* Global reset and base styling */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; /* Changed to Inter font for better appearance */
+}
+
+:root {
+    
+    --bg-primary: #121212;
+    --bg-secondary: rgba(30, 30, 30, 0.75);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --accent-color: #6d5dfc;
+    --accent-color-rgb: 109, 93, 252;
+    --panel-blur: 12px;
+    --panel-border: rgba(255, 255, 255, 0.07);
+    
+    /* Common UI elements */
+    --panel-radius: 18px;
+    --button-radius: 12px;
+    --slider-height: 4px;
+    --transition-speed: 0.3s;
 }
 
 body {
-    margin: 0;
-    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     overflow: hidden;
-    background-color: #121212;
-    font-family: 'Roboto', sans-serif;
-    color: #fff;
-}
-
-/* theme classes with accent colors */
-body.boutique-theme {
-    background: #000000;
-    color: #fff;
-    --accent-color: #6a11cb;
-    --secondary-color: #2575fc;
-    --gradient: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
-}
-
-body.neon-theme {
-    background: #000000;
-    color: #fff;
-    --accent-color: #00E0FF;
-    --secondary-color: #FF00E4;
-    --gradient: linear-gradient(45deg, #00E0FF 0%, #FF00E4 100%);
-}
-
-body.pastel-theme {
-    background: #000000;
-    color: #fff;
-    --accent-color: #FFB6C1;
-    --secondary-color: #87CEFA;
-    --gradient: linear-gradient(45deg, #FFB6C1 0%, #87CEFA 100%);
-}
-
-body.minimal-theme {
-    background: #000000;
-    color: #fff;
-    --accent-color: #aaaaaa;
-    --secondary-color: #555555;
-    --gradient: linear-gradient(45deg, #aaaaaa 0%, #555555 100%);
-}
-
-.controls {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 10;
-    background-color: rgba(30, 30, 30, 0.85); /* Darker background */
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    border: 1px solid rgba(70, 70, 70, 0.5);
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    max-width: 300px;
-    max-height: 90vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    transition: all 0.3s ease;
-    color: #ffffff;
-}
-
-/* scrollbar for the controls panel */
-.controls::-webkit-scrollbar {
-    width: 6px;
-}
-
-.controls::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-}
-
-.controls::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-}
-
-.controls::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
-}
-
-.boutique-theme .controls {
-    border: 1px solid rgba(106, 17, 203, 0.3);
-    box-shadow: 0 8px 32px rgba(106, 17, 203, 0.2);
-}
-
-.neon-theme .controls {
-    border: 1px solid rgba(0, 224, 255, 0.3);
-    box-shadow: 0 8px 32px rgba(0, 224, 255, 0.2);
-}
-
-.pastel-theme .controls {
-    border: 1px solid rgba(255, 182, 193, 0.3);
-    box-shadow: 0 8px 32px rgba(255, 182, 193, 0.2);
-}
-
-.title {
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--accent-color, #ffffff);
-    text-align: center;
-    margin-bottom: 10px;
-    letter-spacing: 0.5px;
-    text-shadow: 0 0 10px rgba(var(--accent-color-rgb, 255, 255, 255), 0.5);
-}
-
-.neon-theme .title {
-    color: #ffffff;
-    text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-}
-
-.buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    margin-bottom: 5px;
-}
-
-/* Button styling using CSS variables for theme colors */
-button {
-    padding: 10px 14px;
-    background-color: rgba(60, 60, 60, 0.8);
-    color: #ffffff;
-    border: 1px solid var(--accent-color, #555555);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 500;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 8px rgba(var(--accent-color-rgb, 85, 85, 85), 0.3);
-}
-
-button:hover {
-    transform: translateY(-2px);
-    background-color: rgba(70, 70, 70, 0.9);
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(var(--accent-color-rgb, 85, 85, 85), 0.5);
-    border-color: var(--secondary-color, #666666);
-}
-
-button:active {
-    transform: translateY(1px);
-}
-
-button.active {
-    background-color: rgba(var(--accent-color-rgb, 85, 85, 85), 0.3);
-    border-color: var(--accent-color, #555555);
-    box-shadow: 0 0 15px rgba(var(--accent-color-rgb, 85, 85, 85), 0.4);
-}
-
-/* Theme-specific button styles */
-.boutique-theme button {
-    --accent-color-rgb: 106, 17, 203;
-    border-color: rgba(106, 17, 203, 0.5);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 8px rgba(106, 17, 203, 0.3);
-}
-
-.boutique-theme button:hover {
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(106, 17, 203, 0.5);
-    border-color: rgba(37, 117, 252, 0.7);
-}
-
-.neon-theme button {
-    --accent-color-rgb: 0, 224, 255;
-    border-color: rgba(0, 224, 255, 0.5);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 8px rgba(0, 224, 255, 0.3);
-}
-
-.neon-theme button:hover {
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 224, 255, 0.5);
-    border-color: rgba(255, 0, 228, 0.7);
-}
-
-.pastel-theme button {
-    --accent-color-rgb: 255, 182, 193;
-    border-color: rgba(255, 182, 193, 0.5);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 8px rgba(255, 182, 193, 0.3);
-}
-
-.pastel-theme button:hover {
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(255, 182, 193, 0.5);
-    border-color: rgba(135, 206, 250, 0.7);
-}
-
-.minimal-theme button {
-    --accent-color-rgb: 170, 170, 170;
-    border-color: rgba(170, 170, 170, 0.5);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 8px rgba(170, 170, 170, 0.3);
-}
-
-.minimal-theme button:hover {
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(170, 170, 170, 0.5);
-    border-color: rgba(85, 85, 85, 0.7);
-}
-
-/* Override for specific buttons that need special styling */
-.boutique-theme #add-circle.active { 
-    background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
-    color: white;
-    background-size: 200% 200%;
-    animation: gradientShift 5s ease infinite;
-}
-
-.boutique-theme #add-circle {
-    background: rgba(60, 60, 60, 0.8);
-    animation: none;
-}
-
-.neon-theme #add-circle.active {
-    background: linear-gradient(45deg, #00E0FF 0%, #FF00E4 100%);
-    color: white;
-    background-size: 200% 200%;
-    animation: gradientShift 5s ease infinite;
-}
-
-.neon-theme #add-circle {
-    background: rgba(60, 60, 60, 0.8);
-    animation: none;
-}
-
-.pastel-theme #add-circle.active {
-    background: linear-gradient(45deg, #FFB6C1 0%, #87CEFA 100%);
-    color: white;
-    background-size: 200% 200%;
-    animation: gradientShift 5s ease infinite;
-}
-
-.pastel-theme #add-circle {
-    background: rgba(60, 60, 60, 0.8);
-    animation: none;
-}
-
-/* Button gradients: only show for the active theme */
-body.boutique-theme button.active {
-    background: linear-gradient(45deg, rgba(106, 17, 203, 0.6), rgba(37, 117, 252, 0.6));
-    border-color: #6a11cb;
-    box-shadow: 0 0 12px rgba(106, 17, 203, 0.4);
-}
-
-body.neon-theme button.active {
-    background: linear-gradient(45deg, rgba(0, 224, 255, 0.6), rgba(255, 0, 228, 0.6));
-    border-color: #00E0FF;
-    box-shadow: 0 0 12px rgba(0, 224, 255, 0.4);
-}
-
-body.pastel-theme button.active {
-    background: linear-gradient(45deg, rgba(255, 182, 193, 0.6), rgba(135, 206, 250, 0.6));
-    border-color: #FFB6C1;
-    box-shadow: 0 0 12px rgba(255, 182, 193, 0.4);
-}
-
-@keyframes gradientShift {
-    0% { background-position: 0% 50% }
-    50% { background-position: 100% 50% }
-    100% { background-position: 0% 50% }
-}
-
-@keyframes gravity-zone-pulse {
-    0% {
-        opacity: 0.4;
-        transform: translate(-50%, -50%) scale(0.95);
-    }
-    100% {
-        opacity: 0.7;
-        transform: translate(-50%, -50%) scale(1.05);
-    }
-}
-
-@keyframes attractor-pulse {
-    0% {
-        opacity: 0.3;
-        transform: translate(-50%, -50%) scale(0.9);
-    }
-    100% {
-        opacity: 0.6;
-        transform: translate(-50%, -50%) scale(1.1);
-    }
-}
-
-@keyframes portal-rotate {
-    0% {
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-    100% {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
-}
-
-@keyframes portal-pulse {
-    0% {
-        opacity: 0.4;
-        transform: translate(-50%, -50%) scale(0.95);
-    }
-    100% {
-        opacity: 0.7;
-        transform: translate(-50%, -50%) scale(1.05);
-    }
-}
-
-@media (max-width: 768px) {
-    .controls {
-        max-width: 250px;
-    }
-    
-    button {
-        padding: 8px 12px;
-        font-size: 0.8rem;
-    }
-}
-
-.theme-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-bottom: 5px;
-}
-
-.theme-selector label {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--accent-color, #ffffff);
-}
-
-.theme-selector select {
-    padding: 8px;
-    border-radius: 6px;
-    border: 1px solid var(--accent-color, #ddd);
-    background-color: rgba(40, 40, 40, 0.9);
-    color: #ffffff;
-    font-size: 0.9rem;
-    cursor: pointer;
-    outline: none;
-    transition: all 0.2s ease;
-}
-
-.theme-selector select:hover {
-    border-color: var(--secondary-color, #aaa);
-}
-
-.boutique-theme .theme-selector select {
-    border-color: rgba(106, 17, 203, 0.5);
-}
-
-.neon-theme .theme-selector select {
-    border-color: rgba(0, 224, 255, 0.5);
-}
-
-.pastel-theme .theme-selector select {
-    border-color: rgba(255, 182, 193, 0.5);
-}
-
-.sliders {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 15px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    background-color: rgba(40, 40, 40, 0.9);
-    border-radius: 10px;
-    border: 1px solid rgba(var(--accent-color-rgb, 70, 70, 70), 0.5);
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
-}
-
-.sliders label {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-/* Improve slider track appearance */
-input[type="range"] {
-    width: 100%;
-    height: 6px;
-    -webkit-appearance: none;
-    border-radius: 8px;
-    background: rgba(30, 30, 30, 0.9);
-    outline: none;
-    opacity: 0.9;
-    transition: opacity 0.2s;
-    border: 1px solid rgba(var(--accent-color-rgb, 70, 70, 70), 0.3);
-}
-
-input[type="range"]:hover {
-    opacity: 1;
-}
-
-/* Theme-specific slider styling */
-.boutique-theme .sliders {
-    border-color: rgba(106, 17, 203, 0.4);
-}
-
-.neon-theme .sliders {
-    border-color: rgba(0, 224, 255, 0.4);
-}
-
-.pastel-theme .sliders {
-    border-color: rgba(255, 182, 193, 0.4);
-}
-
-/* fix layout and spacing with removed elements */
-.controls {
-    margin-top: 15px;
-}
-
-/* fix for modal showing in background */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    visibility: hidden;
-}
-
-.modal.active {
-    display: flex;
-    pointer-events: auto;
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
-    background-color: rgba(30, 30, 30, 0.95);
-    padding: 25px;
-    border-radius: 12px;
-    max-width: 500px;
-    width: 90%;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(var(--accent-color-rgb, 70, 70, 70), 0.3);
     position: relative;
-    color: #ffffff;
+    height: 100vh;
+    transition: all var(--transition-speed) ease;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    background-image: var(--bg-gradient, none);
 }
 
-.modal-content h3 {
-    font-size: 1.5rem;
-    margin-bottom: 15px;
-    text-align: center;
-    color: var(--accent-color, #ffffff);
+/* Modern theme backgrounds */
+.theme-modern-dark {
+    --bg-primary: #121212;
+    --bg-secondary: rgba(30, 30, 30, 0.75);
+    --bg-gradient: radial-gradient(circle at top right, #1a1a1a, #0a0a0a);
+    --panel-border: rgba(255, 255, 255, 0.07);
 }
 
-.modal-content p {
-    margin-bottom: 12px;
-    line-height: 1.5;
-    font-size: 1.1rem;
+.theme-modern-blue {
+    --bg-primary: #0a1929;
+    --bg-secondary: rgba(15, 32, 54, 0.75);
+    --bg-gradient: radial-gradient(circle at top right, #0c2240, #051426);
+    --panel-border: rgba(100, 150, 230, 0.1);
 }
 
-.close-modal {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    font-size: 24px;
-    cursor: pointer;
-    color: rgba(255, 255, 255, 0.7);
-    transition: color 0.2s;
+.theme-modern-purple {
+    --bg-primary: #1a102d;
+    --bg-secondary: rgba(34, 21, 57, 0.75);
+    --bg-gradient: radial-gradient(circle at top right, #25163a, #100920);
+    --panel-border: rgba(180, 120, 230, 0.1);
 }
 
-.close-modal:hover {
-    color: white;
+.theme-modern-mint {
+    --bg-primary: #0a291b;
+    --bg-secondary: rgba(20, 52, 38, 0.75);
+    --bg-gradient: radial-gradient(circle at top right, #0f3827, #051e14);
+    --panel-border: rgba(100, 230, 150, 0.1);
 }
 
+.theme-modern-sunset {
+    --bg-primary: #291a0a;
+    --bg-secondary: rgba(52, 30, 20, 0.75);
+    --bg-gradient: radial-gradient(circle at top right, #38230f, #1e1205);
+    --panel-border: rgba(230, 150, 100, 0.1);
+}
+
+
+/* Physics canvas styling - ensuring full visibility */
 #physics-canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1;
-    background: transparent;
-    display: block;
+    z-index: 5; /* Increased z-index for better layering */
+    pointer-events: auto; /* Enable clicks on the canvas */
+    background-color: transparent; /* Ensure transparent background */
 }
 
-.cursor-follower {
-    position: fixed;
-    width: 30px;
-    height: 30px;
-    background: transparent;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    transition: width 0.2s, height 0.2s, opacity 0.3s;
-    z-index: 9999;
-    opacity: 0;
-}
-
-.cursor-follower.active {
-    opacity: 0.7;
-}
-
-.boutique-theme .cursor-follower {
-    border-color: rgba(106, 17, 203, 0.7);
-    box-shadow: 0 0 10px rgba(106, 17, 203, 0.5);
-}
-
-.neon-theme .cursor-follower {
-    border-color: rgba(0, 224, 255, 0.7);
-    box-shadow: 0 0 10px rgba(0, 224, 255, 0.5);
-}
-
-.pastel-theme .cursor-follower {
-    border-color: rgba(255, 182, 193, 0.7);
-    box-shadow: 0 0 10px rgba(255, 182, 193, 0.5);
-}
-
-.minimal-theme .cursor-follower {
-    border-color: rgba(170, 170, 170, 0.7);
-    box-shadow: 0 0 5px rgba(170, 170, 170, 0.3);
-}
-
-.attractor {
+/* Base visual indicator - fallback visible base */
+.physics-base-indicator {
     position: absolute;
+    bottom: 100px; /* Position from bottom */
+    left: 0;
+    width: 100%;
+    height: 20px;
+    background-color: #FF00FF; /* Bright magenta */
+    border-top: 4px solid #FFFF00; /* Yellow border */
+    z-index: 4; /* Below canvas but visible */
+    pointer-events: none; /* Don't interfere with canvas interactions */
+}
+
+
+
+.controls-panel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--panel-radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 24px;
+    z-index: 20; 
+    width: 360px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transition: all var(--transition-speed) ease;
+    color: var(--text-primary);
+    user-select: none;
+    backdrop-filter: blur(var(--panel-blur));
+    -webkit-backdrop-filter: blur(var(--panel-blur));
+    border: 1px solid var(--panel-border);
+    pointer-events: auto !important; /* Force pointer events to work */
+}
+
+.controls-panel.left-position {
+    right: auto;
+    left: 20px;
+}
+
+
+.header {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.logo-text {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    position: relative;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    text-transform: lowercase;
+}
+
+/* Theme selector */
+.theme-selector {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 6px;
+}
+
+.theme-button {
+    flex: 1;
+    padding: 8px 8px;
+    font-size: 0.8rem;
+    min-width: 0;
+}
+
+.position-toggle {
+    margin-bottom: 20px;
+}
+
+.position-toggle button {
+    width: 100%;
+}
+
+/* Button Styling */
+button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 10px 14px;
+    background-color: rgba(60, 60, 60, 0.2);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--button-radius);
+    margin: 4px 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+button:hover {
+    background-color: rgba(70, 70, 70, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+.control-button, .mode-button, .shape-button {
+    width: 100%;
+    margin: 4px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.mode-controls, .shape-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+    position: relative;
+    z-index: 20;
+}
+
+.shape-button {
+    flex: 1 0 calc(33.333% - 8px); /* Make buttons fit 3 per row */
+    position: relative;
+    z-index: 20;
+    pointer-events: auto !important;
+    min-width: 0;
+    padding: 8px 4px; /* Slightly smaller padding to fit text */
+    font-size: 0.8rem; /* Smaller font size */
+}
+
+.mode-button, .shape-button {
+    flex: 1 0 calc(50% - 4px);
+    position: relative;
+    z-index: 20; /* Ensure buttons have higher z-index */
+    pointer-events: auto !important; /* Force pointer events to work */
+}
+
+.danger {
+    --button-color: #ff4d4d;
+}
+
+.active {
+    background-color: rgba(var(--accent-color-rgb), 0.15);
+    border: 1px solid rgba(var(--accent-color-rgb), 0.2);
+    box-shadow: 0 2px 10px rgba(var(--accent-color-rgb), 0.1);
+    color: var(--accent-color);
+}
+
+hr {
+    border: none;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 20px 0;
+}
+
+/* Slider styling */
+.slider-container .slider-value {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.slider-container {
+    position: relative;
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.slider-header label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+input[type="range"] {
+    width: 100%;
+    height: var(--slider-height);
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    outline: none;
+    margin-bottom: 6px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    border: 2px dashed rgba(255, 215, 0, 0.5);
-    transform: translate(-50%, -50%);
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: none;
+    transition: all 0.2s;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+}
+
+/* Color picker styling */
+.color-picker, .button-color-picker {
+    margin-top: 20px;
+}
+
+.color-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.color-picker-header label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+input[type="color"] {
+    -webkit-appearance: none;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.color-presets {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.color-preset {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.color-preset:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Size preview for resizing shapes */
+.size-preview {
+    position: absolute;
+    border: 2px dashed var(--accent-color);
+    background-color: rgba(var(--accent-color-rgb), 0.05);
     pointer-events: none;
-    transition: all 0.3s ease;
+    display: none;
+    z-index: 2;
+    border-radius: 50%;
 }
 
-.boutique-theme .attractor {
-    border-color: rgba(106, 17, 203, 0.5);
+/* Wind indicator */
+.wind-indicator {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 100px;
+    height: 36px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--button-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(var(--panel-blur));
+    -webkit-backdrop-filter: blur(var(--panel-blur));
+    border: 1px solid var(--panel-border);
+    transition: all var(--transition-speed) ease;
 }
 
-.neon-theme .attractor {
-    border-color: rgba(0, 224, 255, 0.5);
+.wind-arrow {
+    width: 70%;
+    height: 2px;
+    background-color: var(--accent-color);
+    position: relative;
 }
 
-.pastel-theme .attractor {
-    border-color: rgba(255, 182, 193, 0.5);
+.wind-arrow::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -3px;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid var(--accent-color);
 }
 
-.minimal-theme .attractor {
-    border-color: rgba(170, 170, 170, 0.5);
+/* Dropdown styling with arrow */
+.dropdown {
+    position: relative;
+    margin-bottom: 20px;
+    width: 100%;
 }
 
-/* Styles for slow motion effect */
-body
-    animation: slow-motion-pulse 2s infinite alternate;
+.dropdown-toggle {
+    width: 100%;
+    text-align: left;
+    position: relative;
+    padding: 12px 16px;
+    cursor: pointer;
+    background-color: rgba(60, 60, 60, 0.2);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--button-radius);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-@keyframes slow-motion-pulse {
-    0% { filter: brightness(0.9) saturate(1.1); }
-    100% { filter: brightness(1.1) saturate(1.3); }
+.dropdown-toggle:hover {
+    background-color: rgba(70, 70, 70, 0.3);
+}
+
+.dropdown-toggle .arrow {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--text-primary);
+    transition: transform 0.2s;
+    margin-left: 10px;
+}
+
+.dropdown.open .dropdown-toggle .arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: var(--bg-secondary);
+    border-radius: var(--button-radius);
+    margin-top: 5px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    z-index: 20;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s;
+    border: 1px solid var(--panel-border);
+    opacity: 0;
+    visibility: hidden;
+}
+
+.dropdown.open .dropdown-menu {
+    max-height: 220px;
+    opacity: 1;
+    visibility: visible;
+}
+
+.dropdown-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(80, 80, 80, 0.3);
+}
+
+.dropdown-item.active {
+    background-color: rgba(var(--accent-color-rgb), 0.15);
+    color: var(--accent-color);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Media queries for mobile responsiveness */
+@media (max-width: 768px) {
+    .controls-panel {
+        width: 260px;
+        padding: 18px;
+    }
+    
+    .logo-text {
+        font-size: 1.8rem;
+    }
+    
+    button {
+        padding: 8px 12px;
+    }
 }

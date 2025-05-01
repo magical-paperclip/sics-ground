@@ -1,16 +1,16 @@
-// Initialize Matter.js modules
+
 const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
 
-// Create engine and world with better settings for smooth physics
+
 const engine = Engine.create({
-    positionIterations: 8,    // Increased from default 6 for more accurate positioning
-    velocityIterations: 8,    // Increased from default 4 for smoother motion
-    constraintIterations: 4,  // Increased for better constraint solving
-    enableSleeping: true      // Allow objects to "sleep" when not moving for better performance
+    positionIterations: 8,    
+    velocityIterations: 8,    
+    constraintIterations: 4,  
+    enableSleeping: true      
 });
 const world = engine.world;
 
-// Set smoother gravity
+
 world.gravity.scale = 0.001;
 world.gravity.y = 1;
 
@@ -23,7 +23,7 @@ canvas.height = canvasContainer.offsetHeight * pixelRatio;
 canvas.style.width = `${canvasContainer.offsetWidth}px`;
 canvas.style.height = `${canvasContainer.offsetHeight}px`;
 
-// Create renderer with improved settings
+
 const render = Render.create({
     canvas: canvas,
     engine: engine,
@@ -38,15 +38,15 @@ const render = Render.create({
     }
 });
 
-// Run the engine with a smooth, fixed time step
+
 const runner = Runner.create({
     isFixed: true,
-    delta: 1000/60 // Lock to 60 FPS for consistency
+    delta: 1000/60 
 });
 Runner.run(runner, engine);
 Render.run(render);
 
-// Variables
+
 let activeBodies = [];
 let boundaries = [];
 let explosionParticles = [];
@@ -55,11 +55,11 @@ let currentEffect = 'bounce';
 const colors = ['#716040', '#8c7851', '#a88c64', '#d1c4b3', '#d0b49f'];
 const explosionColors = ['#ff7b54', '#ffb26b', '#ffd56b', '#939597', '#6c22bd'];
 
-// Create smoother boundaries with rounded corners
+
 function createBoundaries() {
     const wallOptions = { 
         isStatic: true,
-        chamfer: { radius: 10 }, // Round the corners
+        chamfer: { radius: 10 }, 
         render: { 
             fillStyle: 'rgba(224, 214, 204, 0.8)',
             strokeStyle: 'rgba(209, 196, 179, 0.5)',
@@ -67,11 +67,11 @@ function createBoundaries() {
         } 
     };
     
-    // Create smoother walls and ground
+    
     const groundHeight = 30;
     const wallWidth = 30;
     
-    // Create ground with slightly increased thickness
+    
     const ground = Bodies.rectangle(
         canvas.width / 2, 
         canvas.height - groundHeight/2, 
@@ -80,7 +80,7 @@ function createBoundaries() {
         wallOptions
     );
     
-    // Create base platform above ground to catch shapes that might slip through
+    
     const basePlatform = Bodies.rectangle(
         canvas.width / 2,
         canvas.height - groundHeight - 5,
@@ -876,5 +876,5 @@ for (let i = 0; i < 5; i++) {
         const y = Common.random(50, 100);
         const type = ['circle', 'square', 'polygon'][Math.floor(Math.random() * 3)];
         createBody(x, y, type);
-    }, i * 200); // Stagger creation for smoother start
+    }, i * 200); /
 }

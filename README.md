@@ -1,4 +1,4 @@
-# sics-ground: interactive 2d phisics playground
+# sics-ground: the internet's favorite phys. playground
 
 an intuitive phisics sandbox built on matter.js, where you can experiment with realistic object interactons. create shapes, watch them colide, and explore dynamic effects—all in real time.
 

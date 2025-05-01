@@ -3,7 +3,7 @@
 an intuitive phisics sandbox built on matter.js, where you can experiment with realistic object interactons. create shapes, watch them colide, and explore dynamic effects—all in real time.
 
 ## features
-- real-time phisics simulation with matter.js
+- real-time physics simulation with matter.js
 - four unique colision effects:
   - bounce: enhanced elastic colisions with visual feedback
   - explode: particle-based explosions, scaled to impact force
@@ -24,7 +24,7 @@ built on matter.js with enhanced colision and response settings.
 
 ### rendering pipeline
 utilizes:
-- matter.js native renderer for phisics bodies
+- matter.js native renderer for physics bodies
 - custom canvas api for particle effects
 - css animations for ui elements  
 optimized with:
@@ -38,7 +38,7 @@ optimized with:
 
 ### event handling
 combines:
-- matter.js events module for phisics interactions
+- matter.js events module for physics interactions
 - dom events for user engagement
 - intersectionobserver api for scroll-based triggers
 
@@ -46,14 +46,14 @@ combines:
 - object pooling minimizes gc pauses
 - selective rendering boosts performance
 - sleep optimization for static bodies
-- fixed timestep ensures consistent phisics
+- fixed timestep ensures consistent physics
 - viewport-based pause/resume saves cpu when not visible
 
 ## future enhancements
 - webgl renderer for enhanced graphics
-- phisics constraint tool for joints/connections
+- physics constraint tool for joints/connections
 - touch optimization for mobile devices
-- phisics presets for educational demos
+- physics presets for educational demos
 - export/import system for sharing creations
 
 ---

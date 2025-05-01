@@ -1,0 +1,1598 @@
+// Global variables for physics and interaction that need to be exposed to inline functions
+let world = null;
+let engine = null;
+window.Matter = Matter;
+window.currentMode = 'add-circle'; // Default shape mode
+window.cursorMode = false;
+window.attractorMode = false;
+window.explosionMode = false;
+window.gravityZoneMode = false;
+window.lastMousePos = { x: 0, y: 0 }; 
+// Add iteration counter tracking
+window.iterationCount = 1; // Track iteration count
+
+let collisionParticles = [];
+let collisionParticleCount = 10;
+let collisionParticleSize = 5;
+let collisionParticleLifetime = 1000;
+let collisionEffectThreshold = 2;
+let trailHistory = new Map();
+let maxTrailPoints = 20;
+let trailFadeFactor = 0.6;
+
+
+let draggedBody = null;
+let selectedBody = null;
+let resizing = false;
+let initialResizeDistance = 0;
+let initialScale = 1;
+let sizePreviewElement = null;
+
+
+let lastClickTime = 0;
+let doubleClickThreshold = 300;
+
+// Initialize wind variables
+let windEnabled = false;
+let windStrength = 0.3;
+let windDirection = 0;
+
+// Initialize collision effect style
+window.collisionEffectStyle = 'classic';
+window.collisionEffectsEnabled = true;
+window.trailEffectsEnabled = true;
+
+// Initialize the physics canvas
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM fully loaded, initializing physics engine and event listeners");
+    // Set up Matter.js engine, renderer, and world
+    engine = Matter.Engine.create({
+        enableSleeping: false,
+        constraintIterations: 8,     // Increased for better constraint stability
+        positionIterations: 12,      // Increased from default (6) for better collision detection 
+        velocityIterations: 8        // Increased from default (4) for more accurate physics
+    });
+
+    // Setup iterate button
+    document.getElementById('iterate-button').addEventListener('click', function() {
+        window.iterationCount++;
+        document.getElementById('iteration-number').textContent = window.iterationCount;
+        
+        // Add a visual pulse effect to the iteration number
+        const iterationNumber = document.getElementById('iteration-number');
+        iterationNumber.classList.remove('pulse-animation');
+        void iterationNumber.offsetWidth; // Trigger reflow to restart animation
+        iterationNumber.classList.add('pulse-animation');
+        
+        console.log(`Iteration ${window.iterationCount}`);
+    });
+
+    world = engine.world;
+    window.world = world; // Make world globally accessible
+    
+    // Configure world with improved physics settings
+    world.gravity.y = 1; // Standard gravity value
+    world.gravity.scale = 0.001; // Adjusted scale - was too low at 0.01
+    
+    // Enable improved collision detection and better continuous collision handler
+    Matter.Resolver._restingThresh = 0.001; // Lower resting threshold
+    Matter.Resolver._restingThreshTangent = 0.001;
+    Matter.Resolver._positionDampen = 0.9; // More position damping
+    Matter.Resolver._positionWarming = 0.8; // More position warming
+    
+    // Get the canvas element
+    const canvas = document.getElementById('physics-canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.zIndex = '1';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Set canvas size to match window
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Configure renderer with improved settings
+    const render = Matter.Render.create({
+        canvas: canvas,
+        engine: engine,
+        options: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            wireframes: false,
+            background: '#000000',
+            pixelRatio: window.devicePixelRatio,
+            showSleeping: false,
+            showDebug: false,
+            showBroadphase: false,
+            showBounds: false,
+            showVelocity: false,
+            showCollisions: false,
+            showSeparations: false,
+            showAxes: false,
+            showPositions: false,
+            showAngleIndicator: false,
+            showIds: false,
+            showShadows: false
+        }
+    });
+    
+    const runner = Matter.Runner.create({
+        isFixed: true,          // Fixed time step
+        delta: 1000/60          // 60 FPS for smooth simulation
+    });
+    
+    // Start the engine, runner and renderer in order
+    Matter.Runner.run(runner, engine);
+    Matter.Render.run(render);
+    
+    // Setup physics environment
+    setupPhysics();
+    setupCursorMode();
+    setupWind();
+    setupShapeCreation();
+    setupSpecialModes();
+    setupGravityZoneMode();
+    createStaticBase(); // Create the base
+    
+    // Debug: Create a test shape to verify physics is working
+    setTimeout(function() {
+        console.log("Creating test circle to verify gravity");
+        const testCircle = createCircle(window.innerWidth/2, 100); // Fixed parameter format
+        console.log("Test shape created:", testCircle);
+        console.log("Current gravity settings:", world.gravity);
+        
+        // Check if engine is running
+        console.log("Engine running status:", runner.enabled);
+        
+        // Add a visible indicator in the DOM to show gravity is working
+        const debugElement = document.createElement('div');
+        debugElement.style.position = 'fixed';
+        debugElement.style.top = '10px';
+        debugElement.style.left = '10px';
+        debugElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        debugElement.style.color = 'white';
+        debugElement.style.padding = '10px';
+        debugElement.style.zIndex = '1000';
+        debugElement.style.fontFamily = 'monospace';
+        debugElement.textContent = 'Gravity Debug: Waiting...';
+        document.body.appendChild(debugElement);
+        
+        // Log body position every second to verify movement
+        let startY = testCircle.position.y;
+        const debugInterval = setInterval(function() {
+            const currentY = testCircle.position.y;
+            const deltaY = currentY - startY;
+            console.log("Test circle Y:", currentY, "Change:", deltaY);
+            debugElement.textContent = `Gravity Debug: Y=${Math.round(currentY)}, ΔY=${Math.round(deltaY)}`;
+            
+            if (testCircle.position.y > window.innerHeight - 100) {
+                console.log("Test circle reached bottom area");
+                debugElement.textContent += " (Reached bottom)";
+                // Don't clear interval to keep tracking
+            }
+        }, 500);
+    }, 1000);
+    
+    // Add debug event to check collision detection
+    Matter.Events.on(engine, 'collisionStart', function(event) {
+        console.log("Collision detected between bodies", event.pairs.length);
+    });
+    
+    window.addEventListener('resize', function() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Update renderer dimensions
+        render.options.width = window.innerWidth;
+        render.options.height = window.innerHeight;
+        
+        // Update the base position when window is resized
+        updateBasePosition();
+    });
+
+    // TEST: Add a visible test circle to the center of the canvas on load
+    setTimeout(function() {
+        const canvas = document.getElementById('physics-canvas');
+        const testCircle = Matter.Bodies.circle(canvas.width / 2, 100, 40, {
+            restitution: 0.8,
+            render: { fillStyle: '#4285F4' }
+        });
+        Matter.Composite.add(world, testCircle);
+        console.log('Test circle added to world:', testCircle);
+    }, 1000);
+});
+
+// Function to draw trail effects
+function drawTrailEffects(context) {
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    for (let i = 0; i < bodies.length; i++) {
+        const body = bodies[i];
+        
+        // Skip static bodies
+        if (body.isStatic) continue;
+        
+        // Get or create trail history for this body
+        if (!trailHistory.has(body.id)) {
+            trailHistory.set(body.id, []);
+        }
+        
+        const trail = trailHistory.get(body.id);
+        
+        // Add current position to trail
+        trail.push({
+            x: body.position.x,
+            y: body.position.y,
+            velMag: Math.sqrt(body.velocity.x * body.velocity.x + body.velocity.y * body.velocity.y)
+        });
+        
+        // Limit trail length
+        if (trail.length > maxTrailPoints) {
+            trail.shift();
+        }
+        
+        // Draw trail
+        if (trail.length > 1) {
+            context.beginPath();
+            
+            // Get body color for trail
+            const bodyColor = body.render.fillStyle;
+            
+            // Create gradient for trail
+            for (let j = 0; j < trail.length - 1; j++) {
+                const point = trail[j];
+                const nextPoint = trail[j + 1];
+                
+                // Calculate opacity based on position in trail and velocity
+                const opacity = (j / trail.length) * trailFadeFactor;
+                const speedFactor = Math.min(point.velMag / 10, 1);
+                
+                // Set color with opacity
+                context.strokeStyle = bodyColor;
+                context.globalAlpha = opacity * speedFactor;
+                context.lineWidth = (j / trail.length) * 4 + 1; // Thinner at the end of the trail
+                
+                // Draw line segment
+                context.beginPath();
+                context.moveTo(point.x, point.y);
+                context.lineTo(nextPoint.x, nextPoint.y);
+                context.stroke();
+            }
+            
+            // Reset opacity
+            context.globalAlpha = 1;
+        }
+    }
+    
+    // Cleanup trails for bodies that no longer exist
+    const bodyIds = new Set(bodies.map(b => b.id));
+    for (const [id, trail] of trailHistory.entries()) {
+        if (!bodyIds.has(id)) {
+            trailHistory.delete(id);
+        }
+    }
+}
+
+// Function to update and draw collision particles
+function updateCollisionParticles(context) {
+    // Update particle positions and draw them
+    for (let i = collisionParticles.length - 1; i >= 0; i--) {
+        const particle = collisionParticles[i];
+        
+        // Update position
+        particle.position.x += particle.velocity.x;
+        particle.position.y += particle.velocity.y;
+        
+        // Apply gravity and friction to particles
+        particle.velocity.y += 0.05;
+        particle.velocity.x *= 0.99;
+        particle.velocity.y *= 0.99;
+        
+        // Decrease lifetime
+        particle.lifetime -= 16; // Assuming 60fps
+        
+        // Remove if lifetime expired
+        if (particle.lifetime <= 0) {
+            collisionParticles.splice(i, 1);
+            continue;
+        }
+        
+        // Calculate opacity based on remaining lifetime
+        const opacity = particle.lifetime / particle.maxLifetime;
+        
+        // Draw particle based on style
+        context.globalAlpha = opacity;
+        
+        switch (particle.style) {
+            case 'glow':
+                // Glow effect
+                const gradient = context.createRadialGradient(
+                    particle.position.x, particle.position.y, 0,
+                    particle.position.x, particle.position.y, particle.size * 2
+                );
+                gradient.addColorStop(0, particle.color);
+                gradient.addColorStop(1, 'transparent');
+                context.fillStyle = gradient;
+                context.beginPath();
+                context.arc(particle.position.x, particle.position.y, particle.size * 2, 0, Math.PI * 2);
+                context.fill();
+                break;
+                
+            case 'star':
+                // Star shape
+                context.fillStyle = particle.color;
+                context.beginPath();
+                
+                for (let j = 0; j < 5; j++) {
+                    const angle = (j * 2 * Math.PI / 5) - Math.PI / 2;
+                    const x = particle.position.x + Math.cos(angle) * particle.size;
+                    const y = particle.position.y + Math.sin(angle) * particle.size;
+                    
+                    if (j === 0) {
+                        context.moveTo(x, y);
+                    } else {
+                        context.lineTo(x, y);
+                    }
+                    
+                    // Inner point
+                    const innerAngle = angle + Math.PI / 5;
+                    const innerX = particle.position.x + Math.cos(innerAngle) * (particle.size / 2);
+                    const innerY = particle.position.y + Math.sin(innerAngle) * (particle.size / 2);
+                    context.lineTo(innerX, innerY);
+                }
+                
+                context.closePath();
+                context.fill();
+                break;
+                
+            case 'pixel':
+                // Pixel effect
+                context.fillStyle = particle.color;
+                const size = Math.max(particle.size / 2, 1);
+                context.fillRect(
+                    Math.round(particle.position.x - size / 2),
+                    Math.round(particle.position.y - size / 2),
+                    Math.round(size),
+                    Math.round(size)
+                );
+                break;
+                
+            case 'trail':
+                // Trail effect
+                context.strokeStyle = particle.color;
+                context.lineWidth = particle.size / 3;
+                context.beginPath();
+                context.moveTo(
+                    particle.position.x - particle.velocity.x * 4,
+                    particle.position.y - particle.velocity.y * 4
+                );
+                context.lineTo(particle.position.x, particle.position.y);
+                context.stroke();
+                break;
+                
+            case 'classic':
+            default:
+                // Classic circle
+                context.fillStyle = particle.color;
+                context.beginPath();
+                context.arc(particle.position.x, particle.position.y, particle.size, 0, Math.PI * 2);
+                context.fill();
+                break;
+        }
+    }
+    
+    // Reset opacity
+    context.globalAlpha = 1;
+}
+
+// Set up wind and gravity
+function setupPhysics() {
+    console.log("Setting up physics environment");
+    
+    // Create size preview element for cursor mode
+    sizePreviewElement = document.getElementById('size-preview');
+    
+    // Setup event listeners for physics interactions
+    const canvas = document.getElementById('physics-canvas');
+    
+    // Canvas click handler for creating shapes
+    canvas.addEventListener('click', function(event) {
+        // Only create shapes if click is not on the control panel
+        const rect = canvas.getBoundingClientRect();
+        const clickX = event.clientX;
+        const clickY = event.clientY;
+        // Check if click is under the control panel
+        const controlPanel = document.querySelector('.control-panel');
+        if (controlPanel) {
+            const panelRect = controlPanel.getBoundingClientRect();
+            if (
+                clickX >= panelRect.left && clickX <= panelRect.right &&
+                clickY >= panelRect.top && clickY <= panelRect.bottom
+            ) {
+                // Click was on the control panel, do not create shape
+                return;
+            }
+        }
+        const clickPos = { x: event.clientX, y: event.clientY };
+        console.log("Canvas clicked at:", clickPos, "Current mode:", window.currentMode);
+        
+        // Handle double click detection
+        const now = Date.now();
+        if (now - lastClickTime < doubleClickThreshold) {
+            // Double click detected - handle special actions based on current mode
+            if (window.cursorMode) {
+                // In cursor mode, double click deletes the selected body
+                if (selectedBody) {
+                    Matter.Composite.remove(world, selectedBody);
+                    selectedBody = null;
+                }
+            }
+            lastClickTime = 0; // Reset to prevent triple-click detection
+        } else {
+            lastClickTime = now;
+            
+            // Single click handling - create shapes or interact based on current mode
+            if (!window.cursorMode) {
+                let body = null;
+                switch (window.currentMode) {
+                    case 'add-circle':
+                        body = createCircle(clickPos.x, clickPos.y);
+                        break;
+                    case 'add-rectangle':
+                        body = createRectangle(clickPos.x, clickPos.y);
+                        break;
+                    case 'add-polygon':
+                        body = createPolygon(clickPos.x, clickPos.y);
+                        break;
+                    case 'add-star':
+                        body = createStar(clickPos, getRandomColor());
+                        break;
+                    default:
+                        console.warn("Unknown mode:", window.currentMode);
+                }
+                if (body) {
+                    Matter.Composite.add(world, body);
+                    console.log("Shape added to world:", body);
+                }
+            } else if (window.explosionMode) {
+                const mouse = { x: event.clientX, y: event.clientY };
+                
+                // Find the body under the mouse
+                const body = getBodyAtPosition(mouse);
+                
+                if (body) {
+                    draggedBody = body;
+                    
+                    // Check if we're starting a resize operation
+                    if (event.ctrlKey || event.metaKey) {
+                        resizing = true;
+                        selectedBody = body;
+                        initialScale = 1;
+                        
+                        // Calculate distance from center to cursor for initial scale reference
+                        const bodyCenter = { x: body.position.x, y: body.position.y };
+                        initialResizeDistance = Math.sqrt(
+                            Math.pow(mouse.x - bodyCenter.x, 2) + 
+                            Math.pow(mouse.y - bodyCenter.y, 2)
+                        );
+                        
+                        // Show size preview
+                        updateSizePreview(body, 1);
+                        sizePreviewElement.style.display = 'block';
+                    }
+                }
+            }
+        }
+    }); // <-- Properly close the canvas click handler here
+
+    canvas.addEventListener('mousemove', function(event) {
+        const mousePos = { x: event.clientX, y: event.clientY };
+        window.lastMousePos = mousePos;
+        
+        if (window.cursorMode) {
+            // Update cursor appearance based on what's under it
+            const body = getBodyAtPosition(mousePos);
+            
+            if (body && !body.isStatic) {
+                canvas.style.cursor = 'pointer';
+                // Highlight the body under cursor if it's not the currently selected one
+                if (body !== selectedBody && !resizing && !draggedBody) {
+                    // Visual highlight effect could be added here
+                }
+            } else {
+                canvas.style.cursor = 'default';
+            }
+            
+            // Handle body dragging
+            if (draggedBody && !resizing) {
+                // Move the dragged body to follow the mouse
+                Matter.Body.setPosition(draggedBody, mousePos);
+                // Set body to be static while dragging for stability
+                Matter.Body.setStatic(draggedBody, true);
+            }
+            
+            // Handle body resizing
+            if (resizing && selectedBody) {
+                const bodyCenter = { x: selectedBody.position.x, y: selectedBody.position.y };
+                const currentDistance = Math.sqrt(
+                    Math.pow(mousePos.x - bodyCenter.x, 2) + 
+                    Math.pow(mousePos.y - bodyCenter.y, 2)
+                );
+                
+                // Calculate new scale factor
+                const newScale = currentDistance / initialResizeDistance;
+                
+                // Update size preview
+                updateSizePreview(selectedBody, newScale);
+            }
+        }
+        
+        // Handle attractor mode
+        if (window.attractorMode) {
+            updateAttractor(mousePos);
+        }
+    });
+    
+    canvas.addEventListener('mouseup', function(event) {
+        if (draggedBody) {
+            // Re-enable physics on the dragged body
+            Matter.Body.setStatic(draggedBody, false);
+            draggedBody = null;
+        }
+        
+        if (resizing && selectedBody) {
+            // Apply the resize to the actual body
+            const bodyCenter = { x: selectedBody.position.x, y: selectedBody.position.y };
+            const mouse = { x: event.clientX, y: event.clientY };
+            
+            const currentDistance = Math.sqrt(
+                Math.pow(mouse.x - bodyCenter.x, 2) + 
+                Math.pow(mouse.y - bodyCenter.y, 2)
+            );
+            
+            // Calculate new scale factor
+            const newScale = currentDistance / initialResizeDistance;
+            
+            // Apply the scale to the body
+            scaleBody(selectedBody, newScale);
+            
+            // Hide size preview
+            sizePreviewElement.style.display = 'none';
+            resizing = false;
+        }
+    });
+    
+    // Setup gravity slider
+    const gravitySlider = document.getElementById('gravity-slider');
+    const gravityValue = document.querySelector('.gravity-slider .slider-value');
+
+    // Set slider to range 0–1 for more intuitive control
+    gravitySlider.min = 0;
+    gravitySlider.max = 1;
+    gravitySlider.step = 0.01;
+    gravitySlider.value = world.gravity.y * world.gravity.scale;
+    gravityValue.textContent = (world.gravity.y * world.gravity.scale).toFixed(2);
+
+    gravitySlider.addEventListener('input', function() {
+        // Set gravity.y to 1 and scale to slider value for direct mapping
+        world.gravity.y = 1;
+        world.gravity.scale = parseFloat(this.value);
+        gravityValue.textContent = (world.gravity.y * world.gravity.scale).toFixed(2);
+    });
+    
+    // Setup clear all button
+    document.getElementById('clear-all').addEventListener('click', function() {
+        clearAllShapes();
+    });
+    
+    // Setup collision effect style dropdown
+    const collisionEffectDropdown = document.getElementById('collision-effect-dropdown');
+    const collisionEffectToggle = collisionEffectDropdown.querySelector('.dropdown-toggle span');
+    const collisionEffectMenu = collisionEffectDropdown.querySelector('.dropdown-menu');
+    const collisionEffectItems = collisionEffectMenu.querySelectorAll('.dropdown-item');
+    
+    collisionEffectDropdown.addEventListener('click', function(event) {
+        collisionEffectMenu.classList.toggle('active');
+    });
+    
+    collisionEffectItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const effect = this.getAttribute('data-effect');
+            
+            // Update UI
+            collisionEffectToggle.textContent = 'Collision Effect: ' + effect.charAt(0).toUpperCase() + effect.slice(1);
+            
+            // Remove active class from all items
+            collisionEffectItems.forEach(item => item.classList.remove('active'));
+            
+            // Add active class to clicked item
+            this.classList.add('active');
+            
+            // Update collision effect style
+            updateCollisionEffectStyle(effect);
+        });
+    });
+    
+    // Setup theme dropdown
+    const themeDropdown = document.getElementById('theme-dropdown');
+    const themeToggle = themeDropdown.querySelector('.dropdown-toggle span');
+    const themeMenu = themeDropdown.querySelector('.dropdown-menu');
+    const themeItems = themeMenu.querySelectorAll('.dropdown-item');
+    
+    themeDropdown.addEventListener('click', function(event) {
+        themeMenu.classList.toggle('active');
+    });
+    
+    themeItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const theme = this.getAttribute('data-theme');
+            const themeName = this.textContent;
+            
+            // Update UI
+            themeToggle.textContent = 'Theme: ' + themeName;
+            
+            // Remove active class from all items
+            themeItems.forEach(item => item.classList.remove('active'));
+            
+            // Add active class to clicked item
+            this.classList.add('active');
+            
+            // Update document body class for theme
+            document.body.className = theme;
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!themeDropdown.contains(event.target)) {
+            themeMenu.classList.remove('active');
+        }
+        
+        if (!collisionEffectDropdown.contains(event.target)) {
+            collisionEffectMenu.classList.remove('active');
+        }
+    });
+});
+
+// Function to setup collision effects options
+function setupCollisionEffects() {
+    const effectToggle = document.getElementById('toggle-collision-effects');
+    const trailToggle = document.getElementById('toggle-trail-effects');
+    
+    // Setup collision effects toggle
+    if (effectToggle) {
+        effectToggle.addEventListener('click', function() {
+            window.collisionEffectsEnabled = !window.collisionEffectsEnabled;
+            
+            // Update UI
+            if (window.collisionEffectsEnabled) {
+                this.classList.add('active');
+            } else {
+                this.classList.remove('active');
+            }
+            console.log("Collision effects " + (window.collisionEffectsEnabled ? "enabled" : "disabled"));
+        });
+    }
+    
+    if (trailToggle) {
+        trailToggle.addEventListener('click', function() {
+            window.trailEffectsEnabled = !window.trailEffectsEnabled;
+            
+            // Update UI
+            if (window.trailEffectsEnabled) {
+                this.classList.add('active');
+            } else {
+                this.classList.remove('active');
+            }
+            console.log("Trail effects " + (window.trailEffectsEnabled ? "enabled" : "disabled"));
+        });
+    } 
+    
+    const effectStyleButtons = document.querySelectorAll('[data-effect]');
+    effectStyleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const style = this.getAttribute('data-effect');
+            updateCollisionEffectStyle(style);
+            
+            // Update active state
+            effectStyleButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+}
+
+// Function to set up shape creation based on button clicks
+function setupShapeCreation() {
+    console.log("Setting up shape creation");
+    
+    // Setup shape creation buttons
+    const shapeButtons = document.querySelectorAll('.shape-button');
+    shapeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const shapeType = this.getAttribute('data-shape');
+            console.log(`Shape button clicked: ${shapeType}`);
+            
+            // Deactivate all shape buttons
+            shapeButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Activate the clicked button and set the current mode
+            this.classList.add('active');
+            window.currentMode = shapeType;
+            console.log(`Current mode set to: ${window.currentMode}`);
+        });
+    });
+}
+
+// Create a shape at the specified position
+function createShape(shapeType, x, y) {
+    console.log(`Creating ${shapeType} at (${x}, ${y})`);
+    let body;
+    
+    switch (shapeType) {
+        case 'rectangle': 
+            body = createRectangle(x, y);
+            break;
+        case 'circle': 
+            body = createCircle(x, y);
+            break;
+        case 'triangle': 
+            body = createTriangle(x, y);
+            break;
+        case 'polygon': 
+            body = createPolygon(x, y);
+            break;
+        case 'custom': 
+            body = createCustomShape(x, y);
+            break;
+        default:
+            console.warn(`Unknown shape type: ${shapeType}`);
+            return;
+    }
+    
+    // Apply custom properties
+    if (body) {
+        // Apply current theme color if available
+        if (window.currentThemeColor) {
+            body.render.fillStyle = window.currentThemeColor;
+        }
+        
+        // Add the body to the world
+        Matter.Composite.add(world, body);
+        console.log(`Added ${shapeType} to world`);
+    }
+}
+
+// Create a rectangle
+function createRectangle(x, y) {
+    const width = Math.random() * 50 + 30;
+    const height = Math.random() * 50 + 30;
+    
+    return Matter.Bodies.rectangle(x, y, width, height, {
+        frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+        restitution: 0.7,
+        density: 0.01,     // Increased density for better physics (was 0.001)
+        render: { fillStyle: window.currentThemeColor || '#4285F4' }
+    });
+}
+
+// Create a circle
+function createCircle(x, y) {
+    const radius = Math.random() * 20 + 15;
+    
+    return Matter.Bodies.circle(x, y, radius, {
+        frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+        restitution: 0.7,
+        density: 0.01,     // Increased density for better physics (was 0.001)
+        render: { fillStyle: window.currentThemeColor || '#34A853' }
+    });
+}
+
+// Create a triangle
+function createTriangle(x, y) {
+    const size = Math.random() * 40 + 30;
+    
+    return Matter.Bodies.polygon(x, y, 3, size, {
+        frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+        restitution: 0.7,
+        density: 0.01,     // Increased density for better physics (was 0.001)
+        render: { fillStyle: window.currentThemeColor || '#FBBC05' }
+    });
+}
+
+// Create a polygon
+function createPolygon(x, y) {
+    const sides = Math.floor(Math.random() * 4) + 5; // 5-8 sides
+    const size = Math.random() * 30 + 20;
+    
+    return Matter.Bodies.polygon(x, y, sides, size, {
+        frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+        restitution: 0.7,
+        density: 0.01,     // Increased density for better physics (was 0.001)
+        render: { fillStyle: window.currentThemeColor || '#EA4335' }
+    });
+}
+
+// Create a custom shape
+function createCustomShape(x, y) {
+    // Create a "star" shape using vertices
+    const outerRadius = Math.random() * 30 + 25;
+    const innerRadius = outerRadius * 0.5;
+    const numPoints = 5;
+    const vertices = [];
+    
+    for (let i = 0; i < numPoints * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i * Math.PI) / numPoints;
+        
+        vertices.push({
+            x: x + radius * Math.cos(angle),
+            y: y + radius * Math.sin(angle)
+        });
+    }
+    
+    return Matter.Bodies.fromVertices(x, y, [vertices], {
+        frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+        restitution: 0.7,
+        density: 0.01,     // Increased density for better physics (was 0.001)
+        render: {
+            fillStyle: window.currentThemeColor || '#9C27B0'
+        }
+    });
+}
+
+// Create a star shape
+function createStar(position, color) {
+    const shapeColor = color || getRandomColor();
+    const size = Math.random() * 20 + 15; // Random size between 15-35
+    const points = 5; // Number of points on the star
+    
+    // Create vertices for star shape
+    const vertices = [];
+    const outerRadius = size;
+    const innerRadius = size * 0.4;
+    
+    for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i * Math.PI) / points;
+        
+        vertices.push({
+            x: position.x + radius * Math.cos(angle),
+            y: position.y + radius * Math.sin(angle)
+        });
+    }
+    
+    // Create body from vertices
+    return Matter.Bodies.fromVertices(
+        position.x, 
+        position.y, 
+        [vertices], 
+        {
+            frictionAir: 0.001,  // Reduced air friction to allow better falling (was 0.01)
+            restitution: 0.7,
+            density: 0.01,     // Increased density for better physics (was 0.001)
+            render: {
+                fillStyle: shapeColor,
+                strokeStyle: '#000000',
+                lineWidth: 1
+            },
+            label: 'star'
+        }
+    );
+}
+
+// Setup cursor mode for interacting with shapes
+function setupCursorMode() {
+    console.log("Setting up cursor mode");
+    
+    // Add size preview element to document if it doesn't exist
+    if (!document.getElementById('size-preview')) {
+        sizePreviewElement = document.createElement('div');
+        sizePreviewElement.id = 'size-preview';
+        sizePreviewElement.style.position = 'absolute';
+        sizePreviewElement.style.border = '2px dashed #FFFFFF';
+        sizePreviewElement.style.borderRadius = '50%';
+        sizePreviewElement.style.pointerEvents = 'none';
+        sizePreviewElement.style.display = 'none';
+        document.body.appendChild(sizePreviewElement);
+    } else {
+        sizePreviewElement = document.getElementById('size-preview');
+    }
+    
+    // Setup cursor mode button
+    const cursorButton = document.getElementById('cursor-mode');
+    if (cursorButton) {
+        cursorButton.addEventListener('click', function() {
+            window.cursorMode = !window.cursorMode;
+            
+            // Update UI
+            this.classList.toggle('active', window.cursorMode);
+            
+            // Disable other special modes if cursor mode is activated
+            if (window.cursorMode) {
+                window.attractorMode = false;
+                window.explosionMode = false;
+                window.gravityZoneMode = false;
+                
+                // Update other mode buttons
+                const attractorButton = document.getElementById('attractor-mode');
+                if (attractorButton) attractorButton.classList.remove('active');
+                
+                const explosionButton = document.getElementById('explosion-mode');
+                if (explosionButton) explosionButton.classList.remove('active');
+                
+                const gravityZoneButton = document.getElementById('gravity-zone-mode');
+                if (gravityZoneButton) gravityZoneButton.classList.remove('active');
+            }
+            
+            console.log("Cursor mode " + (window.cursorMode ? "enabled" : "disabled"));
+        });
+    }
+}
+
+// Function to setup special modes (cursor, attractor, explosion)
+function setupSpecialModes() {
+    console.log("Setting up special modes");
+    
+    // Setup cursor mode button
+    const cursorButton = document.getElementById('cursor-mode');
+    if (cursorButton) {
+        cursorButton.addEventListener('click', function() {
+            window.cursorMode = !window.cursorMode;
+            
+            // Update UI
+            this.classList.toggle('active', window.cursorMode);
+            
+            // Disable other special modes if cursor mode is activated
+            if (window.cursorMode) {
+                window.attractorMode = false;
+                window.explosionMode = false;
+                window.gravityZoneMode = false;
+                
+                // Update other mode buttons
+                const attractorButton = document.getElementById('attractor-mode');
+                if (attractorButton) attractorButton.classList.remove('active');
+                
+                const explosionButton = document.getElementById('explosion-mode');
+                if (explosionButton) explosionButton.classList.remove('active');
+                
+                const gravityZoneButton = document.getElementById('gravity-zone-mode');
+                if (gravityZoneButton) gravityZoneButton.classList.remove('active');
+            }
+            
+            console.log("Cursor mode " + (window.cursorMode ? "enabled" : "disabled"));
+        });
+    }
+    
+    // Setup attractor mode button
+    const attractorButton = document.getElementById('attractor-mode');
+    if (attractorButton) {
+        attractorButton.addEventListener('click', function() {
+            window.attractorMode = !window.attractorMode;
+            
+            // Update UI
+            this.classList.toggle('active', window.attractorMode);
+            
+            // Disable other special modes if attractor mode is activated
+            if (window.attractorMode) {
+                window.cursorMode = false;
+                window.explosionMode = false;
+                window.gravityZoneMode = false;
+                
+                // Update other mode buttons
+                const cursorButton = document.getElementById('cursor-mode');
+                if (cursorButton) cursorButton.classList.remove('active');
+                
+                const explosionButton = document.getElementById('explosion-mode');
+                if (explosionButton) explosionButton.classList.remove('active');
+                
+                const gravityZoneButton = document.getElementById('gravity-zone-mode');
+                if (gravityZoneButton) gravityZoneButton.classList.remove('active');
+            }
+            
+            console.log("Attractor mode " + (window.attractorMode ? "enabled" : "disabled"));
+        });
+    }
+    
+    // Setup explosion mode button
+    const explosionButton = document.getElementById('explosion-mode');
+    if (explosionButton) {
+        explosionButton.addEventListener('click', function() {
+            window.explosionMode = !window.explosionMode;
+            
+            // Update UI
+            this.classList.toggle('active', window.explosionMode);
+            
+            // If explosion mode is activated, enable cursor mode too for clicking
+            if (window.explosionMode) {
+                window.cursorMode = true;
+                window.attractorMode = false;
+                window.gravityZoneMode = false;
+                
+                // Update other mode buttons
+                const cursorButton = document.getElementById('cursor-mode');
+                if (cursorButton) cursorButton.classList.add('active');
+                
+                const attractorButton = document.getElementById('attractor-mode');
+                if (attractorButton) attractorButton.classList.remove('active');
+                
+                const gravityZoneButton = document.getElementById('gravity-zone-mode');
+                if (gravityZoneButton) gravityZoneButton.classList.remove('active');
+            }
+            
+            console.log("Explosion mode " + (window.explosionMode ? "enabled" : "disabled"));
+        });
+    }
+}
+
+// Function to setup gravity zone mode
+function setupGravityZoneMode() {
+    console.log("Setting up gravity zone mode");
+    
+    // Default values for gravity zones
+    window.gravityZoneRadius = 200;
+    window.gravityZoneStrength = 0.01;
+    
+    // Setup gravity zone mode button
+    const gravityZoneButton = document.getElementById('gravity-zone-mode');
+    if (gravityZoneButton) {
+        gravityZoneButton.addEventListener('click', function() {
+            window.gravityZoneMode = !window.gravityZoneMode;
+            
+            // Update UI
+            this.classList.toggle('active', window.gravityZoneMode);
+            
+            // Disable other special modes if gravity zone mode is activated
+            if (window.gravityZoneMode) {
+                window.cursorMode = false;
+                window.attractorMode = false;
+                window.explosionMode = false;
+                
+                // Update other mode buttons
+                const cursorButton = document.getElementById('cursor-mode');
+                if (cursorButton) cursorButton.classList.remove('active');
+                
+                const attractorButton = document.getElementById('attractor-mode');
+                if (attractorButton) attractorButton.classList.remove('active');
+                
+                const explosionButton = document.getElementById('explosion-mode');
+                if (explosionButton) explosionButton.classList.remove('active');
+            }
+            
+            console.log("Gravity zone mode " + (window.gravityZoneMode ? "enabled" : "disabled"));
+        });
+    }
+    
+    // Initialize gravity zones array
+    window.gravityZones = [];
+    
+    // Setup gravity zone strength slider
+    const gravityZoneStrengthSlider = document.getElementById('gravity-zone-strength');
+    if (gravityZoneStrengthSlider) {
+        gravityZoneStrengthSlider.addEventListener('input', function() {
+            window.gravityZoneStrength = parseFloat(this.value) / 1000;
+            console.log("Gravity zone strength set to " + window.gravityZoneStrength);
+        });
+    }
+    
+    // Setup gravity zone radius slider
+    const gravityZoneRadiusSlider = document.getElementById('gravity-zone-radius');
+    if (gravityZoneRadiusSlider) {
+        gravityZoneRadiusSlider.addEventListener('input', function() {
+            window.gravityZoneRadius = parseFloat(this.value);
+            console.log("Gravity zone radius set to " + window.gravityZoneRadius);
+        });
+    }
+}
+
+// Function to update and apply gravity zones
+function updateGravityZones() {
+    // Skip if no gravity zones
+    if (!window.gravityZones || window.gravityZones.length === 0) return;
+    
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Apply gravity from each zone
+    window.gravityZones.forEach(zone => {
+        if (!zone.active) return;
+        
+        bodies.forEach(body => {
+            if (body.isStatic) return; // Skip static bodies
+            
+            // Calculate distance from gravity zone to body
+            const dx = zone.position.x - body.position.x;
+            const dy = zone.position.y - body.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Only affect bodies within zone radius
+            if (distance < zone.radius) {
+                // Calculate force based on distance (inverse relationship)
+                const forceMagnitude = zone.strength * (1 - distance / zone.radius);
+                
+                // Calculate force direction (toward zone center)
+                const forceX = (dx / distance) * forceMagnitude;
+                const forceY = (dy / distance) * forceMagnitude;
+                
+                // Apply force to body
+                Matter.Body.applyForce(body, body.position, {
+                    x: forceX,
+                    y: forceY
+                });
+            }
+        });
+    });
+}
+
+// Function to toggle a gravity zone at the provided position
+function toggleGravityZone(position) {
+    // Check if there's already a gravity zone at this position
+    const existingZoneIndex = window.gravityZones.findIndex(zone => {
+        return Math.sqrt(
+            Math.pow(zone.position.x - position.x, 2) + 
+            Math.pow(zone.position.y - position.y, 2)
+        ) < 50; // Within 50px considered same zone
+    });
+    
+    if (existingZoneIndex !== -1) {
+        // Toggle existing zone
+        const zone = window.gravityZones[existingZoneIndex];
+        zone.active = !zone.active;
+        
+        console.log(`Gravity zone ${zone.active ? "activated" : "deactivated"} at (${position.x}, ${position.y})`);
+    } else {
+        // Create new gravity zone
+        const newZone = {
+            position: { x: position.x, y: position.y },
+            radius: window.gravityZoneRadius || 200,
+            strength: window.gravityZoneStrength || 0.01,
+            active: true
+        };
+        
+        window.gravityZones.push(newZone);
+        console.log(`New gravity zone created at (${position.x}, ${position.y})`);
+    }
+}
+
+// Function to create explosion effects
+function createExplosion(position) {
+    const explosionForce = 0.05;
+    const explosionRadius = 200;
+    
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Apply explosion force to each body within radius
+    bodies.forEach(body => {
+        if (body.isStatic) return; // Skip static bodies
+        
+        // Calculate distance from explosion to body
+        const dx = body.position.x - position.x;
+        const dy = body.position.y - position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Only affect bodies within explosion radius
+        if (distance < explosionRadius) {
+            // Calculate force based on distance (inverse relationship)
+            const forceMagnitude = explosionForce * (1 - distance / explosionRadius);
+            
+            // Calculate force direction (away from explosion)
+            const forceX = (dx / distance) * forceMagnitude;
+            const forceY = (dy / distance) * forceMagnitude;
+            
+            // Apply force to body
+            Matter.Body.applyForce(body, body.position, {
+                x: forceX,
+                y: forceY
+            });
+        }
+    });
+    
+    // Create visual explosion effect
+    for (let i = 0; i < 50; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 2;
+        const size = Math.random() * 8 + 3;
+        
+        const velocityX = Math.cos(angle) * speed;
+        const velocityY = Math.sin(angle) * speed;
+        
+        // Random color for explosion
+        const colors = ['#FF5722', '#FFEB3B', '#FF9800', '#FFC107'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Create particle
+        const particle = {
+            position: { x: position.x, y: position.y },
+            velocity: { x: velocityX, y: velocityY },
+            size: size,
+            color: color,
+            lifetime: Math.random() * 1000 + 500,
+            maxLifetime: 1500,
+            style: 'glow' // Use glow style for explosion particles
+        };
+        
+        // Add to collision particles array
+        collisionParticles.push(particle);
+    }
+    
+    console.log(`Explosion created at (${position.x}, ${position.y})`);
+}
+
+// Update attractor behavior
+function updateAttractor(position) {
+    const attractorRadius = 200;
+    const attractorStrength = 0.005;
+    
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Apply attractor force to each body within radius
+    bodies.forEach(body => {
+        if (body.isStatic) return; // Skip static bodies
+        
+        // Calculate distance from attractor to body
+        const dx = position.x - body.position.x;
+        const dy = position.y - body.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Only affect bodies within attractor radius
+        if (distance < attractorRadius) {
+            // Calculate force based on distance (inverse relationship)
+            const forceMagnitude = attractorStrength * (1 - distance / attractorRadius);
+            
+            // Calculate force direction (toward attractor)
+            const forceX = (dx / distance) * forceMagnitude;
+            const forceY = (dy / distance) * forceMagnitude;
+            
+            // Apply force to body
+            Matter.Body.applyForce(body, body.position, {
+                x: forceX,
+                y: forceY
+            });
+        }
+    });
+}
+
+// Function to setup wind effects
+function setupWind() {
+    console.log("Setting up wind effects");
+    
+    // Initialize wind intervals
+    let windUpdateInterval = null;
+    let windDirectionChangeInterval = null;
+    
+    // Setup wind toggle button
+    const windToggle = document.getElementById('toggle-wind');
+    if (windToggle) {
+        windToggle.addEventListener('click', function() {
+            windEnabled = !windEnabled;
+            
+            // Update UI
+            this.classList.toggle('active', windEnabled);
+            
+            if (windEnabled) {
+                // Start wind intervals
+                startWindIntervals();
+                console.log("Wind enabled with strength:", windStrength, "and direction:", windDirection);
+            } else {
+                // Clear wind intervals
+                clearInterval(windUpdateInterval);
+                clearInterval(windDirectionChangeInterval);
+                console.log("Wind disabled");
+            }
+        });
+    }
+    
+    // Setup wind strength slider
+    const windStrengthSlider = document.getElementById('wind-strength');
+    if (windStrengthSlider) {
+        windStrengthSlider.addEventListener('input', function() {
+            windStrength = parseFloat(this.value) / 100;
+            console.log("Wind strength set to:", windStrength);
+        });
+    }
+    
+    // Function to start wind intervals
+    function startWindIntervals() {
+        // Apply wind force every 100ms
+        windUpdateInterval = setInterval(function() {
+            if (!windEnabled) return;
+            
+            applyWindForce();
+        }, 100);
+        
+        // Change wind direction randomly every 5 seconds
+        windDirectionChangeInterval = setInterval(function() {
+            if (!windEnabled) return;
+            
+            // Random wind direction (-1 to 1)
+            windDirection = (Math.random() * 2 - 1) * 0.6;
+            console.log("Wind direction changed to:", windDirection);
+        }, 5000);
+    }
+    
+    // Function to apply wind force to bodies
+    function applyWindForce() {
+        // Get all bodies
+        const bodies = Matter.Composite.allBodies(world);
+        
+        // Apply wind force to each non-static body
+        bodies.forEach(body => {
+            if (body.isStatic) return;
+            
+            // Calculate force based on body area
+            const area = body.area || (body.bounds.max.x - body.bounds.min.x) * (body.bounds.max.y - body.bounds.min.y);
+            const forceMagnitude = windStrength * (area / 10000);
+            
+            // Apply force in wind direction
+            Matter.Body.applyForce(body, body.position, {
+                x: windDirection * forceMagnitude,
+                y: 0.05 * Math.sin(Date.now() / 1000) * forceMagnitude // Slight vertical fluctuation
+            });
+        });
+    }
+}
+
+// Helper function to get a random color
+function getRandomColor() {
+    const colors = [
+        '#4285F4', // Google Blue
+        '#34A853', // Google Green
+        '#FBBC05', // Google Yellow
+        '#EA4335', // Google Red
+        '#9C27B0', // Purple
+        '#00BCD4', // Cyan
+        '#FF5722', // Deep Orange
+        '#3F51B5'  // Indigo
+    ];
+    
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// Function to get body at position
+function getBodyAtPosition(position) {
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Find body at position
+    for (let i = 0; i < bodies.length; i++) {
+        const body = bodies[i];
+        
+        // Skip static bodies (like the ground)
+        if (body.isStatic && body.label !== 'gravity-zone') {
+            continue;
+        }
+        
+        // Check if position is within body bounds
+        if (Matter.Bounds.contains(body.bounds, position)) {
+            // For circles, also check actual distance from center
+            if (body.circleRadius) {
+                const dx = body.position.x - position.x;
+                const dy = body.position.y - position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance <= body.circleRadius) {
+                    return body;
+                }
+            } else {
+                return body;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Scale a body to a new size
+function scaleBody(body, scale) {
+    if (!body) return;
+    
+    // Remember original position
+    const position = { x: body.position.x, y: body.position.y };
+    
+    // Remove the original body
+    Matter.Composite.remove(world, body);
+    
+    // Create a new body with the same properties but scaled
+    let newBody;
+    
+    if (body.circleRadius) {
+        // It's a circle
+        const radius = body.circleRadius * scale;
+        newBody = Matter.Bodies.circle(position.x, position.y, radius, {
+            frictionAir: body.frictionAir,
+            friction: body.friction,
+            restitution: body.restitution,
+            density: body.density,
+            render: {
+                fillStyle: body.render.fillStyle
+            }
+        });
+    } else if (body.label === 'star') {
+        // It's a star - create a new star with scaled size
+        const size = Math.max(body.bounds.max.x - body.bounds.min.x, body.bounds.max.y - body.bounds.min.y) * scale / 2;
+        const vertices = [];
+        const points = 5;
+        const outerRadius = size;
+        const innerRadius = size * 0.4;
+        
+        for (let i = 0; i < points * 2; i++) {
+            const radius = i % 2 === 0 ? outerRadius : innerRadius;
+            const angle = (i * Math.PI) / points;
+            
+            vertices.push({
+                x: position.x + radius * Math.cos(angle),
+                y: position.y + radius * Math.sin(angle)
+            });
+        }
+        
+        newBody = Matter.Bodies.fromVertices(position.x, position.y, [vertices], {
+            frictionAir: body.frictionAir,
+            friction: body.friction,
+            restitution: body.restitution,
+            density: body.density,
+            render: {
+                fillStyle: body.render.fillStyle
+            },
+            label: 'star'
+        });
+    } else if (body.vertices && body.vertices.length > 0) {
+        // It's a polygon or composite shape
+        // Get the centroid of the original vertices
+        const centroid = Matter.Vertices.centre(body.vertices);
+        
+        // Scale vertices around centroid
+        const scaledVertices = body.vertices.map(vertex => {
+            return {
+                x: centroid.x + (vertex.x - centroid.x) * scale,
+                y: centroid.y + (vertex.y - centroid.y) * scale
+            };
+        });
+        
+        // Create new body with scaled vertices
+        newBody = Matter.Bodies.fromVertices(position.x, position.y, [scaledVertices], {
+            frictionAir: body.frictionAir,
+            friction: body.friction,
+            restitution: body.restitution,
+            density: body.density,
+            render: {
+                fillStyle: body.render.fillStyle
+            }
+        });
+    } else {
+        // It's a rectangle or unknown shape, scale it proportionally
+        const width = (body.bounds.max.x - body.bounds.min.x) * scale;
+        const height = (body.bounds.max.y - body.bounds.min.y) * scale;
+        
+        newBody = Matter.Bodies.rectangle(position.x, position.y, width, height, {
+            frictionAir: body.frictionAir,
+            friction: body.friction,
+            restitution: body.restitution,
+            density: body.density,
+            render: {
+                fillStyle: body.render.fillStyle
+            }
+        });
+    }
+    
+    // Add the new body to the world
+    Matter.Composite.add(world, newBody);
+    
+    return newBody;
+}
+
+// Update size preview element
+function updateSizePreview(body, scale) {
+    if (!body || !sizePreviewElement) return;
+    
+    const width = (body.bounds.max.x - body.bounds.min.x) * scale;
+    const height = (body.bounds.max.y - body.bounds.min.y) * scale;
+    
+    // Set position and size
+    sizePreviewElement.style.width = width + 'px';
+    sizePreviewElement.style.height = height + 'px';
+    sizePreviewElement.style.left = (body.position.x - width / 2) + 'px';
+    sizePreviewElement.style.top = (body.position.y - height / 2) + 'px';
+    
+    // For circles, make it round
+    if (body.circleRadius) {
+        sizePreviewElement.style.borderRadius = '50%';
+    } else {
+        sizePreviewElement.style.borderRadius = '0';
+    }
+}
+
+// Create static base platform
+function createStaticBase() {
+    const baseWidth = window.innerWidth * 2;
+    const baseHeight = 50;
+    const baseY = window.innerHeight;
+    
+    // Create static base
+    const base = Matter.Bodies.rectangle(
+        window.innerWidth / 2, 
+        baseY, 
+        baseWidth, 
+        baseHeight, 
+        { 
+            isStatic: true,
+            render: {
+                fillStyle: '#333333'
+            }
+        }
+    );
+    
+    // Add base to world
+    Matter.Composite.add(world, base);
+    
+    return base;
+}
+
+// Update base position on window resize
+function updateBasePosition() {
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Find base body (should be static and at bottom)
+    const base = bodies.find(body => body.isStatic && body.position.y > window.innerHeight - 100);
+    
+    if (base) {
+        // Set position using setPosition
+        Matter.Body.setPosition(base, {
+            x: window.innerWidth / 2,
+            y: window.innerHeight
+        });
+        
+        // Update base width if needed
+        const baseWidth = window.innerWidth * 2;
+        Matter.Body.scale(base, baseWidth / (base.bounds.max.x - base.bounds.min.x), 1);
+    } else {
+        // Create new base if not found
+        createStaticBase();
+    }
+}
+
+// Setup collision effects event handlers
+setupCollisionEffects();
+
+// Add Matter.js afterUpdate event for physics logic
+Matter.Events.on(engine, 'afterUpdate', function() {
+    // Apply wind force if enabled
+    if (windEnabled) {
+        // Wind is handled in its own interval
+    }
+    
+    // Update gravity zones
+    updateGravityZones();
+});
+
+// Function to clear all non-static shapes from the world
+function clearAllShapes() {
+    // Get all bodies in the world
+    const bodies = Matter.Composite.allBodies(world);
+    
+    // Remove each non-static body
+    bodies.forEach(body => {
+        if (!body.isStatic) {
+            Matter.Composite.remove(world, body);
+        }
+    });
+    
+    // Clear collision particles
+    collisionParticles = [];
+    
+    // Clear trail history
+    trailHistory.clear();
+    
+    console.log("All shapes cleared");
+}
+
+// Function to update collision effect style
+function updateCollisionEffectStyle(style) {
+    window.collisionEffectStyle = style;
+    console.log("Collision effect style set to:", style);
+}

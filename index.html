@@ -3,141 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SICS Ground - Physics Playground</title>
+    <title>sics-ground</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="lib/matter.min.js"></script>
 </head>
-<body class="theme-modern-dark">
-    <canvas id="physics-canvas"></canvas>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">sics-ground</div>
+            <ul class="nav-links">
+                <li><a href="#home" class="active">Home</a></li>
+                <li><a href="#playground">Playground</a></li>
+                <li><a href="#about">About</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section id="home" class="hero-section">
+        <div class="container">
+            <header>
+                <h1>sics-ground</h1>
+                <p>the internet's favorite little physics playground</p>
+                <a href="#playground" class="scroll-down-btn">
+                    <span>Play Now</span>
+                    <div class="arrow-down"></div>
+                </a>
+            </header>
+        </div>
+    </section>
     
-    <!-- Added visible base indicator as fallback -->
-    <div class="physics-base-indicator"></div>
-    
-    <div class="controls-panel">
-        <div class="header">
-            <div class="logo-text">sics ground</div>
-            <div class="subtitle">physics playground</div>
-        </div>
-        
-        <div class="position-toggle">
-            <button id="toggle-position" class="control-button">Toggle Panel Position</button>
-        </div>
-        
-        <!-- Theme dropdown with arrow -->
-        <div class="dropdown" id="theme-dropdown">
-            <div class="dropdown-toggle">
-                <span>Theme: Dark</span>
-                <div class="arrow"></div>
+    <section id="playground" class="playground-section">
+        <div class="container">
+            <div class="controls">
+                <div class="collision-effects">
+                    <h2>Collision Effects</h2>
+                    <div class="effect-options">
+                        <button class="effect-btn active" data-effect="bounce">Bounce</button>
+                        <button class="effect-btn" data-effect="explode">Explode</button>
+                        <button class="effect-btn" data-effect="stick">Stick</button>
+                        <button class="effect-btn" data-effect="gravity">Gravity Shift</button>
+                    </div>
+                </div>
+                
+                <div class="shape-creator">
+                    <h2>Add Shapes</h2>
+                    <button id="add-circle">Circle</button>
+                    <button id="add-square">Square</button>
+                    <button id="add-polygon">Polygon</button>
+                    <p class="click-tip">Or click anywhere on the playground to add random shapes!</p>
+                </div>
+                
+                <div class="scene-controls">
+                    <h2>Scene</h2>
+                    <button id="reset-scene">Reset</button>
+                    <button id="toggle-gravity">Toggle Gravity</button>
+                </div>
             </div>
-            <div class="dropdown-menu">
-                <div class="dropdown-item active" data-theme="theme-modern-dark">Dark</div>
-                <div class="dropdown-item" data-theme="theme-modern-blue">Blue</div>
-                <div class="dropdown-item" data-theme="theme-modern-purple">Purple</div>
-                <div class="dropdown-item" data-theme="theme-modern-mint">Mint</div>
-                <div class="dropdown-item" data-theme="theme-modern-sunset">Sunset</div>
-            </div>
-        </div>
-        
-        <!-- Accent color customization -->
-        <div class="button-color-picker">
-            <div class="color-picker-header">
-                <label for="button-color">Accent Color</label>
-                <input type="color" id="button-color" value="#4285F4">
-            </div>
-            <div class="color-presets">
-                <div class="color-preset" style="background-color: #EA4335;" data-color="#EA4335"></div>
-                <div class="color-preset" style="background-color: #4285F4;" data-color="#4285F4"></div>
-                <div class="color-preset" style="background-color: #34A853;" data-color="#34A853"></div>
-                <div class="color-preset" style="background-color: #FBBC05;" data-color="#FBBC05"></div>
-                <div class="color-preset" style="background-color: #ffffff;" data-color="#ffffff"></div>
-            </div>
-        </div>
-        
-        <hr>
-        
-        <!-- Gravity slider -->
-        <div class="slider-container gravity-slider">
-            <div class="slider-header">
-                <label for="gravity-slider">Gravity Strength</label>
-                <span class="slider-value">1.0</span>
-            </div>
-            <input type="range" id="gravity-slider" min="0" max="2" step="0.1" value="1.0">
-        </div>
-        
-        <button id="toggle-wind" class="control-button">Toggle Wind</button>
-        <div class="slider-container">
-            <div class="slider-header">
-                <label for="wind-slider">Wind Strength</label>
-                <span class="slider-value">0.3</span>
-            </div>
-            <input type="range" id="wind-slider" min="0" max="1" step="0.01" value="0.3">
-        </div>
-        <button id="clear-all" class="control-button danger">Clear All</button>
-        <hr>
-        <div class="mode-controls">
-            <button id="cursor-mode" class="mode-button active">Cursor</button>
-            <button id="toggle-attractor" class="mode-button">Attractor</button>
-            <button id="toggle-portal" class="mode-button">Portal</button>
-            <button id="create-explosion" class="mode-button">Explosion</button>
-        </div>
-        <hr>
-        <div class="shape-controls">
-            <button id="add-circle" class="shape-button active" onclick="setShapeMode('circle')">Circle</button>
-            <button id="add-square" class="shape-button" onclick="setShapeMode('square')">Square</button>
-            <button id="add-rectangle" class="shape-button" onclick="setShapeMode('rectangle')">Rectangle</button>
-            <button id="add-star" class="shape-button" onclick="setShapeMode('star')">Star</button>
-            <button id="add-polygon" class="shape-button" onclick="setShapeMode('polygon')">Polygon</button>
-        </div>
-        <div class="color-picker">
-            <div class="color-picker-header">
-                <label for="shape-color">Shape Color</label>
-                <input type="color" id="shape-color" value="#EA4335">
-            </div>
-            <div class="color-presets">
-                <div class="color-preset" style="background-color: #EA4335;" data-color="#EA4335"></div>
-                <div class="color-preset" style="background-color: #4285F4;" data-color="#4285F4"></div>
-                <div class="color-preset" style="background-color: #34A853;" data-color="#34A853"></div>
-                <div class="color-preset" style="background-color: #FBBC05;" data-color="#FBBC05"></div>
-                <div class="color-preset" style="background-color: #ffffff;" data-color="#ffffff"></div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Size preview element for resize mode -->
-    <div id="size-preview" class="size-preview"></div>
-    
-    <!-- Wind indicator -->
-    <div class="wind-indicator">
-        <div class="wind-arrow"></div>
-    </div>
-    
-    <!-- Simple script for direct shape mode setting -->
-    <script>
-        function setShapeMode(type) {
-            // Update current mode
-            window.currentMode = 'add-' + type;
             
-            // Update button states
-            document.querySelectorAll('.shape-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.getElementById('add-' + type).classList.add('active');
-            
-            // Deactivate other modes
-            window.cursorMode = false;
-            window.attractorMode = false;
-            window.portalMode = false;
-            window.explosionMode = false;
-            
-            // Remove active state from other mode buttons
-            document.getElementById('cursor-mode').classList.remove('active');
-            document.getElementById('toggle-attractor').classList.remove('active');
-            document.getElementById('toggle-portal').classList.remove('active');
-            document.getElementById('create-explosion').classList.remove('active');
-        }
-    </script>
+            <div class="canvas-container">
+                <canvas id="physics-canvas"></canvas>
+            </div>
+        </div>
+    </section>
     
+    <section id="about" class="about-section">
+        <div class="container">
+            <h2>About sics-ground</h2>
+            <div class="about-content">
+                <p>sics-ground is an interactive physics sandbox powered by Matter.js where you can play with realistic object physics.</p>
+                <p>Add circles, squares, and polygons to the playground, watch as they interact using one of four effects: Bounce, Explode, Stick, or Gravity Shift.</p>
+                <p>This was my first project that I've made using js so I truly hope sics-ground is fun!</p>
+                <p> - magical paperclip  </p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>© 2025 magical paperclip - sics-ground</p>
+        </div>
+    </footer>
+    
+    <script src="lib/matter.min.js"></script>
     <script src="script.js"></script>
+    <script src="menu-controls.js"></script>
 </body>
 </html>

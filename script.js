@@ -1,1352 +1,880 @@
-// Global variables for physics and interaction that need to be exposed to inline functions
-window.world = null;
-window.Matter = Matter;
-window.currentMode = 'add-circle'; // Default shape mode
-window.cursorMode = false;
-window.attractorMode = false;
-window.portalMode = false;
-window.explosionMode = false;
-window.gravityZoneMode = false;
-window.lastMousePos = { x: 0, y: 0 }; 
+// Initialize Matter.js modules
+const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
 
-let selectedBody = null;
-let draggedBody = null;
-let resizing = false;
-let initialResizeDistance = 0;
-let initialScale = 1;
-let lastClickTime = 0;
-const doubleClickThreshold = 300;
-let sizePreviewElement;
+// Create engine and world with better settings for smooth physics
+const engine = Engine.create({
+    positionIterations: 8,    // Increased from default 6 for more accurate positioning
+    velocityIterations: 8,    // Increased from default 4 for smoother motion
+    constraintIterations: 4,  // Increased for better constraint solving
+    enableSleeping: true      // Allow objects to "sleep" when not moving for better performance
+});
+const world = engine.world;
 
-// Variables for wind
-let windEnabled = false;
-let windStrength = 0.3;
-let windDirection = 1;
-let windVariability = 0.2;
-let windForce = 0;
-let windInterval = null;
+// Set smoother gravity
+world.gravity.scale = 0.001;
+world.gravity.y = 1;
 
-// Variables for special modes
-let attractor = null;
-let portal = { source: null, destination: null };
-let attractorStrength = 0.05;
+// Canvas setup with HiDPI/Retina support
+const canvas = document.getElementById('physics-canvas');
+const canvasContainer = document.querySelector('.canvas-container');
+const pixelRatio = window.devicePixelRatio || 1;
+canvas.width = canvasContainer.offsetWidth * pixelRatio;
+canvas.height = canvasContainer.offsetHeight * pixelRatio;
+canvas.style.width = `${canvasContainer.offsetWidth}px`;
+canvas.style.height = `${canvasContainer.offsetHeight}px`;
 
-// Initialize matter.js engine, world, runner and renderer
-const engine = Matter.Engine.create({
-    gravity: {
-        x: 0,
-        y: 0.6  // Lower gravity for more realistic falling speed
-    },
-    positionIterations: 10,   // Increased for better collision detection
-    velocityIterations: 8,    // Increased for better collision detection
-    constraintIterations: 4,  // Increased for stability
-    enableSleeping: true      // Allow objects to sleep when they stop moving
+// Create renderer with improved settings
+const render = Render.create({
+    canvas: canvas,
+    engine: engine,
+    options: {
+        width: canvas.width,
+        height: canvas.height,
+        wireframes: false,
+        background: 'rgba(41, 40, 65, 0.7)',
+        showAngleIndicator: false,
+        pixelRatio: pixelRatio,
+        hasBounds: true
+    }
 });
 
-// Add collision detection enhancement for high-speed objects
-Matter.Resolver._restingThresh = 0.001; // Lower threshold for better collision detection
-
-window.world = engine.world; // Expose world to global scope
-const world = engine.world;  // Keep local reference for convenience
-const runner = Matter.Runner.create({
-    isFixed: true,           // Fixed time step
-    delta: 1000/60           // 60 FPS for smooth simulation
+// Run the engine with a smooth, fixed time step
+const runner = Runner.create({
+    isFixed: true,
+    delta: 1000/60 // Lock to 60 FPS for consistency
 });
+Runner.run(runner, engine);
+Render.run(render);
 
-// Wait for DOM to be ready before creating the renderer
-let render;
-document.addEventListener('DOMContentLoaded', function() {
-    // Create the renderer now that the DOM is ready
-    render = Matter.Render.create({
-        canvas: document.getElementById('physics-canvas'),
-        engine: engine,
-        options: {
-            width: window.innerWidth,
-            height: window.innerHeight,
-            wireframes: false,
-            background: 'transparent'
-        }
-    });
+// Variables
+let activeBodies = [];
+let boundaries = [];
+let explosionParticles = [];
+let trailParticles = [];
+let currentEffect = 'bounce';
+const colors = ['#716040', '#8c7851', '#a88c64', '#d1c4b3', '#d0b49f'];
+const explosionColors = ['#ff7b54', '#ffb26b', '#ffd56b', '#939597', '#6c22bd'];
 
-    // Start the engine, runner and renderer in order
-    Matter.Runner.run(runner, engine);
-    Matter.Render.run(render);
+// Create smoother boundaries with rounded corners
+function createBoundaries() {
+    const wallOptions = { 
+        isStatic: true,
+        chamfer: { radius: 10 }, // Round the corners
+        render: { 
+            fillStyle: 'rgba(224, 214, 204, 0.8)',
+            strokeStyle: 'rgba(209, 196, 179, 0.5)',
+            lineWidth: 1
+        } 
+    };
     
-    // Setup physics environment
-    setupPhysics();
-    setupCursorMode();
-    setupWind();
-    setupShapeCreation();
-    setupSpecialModes();
-    setupGravityZoneMode();
-    createStaticBase(); // Create the base
+    // Create smoother walls and ground
+    const groundHeight = 30;
+    const wallWidth = 30;
     
-    // Debug: Create a test shape to verify physics is working
-    setTimeout(function() {
-        createCircle({x: window.innerWidth/2, y: 100}, '#EA4335');
-        console.log("Test shape created on startup");
-    }, 1000);
+    // Create ground with slightly increased thickness
+    const ground = Bodies.rectangle(
+        canvas.width / 2, 
+        canvas.height - groundHeight/2, 
+        canvas.width, 
+        groundHeight, 
+        wallOptions
+    );
     
-    // Add event listeners for window resize
-    window.addEventListener('resize', function() {
-        render.options.width = window.innerWidth;
-        render.options.height = window.innerHeight;
-        render.canvas.width = window.innerWidth;
-        render.canvas.height = window.innerHeight;
-        
-        // Update the base position when window is resized
-        updateBasePosition();
-    });
-});
-
-// Set up wind and gravity
-function setupPhysics() {
-    // Default gravity
-    engine.world.gravity.y = 1;
-    
-    // Initialize wind indicator
-    const windIndicator = document.querySelector('.wind-indicator');
-    const windArrow = document.querySelector('.wind-arrow');
-    
-    // Size preview element
-    sizePreviewElement = document.getElementById('size-preview');
-    
-    // Set up gravity slider
-    const gravitySlider = document.getElementById('gravity-slider');
-    const gravityValueDisplay = document.querySelector('.gravity-slider .slider-value');
-    
-    gravitySlider.addEventListener('input', function() {
-        const gravityValue = parseFloat(this.value);
-        engine.world.gravity.y = gravityValue;
-        gravityValueDisplay.textContent = gravityValue.toFixed(1);
-    });
-    
-    // Add event listener for clearing all objects
-    document.getElementById('clear-all').addEventListener('click', function() {
-        const bodies = Matter.Composite.allBodies(world);
-        bodies.forEach(body => {
-            if (!body.isStatic || body.label === 'attractor' || body.label === 'portal') {
-                Matter.Composite.remove(world, body);
+    // Create base platform above ground to catch shapes that might slip through
+    const basePlatform = Bodies.rectangle(
+        canvas.width / 2,
+        canvas.height - groundHeight - 5,
+        canvas.width - 4,
+        10,
+        {
+            isStatic: true,
+            render: {
+                fillStyle: 'rgba(224, 214, 204, 0.4)',
+                strokeStyle: 'rgba(209, 196, 179, 0.3)',
+                lineWidth: 1
             }
-        });
-        
-        // Reset special modes
-        if (attractor) {
-            Matter.Composite.remove(world, attractor);
-            attractor = null;
         }
-        portal = { source: null, destination: null };
+    );
+    
+    const leftWall = Bodies.rectangle(wallWidth/2, canvas.height / 2, wallWidth, canvas.height, wallOptions);
+    const rightWall = Bodies.rectangle(canvas.width - wallWidth/2, canvas.height / 2, wallWidth, canvas.height, wallOptions);
+    const ceiling = Bodies.rectangle(canvas.width / 2, wallWidth/2, canvas.width, wallWidth, wallOptions);
+    
+    boundaries = [ground, basePlatform, leftWall, rightWall, ceiling];
+    Composite.add(world, boundaries);
+}
+
+// Create a random body with improved physics settings
+function createBody(x, y, type) {
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const options = {
+        restitution: 0.8,         // Bouncier
+        friction: 0.05,           // Less friction for smoother sliding
+        frictionAir: 0.002,       // Slight air resistance for more natural movement
+        frictionStatic: 0.2,      // Easier to get moving
+        density: 0.002,           // Lower density for more responsive physics
+        chamfer: { radius: 2 },   // Slightly rounded corners for smoother collisions
+        render: {
+            fillStyle: color,
+            strokeStyle: '#716040',
+            lineWidth: 1
+        }
+    };
+    
+    let body;
+    
+    switch(type) {
+        case 'circle':
+            body = Bodies.circle(x, y, Common.random(15, 30), options);
+            break;
+        case 'square':
+            const size = Common.random(25, 50);
+            body = Bodies.rectangle(x, y, size, size, options);
+            break;
+        case 'polygon':
+            body = Bodies.polygon(x, y, Common.random(3, 6), Common.random(15, 30), options);
+            break;
+        default:
+            body = Bodies.circle(x, y, Common.random(15, 30), options);
+    }
+    
+    // Add some initial velocity for smoother entry
+    Body.setVelocity(body, { 
+        x: Common.random(-1, 1) * 2,
+        y: Common.random(-0.1, 0.1)
+    });
+    
+    activeBodies.push(body);
+    Composite.add(world, body);
+    
+    // Add entry animation effect
+    createRippleEffect(x, y);
+    
+    return body;
+}
+
+// Create ripple effect when adding a new body
+function createRippleEffect(x, y) {
+    for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const distance = 15;
+        
+        const ripple = createExplosionParticle(
+            x + Math.cos(angle) * distance,
+            y + Math.sin(angle) * distance,
+            '#ffffff',
+            5,
+            0.8,
+            angle
+        );
+        
+        ripple.maxLifespan = 30;
+        ripple.lifespan = 30;
+        ripple.velocity.x *= 0.7;
+        ripple.velocity.y *= 0.7;
+        
+        explosionParticles.push(ripple);
+    }
+}
+
+// Create visual effect particles with improved smoothness
+function createExplosionParticle(x, y, color, size, speed, angle) {
+    return {
+        x,
+        y,
+        size,
+        color,
+        velocity: {
+            x: Math.cos(angle) * speed,
+            y: Math.sin(angle) * speed
+        },
+        alpha: 1,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.1, // Slower rotation for smoother look
+        lifespan: 60,
+        maxLifespan: 60,
+        gravity: 0.02,
+        drag: 0.98
+    };
+}
+
+// Create trail particle for shape movement
+function createTrailParticle(x, y, color, size) {
+    return {
+        x,
+        y,
+        size,
+        color,
+        alpha: 0.7,
+        lifespan: 20,
+        maxLifespan: 20
+    };
+}
+
+// Render explosion particles with anti-aliasing and smooth transitions
+function renderExplosionParticles(render) {
+    const context = render.context;
+    
+    // Enable settings for smoother rendering
+    context.globalCompositeOperation = 'lighter';
+    
+    explosionParticles.forEach(particle => {
+        context.save();
+        context.globalAlpha = particle.alpha;
+        context.translate(particle.x, particle.y);
+        context.rotate(particle.rotation);
+        
+        // Draw different shapes with smooth edges
+        const shapePicker = Math.floor(particle.size) % 3;
+        
+        // Add glow effect for smoother looking particles
+        const glow = context.createRadialGradient(0, 0, 0, 0, 0, particle.size * 1.2);
+        glow.addColorStop(0, particle.color);
+        glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        switch(shapePicker) {
+            case 0: // Circle
+                context.beginPath();
+                context.arc(0, 0, particle.size, 0, Math.PI * 2);
+                context.fillStyle = glow;
+                context.fill();
+                break;
+                
+            case 1: // Square
+                context.fillStyle = glow;
+                context.fillRect(-particle.size/2, -particle.size/2, particle.size, particle.size);
+                break;
+                
+            case 2: // Triangle
+                context.beginPath();
+                context.moveTo(0, -particle.size);
+                context.lineTo(particle.size, particle.size);
+                context.lineTo(-particle.size, particle.size);
+                context.closePath();
+                context.fillStyle = glow;
+                context.fill();
+                break;
+        }
+        
+        context.restore();
+    });
+    
+    // Render trail particles
+    context.globalCompositeOperation = 'source-over';
+    trailParticles.forEach(particle => {
+        context.save();
+        context.globalAlpha = particle.alpha * (particle.lifespan / particle.maxLifespan);
+        
+        context.beginPath();
+        context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        context.fillStyle = particle.color;
+        context.fill();
+        
+        context.restore();
     });
 }
 
-// Create the resize functionality for cursor mode
-function setupCursorMode() {
-    const canvas = document.getElementById('physics-canvas');
-    const cursorModeButton = document.getElementById('cursor-mode');
-    
-    cursorModeButton.addEventListener('click', function() {
-        // Toggle cursor mode
-        cursorMode = !cursorMode;
-        this.classList.toggle('active');
+// Update explosion particles with smoother physics
+function updateExplosionParticles() {
+    for (let i = explosionParticles.length - 1; i >= 0; i--) {
+        const particle = explosionParticles[i];
         
-        if (cursorMode) {
-            // Deactivate other modes
-            attractorMode = false;
-            portalMode = false;
-            explosionMode = false;
-            gravityZoneMode = false;
-            currentMode = 'cursor-mode';
-            
-            // Update UI to reflect mode change
-            document.getElementById('toggle-attractor').classList.remove('active');
-            document.getElementById('toggle-portal').classList.remove('active');
-            document.getElementById('create-explosion').classList.remove('active');
-            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
-            
-            // Add cursor mode class to body
-            document.body.classList.add('cursor-mode-active');
-        } else {
-            // Remove cursor mode class
-            document.body.classList.remove('cursor-mode-active');
-            currentMode = 'add-circle'; // Default back to add-circle mode
-        }
-    });
-
-    // Handle mouse down for object selection
-    canvas.addEventListener('mousedown', function(event) {
-        if (!cursorMode) return;
+        // Update position with smoother easing
+        particle.x += particle.velocity.x;
+        particle.y += particle.velocity.y;
         
-        const mousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
+        // Add some gravity with easing
+        particle.velocity.y += particle.gravity;
         
-        // Check for double click to delete an object
-        const currentTime = new Date().getTime();
-        const isDoubleClick = (currentTime - lastClickTime < doubleClickThreshold);
-        lastClickTime = currentTime;
+        // Slow down particles over time with drag
+        particle.velocity.x *= particle.drag;
+        particle.velocity.y *= particle.drag;
         
-        // Get body under cursor
-        const bodyUnderCursor = getBodyAtPosition(mousePosition);
+        // Update rotation with smooth interpolation
+        particle.rotation += particle.rotationSpeed;
         
-        if (bodyUnderCursor) {
-            if (isDoubleClick) {
-                // Remove the body on double click
-                Matter.Composite.remove(world, bodyUnderCursor);
-                selectedBody = null;
-                return;
-            }
-            
-            // Select body for dragging or resizing
-            selectedBody = bodyUnderCursor;
-            
-            // Check if mouse is near the edge for resizing
-            const distanceFromCenter = Math.sqrt(
-                Math.pow(mousePosition.x - selectedBody.position.x, 2) +
-                Math.pow(mousePosition.y - selectedBody.position.y, 2)
-            );
-            
-            const bodyRadius = selectedBody.circleRadius || 
-                               Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
-                                       selectedBody.bounds.max.y - selectedBody.bounds.min.y) / 2;
-            
-            if (distanceFromCenter > bodyRadius * 0.7) {
-                // Near edge - start resizing
-                resizing = true;
-                initialResizeDistance = distanceFromCenter;
-                initialScale = selectedBody.render.sprite ? selectedBody.render.sprite.xScale : 1;
-                
-                // Show size preview
-                sizePreviewElement.style.display = 'block';
-                sizePreviewElement.style.width = bodyRadius * 2 + 'px';
-                sizePreviewElement.style.height = bodyRadius * 2 + 'px';
-                sizePreviewElement.style.left = selectedBody.position.x - bodyRadius + 'px';
-                sizePreviewElement.style.top = selectedBody.position.y - bodyRadius + 'px';
-            } else {
-                // Center area - enable dragging
-                draggedBody = selectedBody;
-                Matter.Body.setStatic(draggedBody, true);
-            }
-        }
-    });
-
-    // Handle mouse move for dragging and resizing
-    canvas.addEventListener('mousemove', function(event) {
-        if (!cursorMode) return;
+        // Reduce size with easing
+        particle.size *= 0.99;
         
-        const mousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
+        // Update lifespan and alpha with easing
+        particle.lifespan--;
+        particle.alpha = (particle.lifespan / particle.maxLifespan) * (particle.lifespan / particle.maxLifespan); // Quadratic easing
         
-        // Save mouse position for other operations
-        lastMousePos = mousePosition;
-        
-        if (draggedBody) {
-            // Move the selected body
-            Matter.Body.setPosition(draggedBody, mousePosition);
-        } else if (resizing && selectedBody) {
-            // Calculate distance from center for resizing
-            const distanceFromCenter = Math.sqrt(
-                Math.pow(mousePosition.x - selectedBody.position.x, 2) +
-                Math.pow(mousePosition.y - selectedBody.position.y, 2)
-            );
-            
-            // Calculate scale factor based on distance change
-            const scaleFactor = distanceFromCenter / initialResizeDistance;
-            
-            // Update size preview element
-            const currentRadius = selectedBody.circleRadius || 
-                                 Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
-                                         selectedBody.bounds.max.y - selectedBody.bounds.min.y) / 2;
-            const newSize = currentRadius * 2 * scaleFactor;
-            
-            sizePreviewElement.style.width = newSize + 'px';
-            sizePreviewElement.style.height = newSize + 'px';
-            sizePreviewElement.style.left = selectedBody.position.x - newSize/2 + 'px';
-            sizePreviewElement.style.top = selectedBody.position.y - newSize/2 + 'px';
-        }
-    });
-
-    // Handle mouse up to stop dragging or apply resize
-    canvas.addEventListener('mouseup', function() {
-        if (draggedBody) {
-            Matter.Body.setStatic(draggedBody, false);
-            draggedBody = null;
-        }
-        
-        if (resizing && selectedBody) {
-            // Calculate new scale based on preview size
-            const previewSize = parseFloat(sizePreviewElement.style.width);
-            const currentSize = selectedBody.circleRadius ? 
-                               selectedBody.circleRadius * 2 : 
-                               Math.max(selectedBody.bounds.max.x - selectedBody.bounds.min.x, 
-                                       selectedBody.bounds.max.y - selectedBody.bounds.min.y);
-            
-            const scaleFactor = previewSize / currentSize;
-            
-            // Apply the new scale to the selected body
-            Matter.Body.scale(selectedBody, scaleFactor, scaleFactor);
-            
-            // Hide size preview
-            sizePreviewElement.style.display = 'none';
-            resizing = false;
-        }
-        
-        selectedBody = null;
-    });
-}
-
-// Get the body at a specific position
-function getBodyAtPosition(position) {
-    // Query all bodies in the world
-    const bodies = Matter.Composite.allBodies(world);
-    
-    // Find the body under the cursor
-    for (let i = 0; i < bodies.length; i++) {
-        const body = bodies[i];
-        
-        if (Matter.Bounds.contains(body.bounds, position)) {
-            const vertices = body.vertices;
-            
-            // Check if position is inside polygon
-            if (body.circleRadius) {
-                // For circles, check if distance to center is less than radius
-                const distance = Math.sqrt(
-                    Math.pow(position.x - body.position.x, 2) +
-                    Math.pow(position.y - body.position.y, 2)
-                );
-                
-                if (distance <= body.circleRadius) {
-                    return body;
-                }
-            } else {
-                // For polygons, check if point is inside
-                if (Matter.Vertices.contains(vertices, position)) {
-                    return body;
-                }
-            }
+        // Remove dead particles
+        if (particle.lifespan <= 0 || particle.size < 0.5) {
+            explosionParticles.splice(i, 1);
         }
     }
     
-    return null;
+    // Update trail particles
+    for (let i = trailParticles.length - 1; i >= 0; i--) {
+        const particle = trailParticles[i];
+        particle.lifespan--;
+        
+        if (particle.lifespan <= 0) {
+            trailParticles.splice(i, 1);
+        }
+    }
+    
+    // Add trail particles to moving bodies for smoother visuals
+    if (Math.random() < 0.3) { // Only add trails occasionally for performance
+        activeBodies.forEach(body => {
+            if (Vector.magnitude(body.velocity) > 1) {
+                const speed = Vector.magnitude(body.velocity);
+                
+                if (speed > 2) { // Only trail fast-moving objects
+                    const pos = body.position;
+                    const trailColor = body.render.fillStyle;
+                    const size = Math.min(5, Math.max(1, speed / 5));
+                    
+                    trailParticles.push(createTrailParticle(
+                        pos.x, 
+                        pos.y,
+                        trailColor,
+                        size
+                    ));
+                }
+            }
+        });
+    }
 }
 
-// Set up wind physics
-function setupWind() {
-    const toggleWindButton = document.getElementById('toggle-wind');
-    const windSlider = document.getElementById('wind-slider');
+// Create a smoother explosion
+function createExplosion(x, y, intensity = 1) {
+    const particleCount = Math.floor(25 * intensity);
+    const baseSize = 3 + (intensity * 2);
+    const baseSpeed = 1 + (intensity * 1.5);
     
-    // Check if wind UI elements exist before trying to use them
-    const windValueDisplay = document.querySelector('#wind-slider + .slider-header .slider-value');
-    const windIndicator = document.querySelector('.wind-indicator');
-    const windArrow = document.querySelector('.wind-arrow');
+    // Create main explosion particles
+    for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 10 * intensity;
+        const size = baseSize + Math.random() * 6;
+        
+        // Vary the speed based on particle size for more natural looking explosion
+        const speedVariation = 1 - (size / (baseSize + 6)) * 0.5;
+        const speed = baseSpeed * speedVariation + Math.random() * 2;
+        
+        const color = explosionColors[Math.floor(Math.random() * explosionColors.length)];
+        
+        const particle = createExplosionParticle(
+            x + Math.cos(angle) * distance,
+            y + Math.sin(angle) * distance,
+            color,
+            size,
+            speed,
+            angle
+        );
+        
+        // Add random variation to lifespans for more natural fading
+        const lifespanVariation = 0.8 + Math.random() * 0.4;
+        particle.lifespan = Math.floor(60 * lifespanVariation);
+        particle.maxLifespan = particle.lifespan;
+        
+        explosionParticles.push(particle);
+    }
     
-    // Safety check - don't proceed if required UI elements are missing
-    if (!toggleWindButton || !windSlider) {
-        console.warn('Wind control elements missing from the DOM');
+    // Add some tiny sparks for additional effect
+    for (let i = 0; i < particleCount/2; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = baseSpeed * 1.5 + Math.random() * 3;
+        const sparkSize = 1 + Math.random() * 2;
+        
+        const spark = createExplosionParticle(
+            x,
+            y,
+            '#ffffff',
+            sparkSize,
+            speed,
+            angle
+        );
+        
+        // Make sparks fade faster and more dynamically
+        const sparkLifespan = 20 + Math.floor(Math.random() * 20);
+        spark.maxLifespan = sparkLifespan;
+        spark.lifespan = sparkLifespan;
+        spark.gravity = 0.01; // Less gravity on sparks
+        
+        explosionParticles.push(spark);
+    }
+    
+    // Add shockwave effect
+    for (let i = 0; i < 20; i++) {
+        const angle = (i / 20) * Math.PI * 2;
+        const shockwave = createExplosionParticle(
+            x,
+            y,
+            'rgba(255, 255, 255, 0.5)',
+            2 + intensity * 2,
+            2 + intensity,
+            angle
+        );
+        
+        shockwave.maxLifespan = 15;
+        shockwave.lifespan = 15;
+        shockwave.gravity = 0;
+        
+        explosionParticles.push(shockwave);
+    }
+}
+
+// Handle collision effects with smoother transitions
+function handleCollision(event) {
+    const pairs = event.pairs;
+    
+    for (let i = 0; i < pairs.length; i++) {
+        const bodyA = pairs[i].bodyA;
+        const bodyB = pairs[i].bodyB;
+        
+        // Calculate collision strength for proportional effects
+        const relativeVelocity = {
+            x: bodyA.velocity.x - bodyB.velocity.x,
+            y: bodyA.velocity.y - bodyB.velocity.y
+        };
+        const collisionSpeed = Math.sqrt(relativeVelocity.x * relativeVelocity.x + relativeVelocity.y * relativeVelocity.y);
+        const impactThreshold = 2; // Minimum speed for effects
+        
+        // Skip if collision is too gentle or between boundaries
+        if (collisionSpeed < impactThreshold || (boundaries.includes(bodyA) && boundaries.includes(bodyB))) {
+            continue;
+        }
+        
+        // Normalized impact force (0-1 range)
+        const impactForce = Math.min(1, collisionSpeed / 10);
+        
+        // Collision point
+        const midX = (bodyA.position.x + bodyB.position.x) / 2;
+        const midY = (bodyA.position.y + bodyB.position.y) / 2;
+        
+        // Apply different collision effects based on selection
+        switch(currentEffect) {
+            case 'bounce':
+                // Enhanced bounce with smooth scaling
+                if (!boundaries.includes(bodyA)) {
+                    const velocityA = Vector.mult(Vector.normalise(bodyA.velocity), bodyA.speed * (1 + impactForce * 0.3));
+                    Body.setVelocity(bodyA, velocityA);
+                }
+                if (!boundaries.includes(bodyB)) {
+                    const velocityB = Vector.mult(Vector.normalise(bodyB.velocity), bodyB.speed * (1 + impactForce * 0.3));
+                    Body.setVelocity(bodyB, velocityB);
+                }
+                
+                // Add tiny spark at collision point for visual feedback
+                if (impactForce > 0.3) {
+                    for (let j = 0; j < 3; j++) {
+                        const sparkAngle = Math.random() * Math.PI * 2;
+                        const spark = createExplosionParticle(
+                            midX, midY, 
+                            '#ffffff', 
+                            1 + impactForce * 2,
+                            1 + impactForce * 2, 
+                            sparkAngle
+                        );
+                        spark.maxLifespan = 10;
+                        spark.lifespan = 10;
+                        explosionParticles.push(spark);
+                    }
+                }
+                break;
+                
+            case 'explode':
+                // Create smooth visual explosion effect
+                if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
+                    // Create visual explosion scaled by impact force
+                    const intensity = 0.5 + impactForce * 2.5;
+                    createExplosion(midX, midY, intensity);
+                    
+                    // Create physical particles
+                    const particleCount = Math.floor(impactForce * 4) + 1;
+                    for (let j = 0; j < particleCount; j++) {
+                        const particle = Bodies.circle(
+                            midX + Common.random(-5, 5),
+                            midY + Common.random(-5, 5),
+                            Common.random(2, 4 + impactForce * 2),
+                            {
+                                restitution: 0.8,
+                                friction: 0.05,
+                                frictionAir: 0.005,
+                                render: {
+                                    fillStyle: explosionColors[Math.floor(Math.random() * explosionColors.length)],
+                                    opacity: 0.8
+                                }
+                            }
+                        );
+                        
+                        // Scale force by impact strength
+                        const forceMagnitude = 0.01 + (impactForce * 0.03);
+                        const angle = Math.random() * Math.PI * 2;
+                        Body.applyForce(particle, particle.position, {
+                            x: forceMagnitude * Math.cos(angle),
+                            y: forceMagnitude * Math.sin(angle)
+                        });
+                        
+                        activeBodies.push(particle);
+                        Composite.add(world, particle);
+                        
+                        // Remove particles with a slight delay variance
+                        const removeDelay = 1500 + Math.random() * 1000;
+                        setTimeout(() => {
+                            if (activeBodies.includes(particle)) {
+                                // Fade out particles before removing them
+                                const fadeInterval = setInterval(() => {
+                                    if (particle.render.opacity > 0.1) {
+                                        particle.render.opacity -= 0.1;
+                                    } else {
+                                        clearInterval(fadeInterval);
+                                        Composite.remove(world, particle);
+                                        activeBodies = activeBodies.filter(body => body !== particle);
+                                    }
+                                }, 50);
+                            }
+                        }, removeDelay);
+                    }
+                }
+                break;
+                
+            case 'stick':
+                // Make bodies stick together with smooth attraction
+                if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
+                    // Scale force by body mass and impact
+                    const baseForce = 0.0005;
+                    const forceMagnitude = baseForce * (1 + impactForce);
+                    
+                    const direction = Vector.sub(bodyB.position, bodyA.position);
+                    const distance = Vector.magnitude(direction);
+                    
+                    if (distance > 0) {
+                        const normalizedDirection = Vector.normalise(direction);
+                        
+                        // Apply scaled forces
+                        Body.applyForce(bodyA, bodyA.position, 
+                            Vector.mult(normalizedDirection, forceMagnitude * bodyA.mass));
+                        
+                        Body.applyForce(bodyB, bodyB.position, 
+                            Vector.mult(normalizedDirection, -forceMagnitude * bodyB.mass));
+                        
+                        // Add visual connection effect
+                        if (Math.random() < 0.2) {
+                            const particlePos = Vector.add(
+                                bodyA.position,
+                                Vector.mult(normalizedDirection, distance * 0.3)
+                            );
+                            
+                            const connectionParticle = createExplosionParticle(
+                                particlePos.x, 
+                                particlePos.y,
+                                'rgba(61, 220, 132, 0.7)',
+                                2 + Math.random() * 2,
+                                0.2,
+                                Math.random() * Math.PI * 2
+                            );
+                            
+                            connectionParticle.maxLifespan = 20;
+                            connectionParticle.lifespan = 20;
+                            connectionParticle.gravity = 0;
+                            
+                            explosionParticles.push(connectionParticle);
+                        }
+                    }
+                }
+                break;
+                
+            case 'gravity':
+                // Smoothly change gravity direction on collision
+                if (!boundaries.includes(bodyA) || !boundaries.includes(bodyB)) {
+                    // Generate random angle weighted by impact force
+                    const startAngle = Math.atan2(world.gravity.y, world.gravity.x);
+                    const angleChange = (Math.random() - 0.5) * Math.PI * impactForce * 2;
+                    const newAngle = startAngle + angleChange;
+                    
+                    // Store current gravity values
+                    const oldGravityX = world.gravity.x;
+                    const oldGravityY = world.gravity.y;
+                    
+                    // Target gravity values
+                    const targetGravityX = Math.sin(newAngle) * 0.001;
+                    const targetGravityY = Math.cos(newAngle) * 0.001;
+                    
+                    // Smoothly transition gravity
+                    const transitionSteps = 20;
+                    const transitionDelay = 50;
+                    
+                    for (let step = 0; step <= transitionSteps; step++) {
+                        setTimeout(() => {
+                            const progress = step / transitionSteps;
+                            // Use easeInOutQuad for smooth transition
+                            const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                            
+                            world.gravity.x = oldGravityX + (targetGravityX - oldGravityX) * easing;
+                            world.gravity.y = oldGravityY + (targetGravityY - oldGravityY) * easing;
+                        }, step * transitionDelay);
+                    }
+                    
+                    // Gravity wave visual effect
+                    for (let i = 0; i < 24; i++) {
+                        const angle = (i / 24) * Math.PI * 2;
+                        const gravityWave = createExplosionParticle(
+                            midX,
+                            midY,
+                            'rgba(108, 34, 189, 0.4)',
+                            5 + Math.random() * 5,
+                            0.5 + impactForce,
+                            angle
+                        );
+                        
+                        gravityWave.maxLifespan = 30;
+                        gravityWave.lifespan = 30;
+                        gravityWave.gravity = 0;
+                        
+                        explosionParticles.push(gravityWave);
+                    }
+                    
+                    // Reset gravity after a delay with smooth transition back
+                    const resetDelay = 1500 + impactForce * 1000;
+                    setTimeout(() => {
+                        const finalGravityX = world.gravity.x;
+                        const finalGravityY = world.gravity.y;
+                        
+                        for (let step = 0; step <= transitionSteps; step++) {
+                            setTimeout(() => {
+                                const progress = step / transitionSteps;
+                                // Use easeInOutQuad for smooth transition
+                                const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                                
+                                world.gravity.x = finalGravityX * (1 - easing);
+                                world.gravity.y = 1 * easing + finalGravityY * (1 - easing);
+                            }, step * transitionDelay);
+                        }
+                    }, resetDelay);
+                }
+                break;
+        }
+    }
+}
+
+// Custom render function with smoother animations
+Events.on(render, 'afterRender', function() {
+    updateExplosionParticles();
+    renderExplosionParticles(render);
+});
+
+// Event listeners for smoother collision detection
+Events.on(engine, 'collisionStart', handleCollision);
+
+// Smoother mouse controls
+const mouse = Mouse.create(render.canvas);
+const mouseConstraint = MouseConstraint.create(engine, {
+    mouse: mouse,
+    constraint: {
+        stiffness: 0.1,  // Softer constraint for smoother dragging
+        damping: 0.1,    // Add damping for smoother movement
+        render: {
+            visible: false
+        }
+    }
+});
+
+// Scale mouse position for retina displays
+mouse.pixelRatio = pixelRatio;
+
+Composite.add(world, mouseConstraint);
+render.mouse = mouse;
+
+// Add a smooth grabbing animation when using mouse
+Events.on(mouseConstraint, 'startdrag', function(event) {
+    const body = event.body;
+    createRippleEffect(body.position.x, body.position.y);
+});
+
+// Setup event listeners for buttons with smoother transitions
+document.querySelectorAll('.effect-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        // Update active effect with visual feedback
+        document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        
+        const newEffect = button.getAttribute('data-effect');
+        
+        // Only add effect if changing
+        if (newEffect !== currentEffect) {
+            currentEffect = newEffect;
+            
+            // Add visual ripple in canvas to indicate mode change
+            const x = canvas.width / (2 * pixelRatio);
+            const y = canvas.height / (2 * pixelRatio);
+            
+            // Different colors for different effects
+            let effectColor;
+            switch(currentEffect) {
+                case 'bounce': effectColor = '#3ddc84'; break;
+                case 'explode': effectColor = '#ff7b54'; break;
+                case 'stick': effectColor = '#6c22bd'; break;
+                case 'gravity': effectColor = '#ffb26b'; break;
+                default: effectColor = '#ffffff';
+            }
+            
+            // Create mode change effect
+            for (let i = 0; i < 36; i++) {
+                const angle = (i / 36) * Math.PI * 2;
+                const modeParticle = createExplosionParticle(
+                    x, y,
+                    effectColor,
+                    8,
+                    3,
+                    angle
+                );
+                
+                modeParticle.maxLifespan = 40;
+                modeParticle.lifespan = 40;
+                modeParticle.gravity = 0;
+                
+                explosionParticles.push(modeParticle);
+            }
+        }
+    });
+});
+
+// Setup add shape buttons with smoother object creation
+document.getElementById('add-circle').addEventListener('click', () => {
+    createBody(canvas.width / (2 * pixelRatio), 50, 'circle');
+});
+
+document.getElementById('add-square').addEventListener('click', () => {
+    createBody(canvas.width / (2 * pixelRatio), 50, 'square');
+});
+
+document.getElementById('add-polygon').addEventListener('click', () => {
+    createBody(canvas.width / (2 * pixelRatio), 50, 'polygon');
+});
+
+// Reset scene with smooth animation
+document.getElementById('reset-scene').addEventListener('click', () => {
+    // Animate removal of bodies for smoother effect
+    const removalDelay = 20;
+    
+    activeBodies.forEach((body, index) => {
+        setTimeout(() => {
+            // Create a small explosion where the body was
+            createExplosion(body.position.x, body.position.y, 0.5);
+            
+            // Remove the body
+            Composite.remove(world, body);
+            
+            // If this is the last body, clear the array
+            if (index === activeBodies.length - 1) {
+                activeBodies = [];
+            }
+        }, index * removalDelay);
+    });
+    
+    // Reset gravity with a smooth transition
+    const steps = 20;
+    const currentGravX = world.gravity.x;
+    const currentGravY = world.gravity.y;
+    
+    for (let i = 0; i <= steps; i++) {
+        setTimeout(() => {
+            const progress = i / steps;
+            world.gravity.x = currentGravX * (1 - progress);
+            world.gravity.y = currentGravY * (1 - progress) + progress;
+        }, i * 20);
+    }
+});
+
+// Toggle gravity with smooth transition
+document.getElementById('toggle-gravity').addEventListener('click', () => {
+    const targetY = world.gravity.y === 1 ? 0 : 1;
+    const currentY = world.gravity.y;
+    const steps = 15;
+    
+    for (let i = 0; i <= steps; i++) {
+        setTimeout(() => {
+            const progress = i / steps;
+            // Use easing function for smoother transition
+            const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            world.gravity.y = currentY + (targetY - currentY) * easing;
+        }, i * 20);
+    }
+    
+    // Visual feedback for gravity change
+    const x = canvas.width / (2 * pixelRatio);
+    const y = canvas.height / (2 * pixelRatio);
+    
+    for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * Math.PI * 2;
+        const gravParticle = createExplosionParticle(
+            x, y,
+            targetY === 0 ? 'rgba(61, 220, 132, 0.7)' : 'rgba(108, 34, 189, 0.7)',
+            5,
+            2,
+            angle
+        );
+        
+        gravParticle.maxLifespan = 30;
+        gravParticle.lifespan = 30;
+        gravParticle.gravity = 0;
+        
+        explosionParticles.push(gravParticle);
+    }
+});
+
+// Handle resize with smoother transitions
+window.addEventListener('resize', () => {
+    // Remove old boundaries
+    boundaries.forEach(boundary => {
+        Composite.remove(world, boundary);
+    });
+    
+    // Update canvas dimensions
+    canvas.width = canvasContainer.offsetWidth * pixelRatio;
+    canvas.height = canvasContainer.offsetHeight * pixelRatio;
+    canvas.style.width = `${canvasContainer.offsetWidth}px`;
+    canvas.style.height = `${canvasContainer.offsetHeight}px`;
+    
+    // Update renderer dimensions
+    render.options.width = canvas.width;
+    render.options.height = canvas.height;
+    
+    // Create new boundaries
+    createBoundaries();
+});
+
+// Add click handler for canvas to create random shapes
+canvas.addEventListener('click', (event) => {
+    // Prevent click from being captured if we're dragging an object
+    if (mouseConstraint.body) {
         return;
     }
     
-    // Update wind strength display if the element exists
-    if (windSlider && windValueDisplay) {
-        windSlider.addEventListener('input', function() {
-            windStrength = parseFloat(this.value);
-            windValueDisplay.textContent = windStrength.toFixed(2);
-        });
-        
-        // Initialize wind value display
-        windValueDisplay.textContent = windSlider.value;
-    }
+    // Get click position relative to canvas, adjusted for pixelRatio
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * pixelRatio;
+    const y = (event.clientY - rect.top) * pixelRatio;
     
-    toggleWindButton.addEventListener('click', function() {
-        windEnabled = !windEnabled;
-        this.classList.toggle('active');
-        
-        if (windEnabled) {
-            // Show wind indicator if it exists
-            if (windIndicator) {
-                windIndicator.classList.add('visible');
-            }
-            
-            // Start wind interval
-            clearInterval(windInterval);
-            windInterval = setInterval(function() {
-                // Randomly vary wind strength
-                const variation = (Math.random() * 2 - 1) * windVariability;
-                windStrength = parseFloat(windSlider.value) + variation;
-                
-                // Randomly change direction occasionally
-                if (Math.random() < 0.03) {
-                    windDirection *= -1;
-                }
-                
-                // Calculate wind force
-                windForce = windStrength * windDirection;
-                
-                // Update wind indicator if it exists
-                if (windArrow) {
-                    windArrow.style.transform = windDirection > 0 ? 'scaleX(1)' : 'scaleX(-1)';
-                    windArrow.style.width = (40 + Math.abs(windForce) * 60) + '%';
-                }
-                
-                // Apply wind force to all bodies
-                const bodies = Matter.Composite.allBodies(world);
-                for (let i = 0; i < bodies.length; i++) {
-                    const body = bodies[i];
-                    if (!body.isStatic) {
-                        const area = body.circleRadius ? 
-                                    Math.PI * body.circleRadius * body.circleRadius : 
-                                    (body.bounds.max.x - body.bounds.min.x) * (body.bounds.max.y - body.bounds.min.y);
-                        
-                        const forceMagnitude = area * 0.001 * windForce;
-                        Matter.Body.applyForce(body, body.position, { x: forceMagnitude, y: 0 });
-                    }
-                }
-            }, 100);
-        } else {
-            // Hide wind indicator if it exists
-            if (windIndicator) {
-                windIndicator.classList.remove('visible');
-            }
-            
-            // Clear wind interval
-            clearInterval(windInterval);
-            windInterval = null;
-        }
-    });
-}
-
-// Setup shape creation functions
-function setupShapeCreation() {
-    const canvas = document.getElementById('physics-canvas');
-    const colorPicker = document.getElementById('shape-color');
+    // Create a random shape at click position
+    const shapeTypes = ['circle', 'square', 'polygon'];
+    const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
     
-    // Direct function to create shapes when buttons are clicked
-    function createShapeAtCenter(shapeType) {
-        // Get center of visible area
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 3; // Higher up so it can fall
-        const position = { x: centerX, y: centerY };
-        const color = colorPicker.value;
-        
-        // Create the selected shape
-        switch(shapeType) {
-            case 'circle':
-                createCircle(position, color);
-                break;
-            case 'rectangle':
-                createRectangle(position, color);
-                break;
-            case 'polygon':
-                createPolygon(position, color);
-                break;
-            case 'square':
-                createSquare(position, color);
-                break;
-            case 'star':
-                createStar(position, color);
-                break;
-        }
-    }
+    // Create the body with a small animation
+    createBody(x, y, randomType);
     
-    // Add event listeners for shape buttons with direct creation
-    document.getElementById('add-circle').addEventListener('click', function(event) {
-        // Stop event propagation
-        event.stopPropagation();
-        
-        // Set the current mode
-        cursorMode = false;
-        attractorMode = false;
-        portalMode = false;
-        explosionMode = false;
-        currentMode = 'add-circle';
-        
-        // Update UI
-        document.getElementById('cursor-mode').classList.remove('active');
-        document.getElementById('toggle-attractor').classList.remove('active');
-        document.getElementById('toggle-portal').classList.remove('active');
-        document.getElementById('create-explosion').classList.remove('active');
-        
-        // Highlight active shape button
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Create a circle immediately
-        createShapeAtCenter('circle');
-        
-        console.log('Circle created');
-    });
-    
-    document.getElementById('add-rectangle').addEventListener('click', function(event) {
-        // Stop event propagation
-        event.stopPropagation();
-        
-        // Set the current mode
-        cursorMode = false;
-        attractorMode = false;
-        portalMode = false;
-        explosionMode = false;
-        currentMode = 'add-rectangle';
-        
-        // Update UI
-        document.getElementById('cursor-mode').classList.remove('active');
-        document.getElementById('toggle-attractor').classList.remove('active');
-        document.getElementById('toggle-portal').classList.remove('active');
-        document.getElementById('create-explosion').classList.remove('active');
-        
-        // Highlight active shape button
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Create a rectangle immediately
-        createShapeAtCenter('rectangle');
-        
-        console.log('Rectangle created');
-    });
-    
-    document.getElementById('add-polygon').addEventListener('click', function(event) {
-        // Stop event propagation
-        event.stopPropagation();
-        
-        // Set the current mode
-        cursorMode = false;
-        attractorMode = false;
-        portalMode = false;
-        explosionMode = false;
-        currentMode = 'add-polygon';
-        
-        // Update UI
-        document.getElementById('cursor-mode').classList.remove('active');
-        document.getElementById('toggle-attractor').classList.remove('active');
-        document.getElementById('toggle-portal').classList.remove('active');
-        document.getElementById('create-explosion').classList.remove('active');
-        
-        // Highlight active shape button
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Create a polygon immediately
-        createShapeAtCenter('polygon');
-        
-        console.log('Polygon created');
-    });
-    
-    document.getElementById('add-square').addEventListener('click', function(event) {
-        // Stop event propagation
-        event.stopPropagation();
-        
-        // Set the current mode
-        cursorMode = false;
-        attractorMode = false;
-        portalMode = false;
-        explosionMode = false;
-        currentMode = 'add-square';
-        
-        // Update UI
-        document.getElementById('cursor-mode').classList.remove('active');
-        document.getElementById('toggle-attractor').classList.remove('active');
-        document.getElementById('toggle-portal').classList.remove('active');
-        document.getElementById('create-explosion').classList.remove('active');
-        
-        // Highlight active shape button
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Create a square immediately
-        createShapeAtCenter('square');
-        
-        console.log('Square created');
-    });
-    
-    document.getElementById('add-star').addEventListener('click', function(event) {
-        // Stop event propagation
-        event.stopPropagation();
-        
-        // Set the current mode
-        cursorMode = false;
-        attractorMode = false;
-        portalMode = false;
-        explosionMode = false;
-        currentMode = 'add-star';
-        
-        // Update UI
-        document.getElementById('cursor-mode').classList.remove('active');
-        document.getElementById('toggle-attractor').classList.remove('active');
-        document.getElementById('toggle-portal').classList.remove('active');
-        document.getElementById('create-explosion').classList.remove('active');
-        
-        // Highlight active shape button
-        document.querySelectorAll('.shape-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-        
-        // Create a star immediately
-        createShapeAtCenter('star');
-        
-        console.log('Star created');
-    });
-    
-    // Canvas click handler for creating additional shapes
-    canvas.addEventListener('click', function(event) {
-        // Check if we clicked on the control panel
-        const controlsPanel = document.querySelector('.controls-panel');
-        const rect = controlsPanel.getBoundingClientRect();
-        
-        // Don't create shapes if we clicked on controls or are in other modes
-        if (event.clientX >= rect.left && event.clientX <= rect.right &&
-            event.clientY >= rect.top && event.clientY <= rect.bottom ||
-            cursorMode || attractorMode || portalMode || explosionMode) {
-            return;
-        }
-        
-        const mousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
-        
-        // Create different shapes based on current mode
-        const color = colorPicker.value;
-        
-        switch (currentMode) {
-            case 'add-circle':
-                createCircle(mousePosition, color);
-                break;
-            case 'add-rectangle':
-                createRectangle(mousePosition, color);
-                break;
-            case 'add-polygon':
-                createPolygon(mousePosition, color);
-                break;
-            case 'add-square':
-                createSquare(mousePosition, color);
-                break;
-            case 'add-star':
-                createStar(mousePosition, color);
-                break;
-        }
-    });
-}
-
-// Create a circle at the specified position
-function createCircle(position, color) {
-    const radius = 30 + Math.random() * 20;
-    const circle = Matter.Bodies.circle(position.x, position.y, radius, {
-        restitution: 0.3 + Math.random() * 0.2, // Moderate bounce, varied slightly
-        friction: 0.2 + Math.random() * 0.4,    // Moderate to high friction
-        frictionAir: 0.002,                     // Slightly higher air resistance
-        density: 0.002 + Math.random() * 0.001, // Realistic density
-        render: {
-            fillStyle: color,
-            strokeStyle: '#000000',
-            lineWidth: 1
-        }
-    });
-    
-    Matter.Composite.add(world, circle);
-}
-
-// Create a rectangle at the specified position
-function createRectangle(position, color) {
-    const width = 40 + Math.random() * 40;
-    const height = 40 + Math.random() * 40;
-    const rectangle = Matter.Bodies.rectangle(position.x, position.y, width, height, {
-        restitution: 0.2 + Math.random() * 0.15, // Lower bounce for rectangles
-        friction: 0.3 + Math.random() * 0.3,     // Higher friction
-        frictionAir: 0.001 + Math.random() * 0.002, // Varied air resistance
-        density: 0.0015 + Math.random() * 0.001,    // Realistic density
-        render: {
-            fillStyle: color,
-            strokeStyle: '#000000',
-            lineWidth: 1
-        }
-    });
-    
-    Matter.Composite.add(world, rectangle);
-}
-
-// Create a polygon at the specified position
-function createPolygon(position, color) {
-    const sides = Math.floor(3 + Math.random() * 5); // 3 to 7 sides
-    const radius = 30 + Math.random() * 20;
-    const polygon = Matter.Bodies.polygon(position.x, position.y, sides, radius, {
-        restitution: 0.2 + Math.random() * 0.1, // Low bounce for polygons
-        friction: 0.4 + Math.random() * 0.3,    // High friction
-        frictionAir: 0.001 + Math.random() * 0.001, // Some air resistance
-        density: 0.002 + Math.random() * 0.002,     // Varied density
-        render: {
-            fillStyle: color,
-            strokeStyle: '#000000',
-            lineWidth: 1
-        }
-    });
-    
-    Matter.Composite.add(world, polygon);
-}
-
-// Create a square at the specified position
-function createSquare(position, color) {
-    const size = 40 + Math.random() * 20; // Size between 40-60px
-    const square = Matter.Bodies.rectangle(position.x, position.y, size, size, {
-        restitution: 0.1 + Math.random() * 0.2, // Low to moderate bounce
-        friction: 0.3 + Math.random() * 0.4,    // Moderate to high friction
-        frictionAir: 0.001,                     // Normal air resistance
-        density: 0.002 + Math.random() * 0.001, // Slightly heavier
-        render: {
-            fillStyle: color,
-            strokeStyle: '#000000',
-            lineWidth: 1
-        }
-    });
-    
-    Matter.Composite.add(world, square);
-}
-
-// Create a star shape at the specified position
-function createStar(position, color) {
-    const outerRadius = 30 + Math.random() * 15;
-    const innerRadius = outerRadius * 0.4;
-    const numPoints = 5;
-    
-    // Create vertices for a star shape
-    const vertices = [];
-    for (let i = 0; i < numPoints * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * i) / numPoints;
-        vertices.push({
-            x: position.x + radius * Math.sin(angle),
-            y: position.y + radius * Math.cos(angle)
-        });
-    }
-    
-    const star = Matter.Bodies.fromVertices(position.x, position.y, [vertices], {
-        restitution: 0.2,         // Low bounce
-        friction: 0.4,            // High friction due to points
-        frictionAir: 0.002,       // Higher air resistance due to shape
-        density: 0.001,           // Light
-        render: {
-            fillStyle: color,
-            strokeStyle: '#000000',
-            lineWidth: 1
-        }
-    });
-    
-    Matter.Composite.add(world, star);
-}
-
-// Setup special physics modes (attractor, portal, explosion)
-function setupSpecialModes() {
-    const canvas = document.getElementById('physics-canvas');
-    
-    // Attractor mode
-    document.getElementById('toggle-attractor').addEventListener('click', function() {
-        attractorMode = !attractorMode;
-        this.classList.toggle('active');
-        
-        if (attractorMode) {
-            // Deactivate other modes
-            cursorMode = false;
-            portalMode = false;
-            explosionMode = false;
-            currentMode = 'attractor-mode';
-            
-            // Update UI to reflect mode change
-            document.getElementById('cursor-mode').classList.remove('active');
-            document.getElementById('toggle-portal').classList.remove('active');
-            document.getElementById('create-explosion').classList.remove('active');
-            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
-            
-            // If there's an existing attractor, remove it
-            if (attractor) {
-                Matter.Composite.remove(world, attractor);
-                attractor = null;
-            }
-        }
-    });
-    
-    // Portal mode
-    document.getElementById('toggle-portal').addEventListener('click', function() {
-        portalMode = !portalMode;
-        this.classList.toggle('active');
-        
-        if (portalMode) {
-            // Deactivate other modes
-            cursorMode = false;
-            attractorMode = false;
-            explosionMode = false;
-            currentMode = 'portal-mode';
-            
-            // Update UI to reflect mode change
-            document.getElementById('cursor-mode').classList.remove('active');
-            document.getElementById('toggle-attractor').classList.remove('active');
-            document.getElementById('create-explosion').classList.remove('active');
-            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
-            
-            // Reset portal points
-            portal = { source: null, destination: null };
-        }
-    });
-    
-    // Explosion mode
-    document.getElementById('create-explosion').addEventListener('click', function() {
-        explosionMode = !explosionMode;
-        this.classList.toggle('active');
-        
-        if (explosionMode) {
-            // Deactivate other modes
-            cursorMode = false;
-            attractorMode = false;
-            portalMode = false;
-            currentMode = 'explosion-mode';
-            
-            // Update UI to reflect mode change
-            document.getElementById('cursor-mode').classList.remove('active');
-            document.getElementById('toggle-attractor').classList.remove('active');
-            document.getElementById('toggle-portal').classList.remove('active');
-            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
-        }
-    });
-    
-    // Handle mouse click for special modes
-    canvas.addEventListener('click', function(event) {
-        const mousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
-        
-        if (attractorMode) {
-            createAttractor(mousePosition);
-        } else if (portalMode) {
-            createPortal(mousePosition);
-        } else if (explosionMode) {
-            createExplosion(mousePosition);
-        }
-    });
-    
-    // Apply attractor force in update loop
-    Matter.Events.on(engine, 'beforeUpdate', function() {
-        if (attractor) {
-            const bodies = Matter.Composite.allBodies(world);
-            
-            bodies.forEach(body => {
-                if (body !== attractor && !body.isStatic) {
-                    // Calculate direction vector
-                    const direction = {
-                        x: attractor.position.x - body.position.x,
-                        y: attractor.position.y - body.position.y
-                    };
-                    
-                    // Calculate distance
-                    const distance = Math.sqrt(
-                        direction.x * direction.x + direction.y * direction.y
-                    );
-                    
-                    // Normalize direction vector
-                    if (distance > 0) {
-                        direction.x /= distance;
-                        direction.y /= distance;
-                    }
-                    
-                    // Apply force with falloff based on distance
-                    const forceMagnitude = Math.min(attractorStrength * body.mass / (distance * 0.1), 0.5);
-                    Matter.Body.applyForce(body, body.position, {
-                        x: direction.x * forceMagnitude,
-                        y: direction.y * forceMagnitude
-                    });
-                }
-            });
-        }
-    });
-    
-    // Handle portal teleportation
-    Matter.Events.on(engine, 'afterUpdate', function() {
-        if (portal.source && portal.destination) {
-            const bodies = Matter.Composite.allBodies(world);
-            
-            bodies.forEach(body => {
-                if (!body.isStatic && body !== portal.source && body !== portal.destination) {
-                    // Check if body is near source portal
-                    const distanceToSource = Math.sqrt(
-                        Math.pow(body.position.x - portal.source.position.x, 2) +
-                        Math.pow(body.position.y - portal.source.position.y, 2)
-                    );
-                    
-                    // If body is close to source portal, teleport to destination
-                    if (distanceToSource < portal.source.circleRadius * 1.2) {
-                        // Apply slight velocity change to prevent immediate teleportation back
-                        const velocityFactor = 1.05;
-                        
-                        // Set new position and adjust velocity slightly
-                        Matter.Body.setPosition(body, {
-                            x: portal.destination.position.x,
-                            y: portal.destination.position.y
-                        });
-                        
-                        Matter.Body.setVelocity(body, {
-                            x: body.velocity.x * velocityFactor,
-                            y: body.velocity.y * velocityFactor
-                        });
-                    }
-                }
-            });
-        }
-    });
-}
-
-// Create attractor at the specified position
-function createAttractor(position) {
-    // Remove existing attractor if there is one
-    if (attractor) {
-        Matter.Composite.remove(world, attractor);
-    }
-    
-    // Create the attractor body
-    attractor = Matter.Bodies.circle(position.x, position.y, 25, {
-        isStatic: true,
-        collisionFilter: { group: -1 }, // No collision with other bodies
-        render: {
-            fillStyle: '#FF5722',
-            lineWidth: 0,
-            sprite: {
-                texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(255,87,34,1)" /><stop offset="100%" stop-color="rgba(255,87,34,0)" /></radialGradient><circle cx="25" cy="25" r="25" fill="url(%23grad)" /></svg>',
-                xScale: 2,
-                yScale: 2
-            }
-        },
-        label: 'attractor'
-    });
-    
-    Matter.Composite.add(world, attractor);
-}
-
-// Create portal at the specified position
-function createPortal(position) {
-    if (!portal.source) {
-        // Create source portal
-        portal.source = Matter.Bodies.circle(position.x, position.y, 30, {
-            isStatic: true,
-            collisionFilter: { group: -1 }, // No collision with other bodies
-            render: {
-                fillStyle: '#3F51B5',
-                sprite: {
-                    texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(63,81,181,1)" /><stop offset="100%" stop-color="rgba(63,81,181,0.3)" /></radialGradient><circle cx="30" cy="30" r="30" fill="url(%23grad)" /></svg>',
-                    xScale: 2,
-                    yScale: 2
-                }
-            },
-            label: 'portal'
-        });
-        
-        Matter.Composite.add(world, portal.source);
-    } else if (!portal.destination) {
-        // Create destination portal
-        portal.destination = Matter.Bodies.circle(position.x, position.y, 30, {
-            isStatic: true,
-            collisionFilter: { group: -1 }, // No collision with other bodies
-            render: {
-                fillStyle: '#9C27B0',
-                sprite: {
-                    texture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" stop-color="rgba(156,39,176,1)" /><stop offset="100%" stop-color="rgba(156,39,176,0.3)" /></radialGradient><circle cx="30" cy="30" r="30" fill="url(%23grad)" /></svg>',
-                    xScale: 2,
-                    yScale: 2
-                }
-            },
-            label: 'portal'
-        });
-        
-        Matter.Composite.add(world, portal.destination);
-    }
-}
-
-// Create explosion at the specified position
-function createExplosion(position) {
-    const radius = 150; // Explosion radius
-    const bodies = Matter.Composite.allBodies(world);
-    
-    // Create visual effect
-    const explosionEffect = document.createElement('div');
-    explosionEffect.className = 'explosion-effect';
-    explosionEffect.style.left = (position.x - radius) + 'px';
-    explosionEffect.style.top = (position.y - radius) + 'px';
-    explosionEffect.style.width = (radius * 2) + 'px';
-    explosionEffect.style.height = (radius * 2) + 'px';
-    document.body.appendChild(explosionEffect);
-    
-    // Fade out and remove the effect
-    setTimeout(() => {
-        explosionEffect.style.opacity = '0';
+    // Add a larger ripple effect for visual feedback
+    for (let i = 0; i < 8; i++) {
         setTimeout(() => {
-            document.body.removeChild(explosionEffect);
-        }, 500);
-    }, 100);
-    
-    // Apply force to all bodies within radius
-    bodies.forEach(body => {
-        if (!body.isStatic) {
-            const distance = Math.sqrt(
-                Math.pow(body.position.x - position.x, 2) +
-                Math.pow(body.position.y - position.y, 2)
-            );
-            
-            if (distance < radius) {
-                // Calculate direction vector
-                const direction = {
-                    x: body.position.x - position.x,
-                    y: body.position.y - position.y
-                };
-                
-                // Normalize direction vector
-                const magnitude = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
-                if (magnitude > 0) {
-                    direction.x /= magnitude;
-                    direction.y /= magnitude;
-                }
-                
-                // Force decreases with distance
-                const forceMagnitude = 0.15 * body.mass * (1 - distance / radius);
-                
-                // Apply explosion force
-                Matter.Body.applyForce(body, body.position, {
-                    x: direction.x * forceMagnitude,
-                    y: direction.y * forceMagnitude
-                });
-            }
-        }
-    });
-}
-
-// Setup gravity zone mode
-function setupGravityZoneMode() {
-    const canvas = document.getElementById('physics-canvas');
-    const toggleGravityZone = document.getElementById('toggle-gravity-zone');
-    
-    toggleGravityZone.addEventListener('click', function() {
-        gravityZoneMode = !gravityZoneMode;
-        this.classList.toggle('active');
-        
-        if (gravityZoneMode) {
-            // Deactivate other modes
-            cursorMode = false;
-            attractorMode = false;
-            portalMode = false;
-            explosionMode = false;
-            currentMode = 'gravity-zone-mode';
-            
-            // Update UI to reflect mode change
-            document.getElementById('cursor-mode').classList.remove('active');
-            document.getElementById('toggle-attractor').classList.remove('active');
-            document.getElementById('toggle-portal').classList.remove('active');
-            document.getElementById('create-explosion').classList.remove('active');
-            document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('active'));
-        }
-    });
-    
-    canvas.addEventListener('click', function(event) {
-        if (!gravityZoneMode) return;
-        
-        const mousePosition = {
-            x: event.clientX,
-            y: event.clientY
-        };
-        
-        createGravityZone(mousePosition);
-    });
-}
-
-// Create a gravity zone at the specified position
-function createGravityZone(position) {
-    const radius = 100;
-    const gravityZone = Matter.Bodies.circle(position.x, position.y, radius, {
-        isStatic: true,
-        collisionFilter: { group: -1 }, // No collision with other bodies
-        render: {
-            fillStyle: 'rgba(76, 175, 80, 0.2)',
-            strokeStyle: '#4CAF50',
-            lineWidth: 2
-        },
-        label: 'gravity-zone'
-    });
-    
-    // Customize gravity direction within this zone
-    gravityZone.gravityDirection = { x: Math.random() * 2 - 1, y: Math.random() * 2 - 1 };
-    
-    Matter.Composite.add(world, gravityZone);
-    
-    // Add gravity zone effect to beforeUpdate event
-    Matter.Events.on(engine, 'beforeUpdate', function() {
-        const bodies = Matter.Composite.allBodies(world);
-        const gravityZones = bodies.filter(body => body.label === 'gravity-zone');
-        
-        for (const zone of gravityZones) {
-            bodies.forEach(body => {
-                if (!body.isStatic && body.label !== 'gravity-zone') {
-                    // Check if body is inside gravity zone
-                    const distance = Math.sqrt(
-                        Math.pow(body.position.x - zone.position.x, 2) +
-                        Math.pow(body.position.y - zone.position.y, 2)
-                    );
-                    
-                    if (distance < zone.circleRadius) {
-                        // Apply custom gravity force
-                        const forceMagnitude = 0.001 * body.mass;
-                        Matter.Body.applyForce(body, body.position, {
-                            x: zone.gravityDirection.x * forceMagnitude,
-                            y: zone.gravityDirection.y * forceMagnitude
-                        });
-                    }
-                }
-            });
-        }
-    });
-}
-
-// Toggle menu position
-const togglePositionButton = document.getElementById('toggle-position');
-togglePositionButton.addEventListener('click', function() {
-    const controlsPanel = document.querySelector('.controls-panel');
-    controlsPanel.classList.toggle('left-position');
+            createRippleEffect(x, y);
+        }, i * 30);
+    }
 });
 
-// Initialize theme switching
-document.addEventListener('DOMContentLoaded', function() {
-    // Setup themes
-    setupThemes();
-    setupAccentColors();
-    setupColorPresets();
-});
+// Initialize playground
+createBoundaries();
 
-// Set up theme switching functionality
-function setupThemes() {
-    // Set up theme dropdown
-    const themeDropdown = document.getElementById('theme-dropdown');
-    const themeToggle = themeDropdown.querySelector('.dropdown-toggle');
-    const themeMenu = themeDropdown.querySelector('.dropdown-menu');
-    const themeItems = themeDropdown.querySelectorAll('.dropdown-item');
-    const themeNameSpan = themeToggle.querySelector('span');
-    
-    // Toggle dropdown when clicked
-    themeToggle.addEventListener('click', function(event) {
-        event.stopPropagation();
-        themeDropdown.classList.toggle('open');
-    });
-    
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
-        if (!themeDropdown.contains(event.target)) {
-            themeDropdown.classList.remove('open');
-        }
-    });
-    
-    // Handle theme selection
-    themeItems.forEach(item => {
-        item.addEventListener('click', function() {
-            // Get theme data
-            const themeName = this.textContent;
-            const themeClass = this.getAttribute('data-theme');
-            
-            // Update dropdown toggle text
-            themeNameSpan.textContent = `Theme: ${themeName}`;
-            
-            // Remove all theme classes
-            document.body.classList.remove(
-                'theme-modern-dark',
-                'theme-modern-blue',
-                'theme-modern-purple',
-                'theme-modern-mint',
-                'theme-modern-sunset'
-            );
-            
-            // Add the selected theme class
-            document.body.classList.add(themeClass);
-            
-            // Update active state on items
-            themeItems.forEach(i => i.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Close the dropdown
-            themeDropdown.classList.remove('open');
-        });
-    });
-}
-
-// Set up accent color functionality
-function setupAccentColors() {
-    const buttonColorPicker = document.getElementById('button-color');
-    
-    // Add event listener for color change
-    buttonColorPicker.addEventListener('input', function() {
-        updateAccentColor(this.value);
-    });
-    
-    // Initialize with default color
-    updateAccentColor(buttonColorPicker.value);
-}
-
-// Update accent color throughout the UI
-function updateAccentColor(color) {
-    // Convert hex to rgb for CSS variables
-    const rgb = hexToRgb(color);
-    
-    // Set CSS variables
-    document.documentElement.style.setProperty('--accent-color', color);
-    document.documentElement.style.setProperty('--accent-color-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
-    
-    // Apply to active elements
-    document.querySelectorAll('.active').forEach(el => {
-        el.style.color = color;
-    });
-}
-
-// Set up color preset functionality for both pickers
-function setupColorPresets() {
-    // For accent color presets
-    const accentPresets = document.querySelectorAll('.button-color-picker .color-preset');
-    accentPresets.forEach(preset => {
-        preset.addEventListener('click', function() {
-            const color = this.getAttribute('data-color');
-            document.getElementById('button-color').value = color;
-            updateAccentColor(color);
-        });
-    });
-    
-    // For shape color presets
-    const shapePresets = document.querySelectorAll('.color-picker .color-preset');
-    shapePresets.forEach(preset => {
-        preset.addEventListener('click', function() {
-            const color = this.getAttribute('data-color');
-            document.getElementById('shape-color').value = color;
-        });
-    });
-}
-
-// Helper function to convert hex to rgb
-function hexToRgb(hex) {
-    // Remove # if present
-    hex = hex.replace(/^#/, '');
-    
-    // Parse hex values
-    const bigint = parseInt(hex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    
-    return { r, g, b };
-}
-
-// Create a static base and walls to contain the shapes
-function createStaticBase() {
-    // Add console logging to debug base creation
-    console.log("Window dimensions:", window.innerWidth, "x", window.innerHeight);
-    
-    // Create a MASSIVE, can't-miss base in the MIDDLE of the screen
-    const base = Matter.Bodies.rectangle(
-        window.innerWidth / 2,          // Center horizontally
-        window.innerHeight / 2 + 200,   // Lower middle of the screen
-        window.innerWidth,              // Full width of screen
-        50,                             // Extra thick
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: '#FF00FF',   // Bright magenta (very visible)
-                strokeStyle: '#FFFF00', // Yellow outline for contrast
-                lineWidth: 5            // Extra thick outline
-            },
-            label: 'base',
-            friction: 0.5,
-            restitution: 0.3,
-            density: 10
-        }
-    );
-    
-    // Create a second backup base higher up
-    const upperBase = Matter.Bodies.rectangle(
-        window.innerWidth / 2,          // Center horizontally
-        window.innerHeight / 3,         // Upper third of screen
-        window.innerWidth / 1.5,        // 75% width
-        40,                             // Thick
-        { 
-            isStatic: true,
-            render: {
-                fillStyle: '#00FF00',   // Bright green
-                strokeStyle: '#FF0000', // Red outline
-                lineWidth: 4            // Thick outline
-            },
-            label: 'upper-base',
-            friction: 0.4,
-            restitution: 0.4,
-            density: 10
-        }
-    );
-    
-    // Add side walls
-    const leftWall = Matter.Bodies.rectangle(
-        20,                          // Well inside screen
-        window.innerHeight / 2,
-        40,                          // Very thick wall
-        window.innerHeight,
-        {
-            isStatic: true,
-            render: {
-                fillStyle: '#00FFFF', // Cyan
-                strokeStyle: '#000000',
-                lineWidth: 2
-            },
-            label: 'wall',
-            friction: 0.3,
-            restitution: 0.3
-        }
-    );
-    
-    const rightWall = Matter.Bodies.rectangle(
-        window.innerWidth - 20,      // Well inside screen
-        window.innerHeight / 2,
-        40,                          // Very thick wall
-        window.innerHeight,
-        {
-            isStatic: true,
-            render: {
-                fillStyle: '#00FFFF', // Cyan
-                strokeStyle: '#000000',
-                lineWidth: 2
-            },
-            label: 'wall',
-            friction: 0.3,
-            restitution: 0.3
-        }
-    );
-    
-    // Add all bodies to the world
-    Matter.Composite.add(world, [base, upperBase, leftWall, rightWall]);
-    
-    // Output debug info to console
-    console.log("CREATED BASES at these positions:");
-    console.log("Main base:", window.innerHeight / 2 + 200);
-    console.log("Upper base:", window.innerHeight / 3);
-    
-    // Create a visible DOM element as a fallback indicator
-    const indicator = document.createElement('div');
-    indicator.style.position = 'absolute';
-    indicator.style.left = '50%';
-    indicator.style.top = (window.innerHeight / 2 + 200) + 'px';
-    indicator.style.transform = 'translate(-50%, -50%)';
-    indicator.style.width = '400px';
-    indicator.style.height = '30px';
-    indicator.style.backgroundColor = 'red';
-    indicator.style.border = '3px solid yellow';
-    indicator.style.zIndex = '1000';
-    indicator.style.textAlign = 'center';
-    indicator.style.color = 'white';
-    indicator.style.fontWeight = 'bold';
-    indicator.style.padding = '5px';
-    indicator.innerHTML = 'THIS IS THE BASE LOCATION';
-    document.body.appendChild(indicator);
+// Add initial bodies with staggered timing for smoother startup
+for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+        const x = Common.random(100, canvas.width / pixelRatio - 100);
+        const y = Common.random(50, 100);
+        const type = ['circle', 'square', 'polygon'][Math.floor(Math.random() * 3)];
+        createBody(x, y, type);
+    }, i * 200); // Stagger creation for smoother start
 }

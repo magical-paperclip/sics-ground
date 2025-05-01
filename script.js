@@ -75,11 +75,10 @@ document.addEventListener('DOMContentLoaded', function() {
             } 
         };
         
-        
         const groundHeight = 30;
         const wallWidth = 30;
         
-        
+        // Main ground at the bottom
         const ground = Bodies.rectangle(
             canvas.width / 2, 
             canvas.height - groundHeight/2, 
@@ -88,23 +87,62 @@ document.addEventListener('DOMContentLoaded', function() {
             wallOptions
         );
         
+        // Improved base platform that objects can rest on
+        const basePlatformOptions = {
+            isStatic: true,
+            chamfer: { radius: 5 },
+            render: {
+                fillStyle: 'rgba(150, 140, 130, 0.9)',
+                strokeStyle: '#8c7851',
+                lineWidth: 2
+            },
+            friction: 0.3,           // Increased friction to prevent sliding
+            frictionStatic: 0.5,     // Higher static friction
+            restitution: 0.2,        // Less bouncy
+            slop: 0.1,               // Better collision handling
+            collisionFilter: {       // Ensure it collides with objects properly
+                category: 0x0001,
+                mask: 0xFFFFFFFF
+            }
+        };
         
-        // Add a solid base platform that objects can't pass through
+        // Position the platform higher up from the ground (30px instead of 5px)
         const basePlatform = Bodies.rectangle(
             canvas.width / 2,
-            canvas.height - groundHeight - 5,
-            canvas.width - 100, // Slightly narrower than the ground
-            15, // Height of the platform
+            canvas.height - groundHeight - 30,
+            canvas.width - 120,
+            20,
+            basePlatformOptions
+        );
+        
+        // Create visible supports connecting platform to ground
+        const leftSupport = Bodies.rectangle(
+            canvas.width / 2 - (canvas.width - 180) / 4,
+            canvas.height - groundHeight - 15,
+            15,
+            30,
             {
                 isStatic: true,
-                chamfer: { radius: 5 },
                 render: {
-                    fillStyle: 'rgba(150, 140, 130, 0.9)', // Darker, more solid appearance
-                    strokeStyle: '#8c7851',
-                    lineWidth: 2
-                },
-                friction: 0.2, // More friction so objects settle on it
-                restitution: 0.3 // Less bouncy
+                    fillStyle: 'rgba(140, 120, 81, 0.9)',
+                    strokeStyle: '#716040',
+                    lineWidth: 1
+                }
+            }
+        );
+        
+        const rightSupport = Bodies.rectangle(
+            canvas.width / 2 + (canvas.width - 180) / 4,
+            canvas.height - groundHeight - 15,
+            15,
+            30,
+            {
+                isStatic: true,
+                render: {
+                    fillStyle: 'rgba(140, 120, 81, 0.9)',
+                    strokeStyle: '#716040',
+                    lineWidth: 1
+                }
             }
         );
         
@@ -112,8 +150,50 @@ document.addEventListener('DOMContentLoaded', function() {
         const rightWall = Bodies.rectangle(canvas.width - wallWidth/2, canvas.height / 2, wallWidth, canvas.height, wallOptions);
         const ceiling = Bodies.rectangle(canvas.width / 2, wallWidth/2, canvas.width, wallWidth, wallOptions);
         
-        boundaries = [ground, basePlatform, leftWall, rightWall, ceiling];
+        // Add all boundaries including the supports
+        boundaries = [ground, basePlatform, leftSupport, rightSupport, leftWall, rightWall, ceiling];
         Composite.add(world, boundaries);
+        
+        // Create angled ramps on the left and right of the platform
+        const rampOptions = {
+            isStatic: true,
+            chamfer: { radius: 2 },
+            render: {
+                fillStyle: 'rgba(209, 196, 179, 0.8)',
+                strokeStyle: '#716040',
+                lineWidth: 1
+            },
+            friction: 0.1,
+            restitution: 0.1
+        };
+        
+        // Left ramp
+        const leftRamp = Bodies.rectangle(
+            basePlatform.position.x - (canvas.width - 120) / 2 - 30,
+            basePlatform.position.y + 15,
+            80,
+            10,
+            rampOptions
+        );
+        
+        // Rotate left ramp
+        Body.rotate(leftRamp, Math.PI / 8);
+        
+        // Right ramp
+        const rightRamp = Bodies.rectangle(
+            basePlatform.position.x + (canvas.width - 120) / 2 + 30,
+            basePlatform.position.y + 15,
+            80,
+            10,
+            rampOptions
+        );
+        
+        // Rotate right ramp
+        Body.rotate(rightRamp, -Math.PI / 8);
+        
+        // Add ramps to boundaries and world
+        boundaries.push(leftRamp, rightRamp);
+        Composite.add(world, [leftRamp, rightRamp]);
     }
 
     // Create a random body with improved physics settings

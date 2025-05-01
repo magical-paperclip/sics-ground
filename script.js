@@ -991,60 +991,152 @@ function initNetworkBackground() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    // Particle settings
-    const particleCount = 80;
-    const maxDistance = 150;
-    const lineOpacity = 0.15;
-    const dotOpacity = 0.4;
-    const particleSpeed = 0.3;
-    const mouseRadius = 150; // Radius of mouse influence
-    const mouseForce = 2;    // Strength of mouse influence
+    // Enhanced particle settings for better visibility and interactivity
+    const particleCount = 120;   // Increased from 80
+    const maxDistance = 180;     // Increased connection distance
+    const lineOpacity = 0.25;    // Increased from 0.15
+    const dotOpacity = 0.6;      // Increased from 0.4
+    const particleSpeed = 0.4;   // Slightly faster movement
+    const mouseRadius = 200;     // Larger mouse influence area
+    const mouseForce = 3.5;      // Stronger mouse influence
     
-    // Colors
+    // Brighter, more vibrant colors with higher opacity
     const colors = [
-        'rgba(108, 34, 189, 0.7)',  // Purple
-        'rgba(61, 220, 132, 0.7)',  // Green
-        'rgba(255, 123, 84, 0.7)'   // Orange
+        'rgba(120, 60, 220, 0.85)',  // Vibrant purple
+        'rgba(70, 240, 140, 0.85)',  // Bright green
+        'rgba(255, 140, 90, 0.85)',  // Bright orange
+        'rgba(65, 200, 255, 0.85)'   // Added bright blue
     ];
     
     // Create particles
     const particles = [];
     
-    // Mouse position
+    // Mouse position with enhanced tracking
     const mouse = {
         x: null,
         y: null,
-        radius: mouseRadius
+        radius: mouseRadius,
+        active: false            // Track if mouse is being moved
     };
     
-    // Track mouse position
+    // Add pulse effect when clicking
+    canvas.addEventListener('click', (event) => {
+        createPulseEffect(event.clientX - canvas.getBoundingClientRect().left, 
+                         event.clientY - canvas.getBoundingClientRect().top);
+    });
+    
+    // Track mouse position with enhanced sensitivity
     canvas.addEventListener('mousemove', (event) => {
         const rect = canvas.getBoundingClientRect();
+        
+        // Activate mouse influence with a fade-in effect
+        if (!mouse.active) {
+            mouse.active = true;
+            // Start with a small radius and expand
+            let startRadius = 50;
+            const expandInterval = setInterval(() => {
+                startRadius += 10;
+                if (startRadius >= mouseRadius) {
+                    clearInterval(expandInterval);
+                }
+                mouse.radius = startRadius;
+            }, 20);
+        }
+        
         mouse.x = event.clientX - rect.left;
         mouse.y = event.clientY - rect.top;
     });
     
-    // Reset mouse position when mouse leaves
+    // Reset mouse position when mouse leaves with fade-out effect
     canvas.addEventListener('mouseleave', () => {
-        mouse.x = null;
-        mouse.y = null;
+        if (mouse.active) {
+            // Shrink radius before deactivating
+            const shrinkInterval = setInterval(() => {
+                mouse.radius -= 10;
+                if (mouse.radius <= 0) {
+                    clearInterval(shrinkInterval);
+                    mouse.x = null;
+                    mouse.y = null;
+                    mouse.active = false;
+                }
+            }, 20);
+        }
     });
     
-    // Particle class
+    // Create pulse effect when clicking
+    function createPulseEffect(x, y) {
+        const pulseCount = 3;
+        
+        for (let i = 0; i < pulseCount; i++) {
+            setTimeout(() => {
+                const pulse = {
+                    x: x,
+                    y: y,
+                    size: 0,
+                    maxSize: 200 + (i * 50),
+                    opacity: 0.7,
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                };
+                
+                const pulseInterval = setInterval(() => {
+                    pulse.size += 5;
+                    pulse.opacity -= 0.01;
+                    
+                    // Draw expanding circle
+                    ctx.beginPath();
+                    ctx.arc(pulse.x, pulse.y, pulse.size, 0, Math.PI * 2);
+                    ctx.strokeStyle = pulse.color;
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = pulse.opacity;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                    
+                    // Clear interval when pulse is complete
+                    if (pulse.size >= pulse.maxSize || pulse.opacity <= 0) {
+                        clearInterval(pulseInterval);
+                    }
+                }, 20);
+            }, i * 200);
+        }
+        
+        // Also create some new particles at click point
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 20;
+            const newParticle = new Particle();
+            
+            newParticle.x = x + Math.cos(angle) * distance;
+            newParticle.y = y + Math.sin(angle) * distance;
+            newParticle.size = Math.random() * 4 + 2; // Larger particles
+            
+            // Give them an outward velocity
+            newParticle.velocityX = Math.cos(angle) * (Math.random() * 2 + 1);
+            newParticle.velocityY = Math.sin(angle) * (Math.random() * 2 + 1);
+            
+            particles.push(newParticle);
+        }
+    }
+    
+    // Enhanced Particle class
     class Particle {
         constructor() {
             this.x = Math.random() * canvas.width / window.devicePixelRatio;
             this.y = Math.random() * canvas.height / window.devicePixelRatio;
             this.velocityX = Math.random() * particleSpeed * 2 - particleSpeed;
             this.velocityY = Math.random() * particleSpeed * 2 - particleSpeed;
-            this.size = Math.random() * 2 + 1;
+            this.size = Math.random() * 3 + 1.5; // Larger particles
+            this.baseSize = this.size; // Store original size for pulsing effect
             this.color = colors[Math.floor(Math.random() * colors.length)];
-            // Add a unique wobble effect to each particle
+            this.targetX = null; // Target coordinates for attraction effect
+            this.targetY = null;
             this.wobble = {
                 speed: Math.random() * 0.02 + 0.01,
                 offset: Math.random() * Math.PI * 2,
-                amplitude: Math.random() * 0.5 + 0.5
+                amplitude: Math.random() * 0.7 + 0.6 // Increased wobble effect
             };
+            // Add glow effect property
+            this.glow = Math.random() > 0.7; // 30% of particles will glow
+            this.glowIntensity = Math.random() * 0.5 + 0.5;
         }
         
         update() {
@@ -1057,7 +1149,7 @@ function initNetworkBackground() {
                 this.velocityY = -this.velocityY;
             }
             
-            // Mouse interaction
+            // Enhanced mouse interaction
             if (mouse.x !== null && mouse.y !== null) {
                 const dx = mouse.x - this.x;
                 const dy = mouse.y - this.y;
@@ -1071,24 +1163,42 @@ function initNetworkBackground() {
                     const wobbleX = Math.sin(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
                     const wobbleY = Math.cos(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
                     
-                    // Apply the force in the direction away from mouse
-                    this.velocityX += dx * force * mouseForce * 0.01 + wobbleX * 0.1;
-                    this.velocityY += dy * force * mouseForce * 0.01 + wobbleY * 0.1;
+                    // Apply stronger repulsion force with wobble
+                    this.velocityX += -dx * force * mouseForce * 0.015 + wobbleX * 0.15;
+                    this.velocityY += -dy * force * mouseForce * 0.015 + wobbleY * 0.15;
+                    
+                    // Increase size when affected by mouse (subtle swell effect)
+                    this.size = this.baseSize * (1 + force * 0.5);
+                    
+                    // Enhanced visual feedback - change color slightly when affected
+                    if (Math.random() > 0.95) {
+                        this.color = colors[Math.floor(Math.random() * colors.length)];
+                    }
+                } else {
+                    // Gradually return to base size
+                    if (this.size > this.baseSize) {
+                        this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
+                    }
+                }
+            } else {
+                // Return to base size when mouse not present
+                if (this.size > this.baseSize) {
+                    this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
                 }
             }
             
-            // Add gentle wobble even when not near mouse
-            this.velocityX += Math.sin(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.01 * this.wobble.amplitude;
-            this.velocityY += Math.cos(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.01 * this.wobble.amplitude;
+            // Enhanced random movement with more pronounced wobble
+            this.velocityX += Math.sin(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
+            this.velocityY += Math.cos(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
             
-            // Limit speed
+            // Limit speed to prevent particles from moving too fast
             const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-            if (speed > 2) {
-                this.velocityX = (this.velocityX / speed) * 2;
-                this.velocityY = (this.velocityY / speed) * 2;
+            if (speed > 2.5) { // Increased max speed
+                this.velocityX = (this.velocityX / speed) * 2.5;
+                this.velocityY = (this.velocityY / speed) * 2.5;
             }
             
-            // Add some drag to slow particles
+            // Add some drag to slow particles gradually
             this.velocityX *= 0.98;
             this.velocityY *= 0.98;
             
@@ -1098,27 +1208,51 @@ function initNetworkBackground() {
         }
         
         draw() {
-            // Draw particle with pulsing effect
-            const pulseScale = 1 + Math.sin(Date.now() * 0.003 + this.wobble.offset) * 0.1;
+            // Enhanced drawing with glow effect
+            const pulseScale = 1 + Math.sin(Date.now() * 0.004 + this.wobble.offset) * 0.15; // Larger pulse
             const size = this.size * pulseScale;
             
+            // Draw glow for special particles
+            if (this.glow) {
+                const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size * 2.5);
+                glow.addColorStop(0, this.color);
+                glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size * 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.globalAlpha = 0.2 * this.glowIntensity * pulseScale;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Draw main particle with enhanced appearance
             ctx.beginPath();
             ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
             ctx.globalAlpha = dotOpacity;
             ctx.fill();
+            
+            // Add a small white core to some particles for extra sparkle
+            if (Math.random() > 0.7) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fill();
+            }
+            
             ctx.globalAlpha = 1;
         }
     }
     
-    // Initialize particles
+    // Initialize particles with variety in positions
     function init() {
         for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle());
         }
     }
     
-    // Connect particles with lines
+    // Connect particles with enhanced lines
     function connect() {
         for (let i = 0; i < particles.length; i++) {
             for (let j = i + 1; j < particles.length; j++) {
@@ -1127,10 +1261,10 @@ function initNetworkBackground() {
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance < maxDistance) {
-                    // Make lines fade based on distance
-                    const opacity = lineOpacity * (1 - distance / maxDistance);
+                    // Make lines fade based on distance with enhanced opacity curve
+                    const opacity = lineOpacity * Math.pow((1 - distance / maxDistance), 2);
                     
-                    // Get gradient color between two particles
+                    // Enhanced gradient with more vibrant appearance
                     const gradient = ctx.createLinearGradient(
                         particles[i].x, particles[i].y,
                         particles[j].x, particles[j].y
@@ -1139,20 +1273,43 @@ function initNetworkBackground() {
                     gradient.addColorStop(0, particles[i].color);
                     gradient.addColorStop(1, particles[j].color);
                     
+                    // Draw thicker lines when closer
+                    const lineWidth = Math.max(0.5, 1.5 * (1 - distance / maxDistance));
+                    
                     ctx.beginPath();
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
                     ctx.strokeStyle = gradient;
                     ctx.globalAlpha = opacity;
-                    ctx.lineWidth = 0.5;
+                    ctx.lineWidth = lineWidth;
                     ctx.stroke();
                     ctx.globalAlpha = 1;
+                    
+                    // Add extra glow effect to lines near mouse
+                    if (mouse.x !== null && mouse.y !== null) {
+                        const midX = (particles[i].x + particles[j].x) / 2;
+                        const midY = (particles[i].y + particles[j].y) / 2;
+                        const mouseDistance = Math.sqrt(
+                            Math.pow(midX - mouse.x, 2) + 
+                            Math.pow(midY - mouse.y, 2)
+                        );
+                        
+                        if (mouseDistance < mouse.radius * 0.8) {
+                            const glowOpacity = 0.1 * (1 - mouseDistance / (mouse.radius * 0.8));
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = 'rgba(255, 255, 255, ' + glowOpacity + ')';
+                            ctx.lineWidth = lineWidth + 1;
+                            ctx.stroke();
+                        }
+                    }
                 }
             }
         }
     }
     
-    // Animation loop
+    // Animation loop with performance optimization
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
@@ -1164,6 +1321,11 @@ function initNetworkBackground() {
         
         // Connect particles with lines
         connect();
+        
+        // Optional: Remove excess particles to maintain performance
+        while (particles.length > particleCount + 20) {
+            particles.shift();
+        }
         
         requestAnimationFrame(animate);
     }

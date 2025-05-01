@@ -1,5 +1,8 @@
 // Wait for the DOM to be fully loaded before initializing the physics playground
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the network background
+    initNetworkBackground();
+    
     const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
 
     const engine = Engine.create({
@@ -86,18 +89,22 @@ document.addEventListener('DOMContentLoaded', function() {
         );
         
         
+        // Add a solid base platform that objects can't pass through
         const basePlatform = Bodies.rectangle(
             canvas.width / 2,
             canvas.height - groundHeight - 5,
-            canvas.width - 4,
-            10,
+            canvas.width - 100, // Slightly narrower than the ground
+            15, // Height of the platform
             {
                 isStatic: true,
+                chamfer: { radius: 5 },
                 render: {
-                    fillStyle: 'rgba(224, 214, 204, 0.4)',
-                    strokeStyle: 'rgba(209, 196, 179, 0.3)',
-                    lineWidth: 1
-                }
+                    fillStyle: 'rgba(150, 140, 130, 0.9)', // Darker, more solid appearance
+                    strokeStyle: '#8c7851',
+                    lineWidth: 2
+                },
+                friction: 0.2, // More friction so objects settle on it
+                restitution: 0.3 // Less bouncy
             }
         );
         
@@ -884,3 +891,204 @@ document.addEventListener('DOMContentLoaded', function() {
         }, i * 200);
     }
 });
+
+// Particle network background
+function initNetworkBackground() {
+    const canvas = document.getElementById('network-background');
+    const ctx = canvas.getContext('2d');
+    const container = document.querySelector('.canvas-container');
+    
+    // Set canvas size
+    const resizeCanvas = () => {
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = container.offsetWidth * pixelRatio;
+        canvas.height = container.offsetHeight * pixelRatio;
+        canvas.style.width = `${container.offsetWidth}px`;
+        canvas.style.height = `${container.offsetHeight}px`;
+        ctx.scale(pixelRatio, pixelRatio);
+    };
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Particle settings
+    const particleCount = 80;
+    const maxDistance = 150;
+    const lineOpacity = 0.15;
+    const dotOpacity = 0.4;
+    const particleSpeed = 0.3;
+    const mouseRadius = 150; // Radius of mouse influence
+    const mouseForce = 2;    // Strength of mouse influence
+    
+    // Colors
+    const colors = [
+        'rgba(108, 34, 189, 0.7)',  // Purple
+        'rgba(61, 220, 132, 0.7)',  // Green
+        'rgba(255, 123, 84, 0.7)'   // Orange
+    ];
+    
+    // Create particles
+    const particles = [];
+    
+    // Mouse position
+    const mouse = {
+        x: null,
+        y: null,
+        radius: mouseRadius
+    };
+    
+    // Track mouse position
+    canvas.addEventListener('mousemove', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = event.clientX - rect.left;
+        mouse.y = event.clientY - rect.top;
+    });
+    
+    // Reset mouse position when mouse leaves
+    canvas.addEventListener('mouseleave', () => {
+        mouse.x = null;
+        mouse.y = null;
+    });
+    
+    // Particle class
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width / window.devicePixelRatio;
+            this.y = Math.random() * canvas.height / window.devicePixelRatio;
+            this.velocityX = Math.random() * particleSpeed * 2 - particleSpeed;
+            this.velocityY = Math.random() * particleSpeed * 2 - particleSpeed;
+            this.size = Math.random() * 2 + 1;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            // Add a unique wobble effect to each particle
+            this.wobble = {
+                speed: Math.random() * 0.02 + 0.01,
+                offset: Math.random() * Math.PI * 2,
+                amplitude: Math.random() * 0.5 + 0.5
+            };
+        }
+        
+        update() {
+            // Wall detection with bounce
+            if (this.x < 0 || this.x > canvas.width / window.devicePixelRatio) {
+                this.velocityX = -this.velocityX;
+            }
+            
+            if (this.y < 0 || this.y > canvas.height / window.devicePixelRatio) {
+                this.velocityY = -this.velocityY;
+            }
+            
+            // Mouse interaction
+            if (mouse.x !== null && mouse.y !== null) {
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < mouse.radius) {
+                    // Calculate force based on distance (closer = stronger)
+                    const force = (mouse.radius - distance) / mouse.radius;
+                    
+                    // Add wobble to make movement more organic
+                    const wobbleX = Math.sin(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
+                    const wobbleY = Math.cos(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
+                    
+                    // Apply the force in the direction away from mouse
+                    this.velocityX += dx * force * mouseForce * 0.01 + wobbleX * 0.1;
+                    this.velocityY += dy * force * mouseForce * 0.01 + wobbleY * 0.1;
+                }
+            }
+            
+            // Add gentle wobble even when not near mouse
+            this.velocityX += Math.sin(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.01 * this.wobble.amplitude;
+            this.velocityY += Math.cos(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.01 * this.wobble.amplitude;
+            
+            // Limit speed
+            const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+            if (speed > 2) {
+                this.velocityX = (this.velocityX / speed) * 2;
+                this.velocityY = (this.velocityY / speed) * 2;
+            }
+            
+            // Add some drag to slow particles
+            this.velocityX *= 0.98;
+            this.velocityY *= 0.98;
+            
+            // Update position
+            this.x += this.velocityX;
+            this.y += this.velocityY;
+        }
+        
+        draw() {
+            // Draw particle with pulsing effect
+            const pulseScale = 1 + Math.sin(Date.now() * 0.003 + this.wobble.offset) * 0.1;
+            const size = this.size * pulseScale;
+            
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = dotOpacity;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+    }
+    
+    // Initialize particles
+    function init() {
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+    }
+    
+    // Connect particles with lines
+    function connect() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < maxDistance) {
+                    // Make lines fade based on distance
+                    const opacity = lineOpacity * (1 - distance / maxDistance);
+                    
+                    // Get gradient color between two particles
+                    const gradient = ctx.createLinearGradient(
+                        particles[i].x, particles[i].y,
+                        particles[j].x, particles[j].y
+                    );
+                    
+                    gradient.addColorStop(0, particles[i].color);
+                    gradient.addColorStop(1, particles[j].color);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = gradient;
+                    ctx.globalAlpha = opacity;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+    }
+    
+    // Animation loop
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Update and draw particles
+        for (let i = 0; i < particles.length; i++) {
+            particles[i].update();
+            particles[i].draw();
+        }
+        
+        // Connect particles with lines
+        connect();
+        
+        requestAnimationFrame(animate);
+    }
+    
+    // Start the animation
+    init();
+    animate();
+}

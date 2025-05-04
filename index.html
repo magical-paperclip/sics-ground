@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>sics-ground</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
@@ -18,21 +19,8 @@
         </div>
     </nav>
 
-    <section id="home" class="hero-section">
-        <div class="container">
-            <header>
-                <h1>sics-ground</h1>
-                <p>the internet's favorite little physics playground</p>
-                <a href="#playground" class="scroll-down-btn">
-                    <span>Play Now</span>
-                    <div class="arrow-down"></div>
-                </a>
-            </header>
-        </div>
-    </section>
-    
-    <section id="playground" class="playground-section">
-        <div class="container">
+    <div class="app-layout">
+        <div class="left-sidebar">
             <div class="controls">
                 <div class="collision-effects">
                     <h2>Collision Effects</h2>
@@ -58,21 +46,23 @@
                     <button id="toggle-gravity">Toggle Gravity</button>
                 </div>
             </div>
-            
+        </div>
+        
+        <div class="canvas-wrapper">
             <div class="canvas-container">
                 <canvas id="network-background"></canvas>
                 <canvas id="physics-canvas"></canvas>
             </div>
         </div>
-    </section>
+    </div>
     
     <section id="about" class="about-section">
         <div class="container">
             <h2>About sics-ground</h2>
             <div class="about-content">
                 <p>sics-ground is an interactive physics sandbox powered by Matter.js where you can play with realistic object physics.</p>
-                <p>add circles, squares, and polygons to the playground, watch as they interact using one of four effects: bounce, explode, stick, or gravity shift.</p>
-                <p>this is my first project that i've made using matter.js so i hope sics-ground is fun!</p>
+                <p>Add circles, squares, and polygons to the playground, watch as they interact using one of four effects: Bounce, Explode, Stick, or Gravity Shift.</p>
+                <p>This was my first project that I've made using js so I truly hope sics-ground is fun!</p>
                 <p> - magical paperclip  </p>
             </div>
         </div>

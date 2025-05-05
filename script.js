@@ -1,14 +1,13 @@
-// Wait for the DOM to be fully loaded before initializing the physics playground
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the network background
     initNetworkBackground();
     
     const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
 
+    
     const engine = Engine.create({
-        positionIterations: 8,    
-        velocityIterations: 8,    
-        constraintIterations: 4,  
+        positionIterations: 12,    
+        velocityIterations: 12,    
+        constraintIterations: 6,   
         enableSleeping: true      
     });
     const world = engine.world;
@@ -16,13 +15,15 @@ document.addEventListener('DOMContentLoaded', function() {
     world.gravity.scale = 0.001;
     world.gravity.y = 1;
 
-    // Canvas setup with HiDPI/Retina support
+    
     const canvas = document.getElementById('physics-canvas');
     const canvasContainer = document.querySelector('.canvas-container');
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
     
-    // Debug logging to help identify issues
+    
     console.log('Canvas element:', canvas);
     console.log('Canvas container:', canvasContainer);
+    console.log('Canvas wrapper:', canvasWrapper);
     
     if (!canvas || !canvasContainer) {
         console.error('Canvas or container elements not found!');
@@ -34,6 +35,12 @@ document.addEventListener('DOMContentLoaded', function() {
     canvas.height = canvasContainer.offsetHeight * pixelRatio;
     canvas.style.width = `${canvasContainer.offsetWidth}px`;
     canvas.style.height = `${canvasContainer.offsetHeight}px`;
+
+    let scrollY = 0;
+    canvasWrapper.addEventListener('scroll', () => {
+        scrollY = canvasWrapper.scrollTop;
+        updateBoundaries();
+    });
 
     const render = Render.create({
         canvas: canvas,
@@ -49,9 +56,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    
     const runner = Runner.create({
-        isFixed: true,
-        delta: 1000/60 
+        isFixed: false,            // Changed to false to use requestAnimationFrame
+        delta: 1000/120            // Increased from 60 FPS to 120 FPS for smoother animation
     });
     Runner.run(runner, engine);
     Render.run(render);
@@ -78,54 +86,60 @@ document.addEventListener('DOMContentLoaded', function() {
         const groundHeight = 30;
         const wallWidth = 30;
         
-        // Main ground at the bottom
+        // Create the base ground
         const ground = Bodies.rectangle(
             canvas.width / 2, 
-            canvas.height - groundHeight/2, 
+            canvas.height - groundHeight/2 + scrollY, 
             canvas.width, 
             groundHeight, 
-            wallOptions
+            {
+                ...wallOptions,
+                render: {
+                    fillStyle: '#34A853', 
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 2
+                },
+                friction: 0.3,
+                frictionStatic: 0.5,
+            }
         );
         
-        // Improved base platform that objects can rest on
         const basePlatformOptions = {
             isStatic: true,
             chamfer: { radius: 5 },
             render: {
-                fillStyle: 'rgba(150, 140, 130, 0.9)',
-                strokeStyle: '#8c7851',
+                fillStyle: 'rgba(66, 133, 244, 0.9)', 
+                strokeStyle: 'rgba(255, 255, 255, 0.3)',
                 lineWidth: 2
             },
-            friction: 0.3,           // Increased friction to prevent sliding
-            frictionStatic: 0.5,     // Higher static friction
-            restitution: 0.2,        // Less bouncy
-            slop: 0.1,               // Better collision handling
-            collisionFilter: {       // Ensure it collides with objects properly
+            friction: 0.3,           
+            frictionStatic: 0.5,     
+            restitution: 0.2,        
+            slop: 0.1,               
+            collisionFilter: {       
                 category: 0x0001,
                 mask: 0xFFFFFFFF
             }
         };
         
-        // Position the platform higher up from the ground (30px instead of 5px)
         const basePlatform = Bodies.rectangle(
             canvas.width / 2,
-            canvas.height - groundHeight - 30,
+            canvas.height - groundHeight - 30 + scrollY, 
             canvas.width - 120,
             20,
             basePlatformOptions
         );
         
-        // Create visible supports connecting platform to ground
         const leftSupport = Bodies.rectangle(
             canvas.width / 2 - (canvas.width - 180) / 4,
-            canvas.height - groundHeight - 15,
+            canvas.height - groundHeight - 15 + scrollY, 
             15,
             30,
             {
                 isStatic: true,
                 render: {
-                    fillStyle: 'rgba(140, 120, 81, 0.9)',
-                    strokeStyle: '#716040',
+                    fillStyle: '#EA4335', 
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
                     lineWidth: 1
                 }
             }
@@ -133,41 +147,157 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const rightSupport = Bodies.rectangle(
             canvas.width / 2 + (canvas.width - 180) / 4,
-            canvas.height - groundHeight - 15,
+            canvas.height - groundHeight - 15 + scrollY, 
             15,
             30,
             {
                 isStatic: true,
                 render: {
-                    fillStyle: 'rgba(140, 120, 81, 0.9)',
-                    strokeStyle: '#716040',
+                    fillStyle: '#FBBC05', 
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
                     lineWidth: 1
                 }
             }
         );
         
-        const leftWall = Bodies.rectangle(wallWidth/2, canvas.height / 2, wallWidth, canvas.height, wallOptions);
-        const rightWall = Bodies.rectangle(canvas.width - wallWidth/2, canvas.height / 2, wallWidth, canvas.height, wallOptions);
-        const ceiling = Bodies.rectangle(canvas.width / 2, wallWidth/2, canvas.width, wallWidth, wallOptions);
+        const bottomFloor = Bodies.rectangle(
+            canvas.width / 2,
+            canvasContainer.offsetHeight - groundHeight/2,
+            canvas.width * 2, 
+            groundHeight * 2, 
+            {
+                isStatic: true,
+                render: {
+                    fillStyle: '#34A853', 
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 1
+                },
+                friction: 0.5,
+                frictionStatic: 0.7,
+            }
+        );
         
-        // Add all boundaries including the supports
-        boundaries = [ground, basePlatform, leftSupport, rightSupport, leftWall, rightWall, ceiling];
+        // Left wall
+        const leftWall = Bodies.rectangle(
+            wallWidth/2, 
+            canvas.height / 2 + scrollY / 2, 
+            wallWidth, 
+            canvas.height + scrollY, 
+            wallOptions
+        );
+        
+       
+        
+        const rightWallWidth = canvas.width * 0.3;
+        const rightWall = Bodies.rectangle(
+            canvas.width - rightWallWidth/2, 
+            canvas.height / 2 + scrollY / 2, 
+            rightWallWidth, 
+            canvas.height * 2, 
+            {
+                isStatic: true,
+                chamfer: { radius: 5 },
+                render: {
+                    fillStyle: 'rgba(66, 133, 244, 0.8)',
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 2
+                }
+            }
+        );
+        
+        // Additional right edge barrier to absolutely prevent shapes from passing the visible right edge
+        const rightEdgeBarrier = Bodies.rectangle(
+            canvas.width + wallWidth/2,
+            canvas.height / 2 + scrollY / 2,
+            wallWidth * 2,
+            canvas.height * 2,
+            {
+                isStatic: true,
+                render: {
+                    visible: false 
+                },
+                friction: 1,
+                frictionStatic: 1,
+                restitution: 0.1
+            }
+        );
+        
+        
+        const decorElement1 = Bodies.rectangle(
+            canvas.width - rightWallWidth/2,
+            canvas.height * 0.25 + scrollY,
+            rightWallWidth * 0.7,
+            30,
+            {
+                isStatic: true,
+                chamfer: { radius: 15 },
+                render: {
+                    fillStyle: '#EA4335',
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 1
+                }
+            }
+        );
+        
+        const decorElement2 = Bodies.rectangle(
+            canvas.width - rightWallWidth/2,
+            canvas.height * 0.5 + scrollY,
+            rightWallWidth * 0.5,
+            30,
+            {
+                isStatic: true,
+                chamfer: { radius: 15 },
+                render: {
+                    fillStyle: '#FBBC05',
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 1
+                }
+            }
+        );
+        
+        const decorElement3 = Bodies.rectangle(
+            canvas.width - rightWallWidth/2,
+            canvas.height * 0.75 + scrollY,
+            rightWallWidth * 0.7,
+            30,
+            {
+                isStatic: true,
+                chamfer: { radius: 15 },
+                render: {
+                    fillStyle: '#34A853',
+                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                    lineWidth: 1
+                }
+            }
+        );
+        
+        const ceiling = Bodies.rectangle(
+            canvas.width / 2, 
+            wallWidth/2 + scrollY, 
+            canvas.width, 
+            wallWidth, 
+            wallOptions
+        );
+        
+        boundaries = [
+            ground, basePlatform, leftSupport, rightSupport, 
+            leftWall, rightWall, rightEdgeBarrier, ceiling, bottomFloor, 
+            decorElement1, decorElement2, decorElement3
+        ];
         Composite.add(world, boundaries);
         
-        // Create angled ramps on the left and right of the platform
         const rampOptions = {
             isStatic: true,
             chamfer: { radius: 2 },
             render: {
-                fillStyle: 'rgba(209, 196, 179, 0.8)',
-                strokeStyle: '#716040',
+                fillStyle: 'rgba(66, 133, 244, 0.8)', 
+                strokeStyle: 'rgba(255, 255, 255, 0.3)',
                 lineWidth: 1
             },
             friction: 0.1,
             restitution: 0.1
         };
         
-        // Left ramp
         const leftRamp = Bodies.rectangle(
             basePlatform.position.x - (canvas.width - 120) / 2 - 30,
             basePlatform.position.y + 15,
@@ -176,10 +306,8 @@ document.addEventListener('DOMContentLoaded', function() {
             rampOptions
         );
         
-        // Rotate left ramp
         Body.rotate(leftRamp, Math.PI / 8);
         
-        // Right ramp
         const rightRamp = Bodies.rectangle(
             basePlatform.position.x + (canvas.width - 120) / 2 + 30,
             basePlatform.position.y + 15,
@@ -188,27 +316,32 @@ document.addEventListener('DOMContentLoaded', function() {
             rampOptions
         );
         
-        // Rotate right ramp
         Body.rotate(rightRamp, -Math.PI / 8);
         
-        // Add ramps to boundaries and world
         boundaries.push(leftRamp, rightRamp);
         Composite.add(world, [leftRamp, rightRamp]);
     }
 
-    // Create a random body with improved physics settings
     function createBody(x, y, type) {
-        const color = colors[Math.floor(Math.random() * colors.length)];
+        const googleColors = [
+            '#4285F4', 
+            '#EA4335', 
+            '#FBBC05', 
+            '#34A853'  
+        ];
+        
+        const color = googleColors[Math.floor(Math.random() * googleColors.length)];
+        
         const options = {
-            restitution: 0.8,         // Bouncier
-            friction: 0.05,           // Less friction for smoother sliding
-            frictionAir: 0.002,       // Slight air resistance for more natural movement
-            frictionStatic: 0.2,      // Easier to get moving
-            density: 0.002,           // Lower density for more responsive physics
-            chamfer: { radius: 2 },   // Slightly rounded corners for smoother collisions
+            restitution: 0.3,         
+            friction: 0.15,           
+            frictionAir: 0.002,       
+            frictionStatic: 0.3,      
+            density: 0.0025,          
+            chamfer: { radius: 2 },   
             render: {
                 fillStyle: color,
-                strokeStyle: '#716040',
+                strokeStyle: 'rgba(255, 255, 255, 0.3)',
                 lineWidth: 1
             }
         };
@@ -230,7 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 body = Bodies.circle(x, y, Common.random(15, 30), options);
         }
         
-        // Add some initial velocity for smoother entry
         Body.setVelocity(body, { 
             x: Common.random(-1, 1) * 2,
             y: Common.random(-0.1, 0.1)
@@ -239,13 +371,11 @@ document.addEventListener('DOMContentLoaded', function() {
         activeBodies.push(body);
         Composite.add(world, body);
         
-        // Add entry animation effect
         createRippleEffect(x, y);
         
         return body;
     }
 
-    // Create ripple effect when adding a new body
     function createRippleEffect(x, y) {
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
@@ -269,7 +399,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Create visual effect particles with improved smoothness
     function createExplosionParticle(x, y, color, size, speed, angle) {
         return {
             x,
@@ -282,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             alpha: 1,
             rotation: Math.random() * Math.PI * 2,
-            rotationSpeed: (Math.random() - 0.5) * 0.1, // Slower rotation for smoother look
+            rotationSpeed: (Math.random() - 0.5) * 0.1, 
             lifespan: 60,
             maxLifespan: 60,
             gravity: 0.02,
@@ -290,7 +419,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Create trail particle for shape movement
     function createTrailParticle(x, y, color, size) {
         return {
             x,
@@ -303,11 +431,9 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Render explosion particles with anti-aliasing and smooth transitions
     function renderExplosionParticles(render) {
         const context = render.context;
         
-        // Enable settings for smoother rendering
         context.globalCompositeOperation = 'lighter';
         
         explosionParticles.forEach(particle => {
@@ -316,28 +442,26 @@ document.addEventListener('DOMContentLoaded', function() {
             context.translate(particle.x, particle.y);
             context.rotate(particle.rotation);
             
-            // Draw different shapes with smooth edges
             const shapePicker = Math.floor(particle.size) % 3;
             
-            // Add glow effect for smoother looking particles
             const glow = context.createRadialGradient(0, 0, 0, 0, 0, particle.size * 1.2);
             glow.addColorStop(0, particle.color);
             glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             switch(shapePicker) {
-                case 0: // Circle
+                case 0: 
                     context.beginPath();
                     context.arc(0, 0, particle.size, 0, Math.PI * 2);
                     context.fillStyle = glow;
                     context.fill();
                     break;
                     
-                case 1: // Square
+                case 1: 
                     context.fillStyle = glow;
                     context.fillRect(-particle.size/2, -particle.size/2, particle.size, particle.size);
                     break;
                     
-                case 2: // Triangle
+                case 2: 
                     context.beginPath();
                     context.moveTo(0, -particle.size);
                     context.lineTo(particle.size, particle.size);
@@ -351,7 +475,6 @@ document.addEventListener('DOMContentLoaded', function() {
             context.restore();
         });
         
-        // Render trail particles
         context.globalCompositeOperation = 'source-over';
         trailParticles.forEach(particle => {
             context.save();
@@ -366,39 +489,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Update explosion particles with smoother physics
     function updateExplosionParticles() {
         for (let i = explosionParticles.length - 1; i >= 0; i--) {
             const particle = explosionParticles[i];
             
-            // Update position with smoother easing
+            // Use smoother interpolation for particle movement
             particle.x += particle.velocity.x;
             particle.y += particle.velocity.y;
             
-            // Add some gravity with easing
+            // Add smoother gravity effect
             particle.velocity.y += particle.gravity;
             
-            // Slow down particles over time with drag
+            // Enhanced drag for smoother deceleration
             particle.velocity.x *= particle.drag;
             particle.velocity.y *= particle.drag;
             
-            // Update rotation with smooth interpolation
+            // Smoother rotation
             particle.rotation += particle.rotationSpeed;
             
-            // Reduce size with easing
-            particle.size *= 0.99;
+            // More gradual size reduction for smoother scaling
+            particle.size *= 0.995; // Changed from 0.99 for smoother scaling
             
-            // Update lifespan and alpha with easing
+            // Enhanced quadratic easing for alpha transition
+            const progress = particle.lifespan / particle.maxLifespan;
+            particle.alpha = progress * progress; // Quadratic easing
+            
             particle.lifespan--;
-            particle.alpha = (particle.lifespan / particle.maxLifespan) * (particle.lifespan / particle.maxLifespan); // Quadratic easing
             
-            // Remove dead particles
             if (particle.lifespan <= 0 || particle.size < 0.5) {
                 explosionParticles.splice(i, 1);
             }
         }
         
-        // Update trail particles
         for (let i = trailParticles.length - 1; i >= 0; i--) {
             const particle = trailParticles[i];
             particle.lifespan--;
@@ -408,13 +530,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Add trail particles to moving bodies for smoother visuals
-        if (Math.random() < 0.3) { // Only add trails occasionally for performance
+        if (Math.random() < 0.3) { 
             activeBodies.forEach(body => {
                 if (Vector.magnitude(body.velocity) > 1) {
                     const speed = Vector.magnitude(body.velocity);
                     
-                    if (speed > 2) { // Only trail fast-moving objects
+                    if (speed > 2) { 
                         const pos = body.position;
                         const trailColor = body.render.fillStyle;
                         const size = Math.min(5, Math.max(1, speed / 5));
@@ -431,19 +552,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Create a smoother explosion
     function createExplosion(x, y, intensity = 1) {
         const particleCount = Math.floor(25 * intensity);
         const baseSize = 3 + (intensity * 2);
         const baseSpeed = 1 + (intensity * 1.5);
         
-        // Create main explosion particles
         for (let i = 0; i < particleCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = Math.random() * 10 * intensity;
             const size = baseSize + Math.random() * 6;
             
-            // Vary the speed based on particle size for more natural looking explosion
             const speedVariation = 1 - (size / (baseSize + 6)) * 0.5;
             const speed = baseSpeed * speedVariation + Math.random() * 2;
             
@@ -458,7 +576,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 angle
             );
             
-            // Add random variation to lifespans for more natural fading
             const lifespanVariation = 0.8 + Math.random() * 0.4;
             particle.lifespan = Math.floor(60 * lifespanVariation);
             particle.maxLifespan = particle.lifespan;
@@ -466,7 +583,6 @@ document.addEventListener('DOMContentLoaded', function() {
             explosionParticles.push(particle);
         }
         
-        // Add some tiny sparks for additional effect
         for (let i = 0; i < particleCount/2; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = baseSpeed * 1.5 + Math.random() * 3;
@@ -481,16 +597,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 angle
             );
             
-            // Make sparks fade faster and more dynamically
             const sparkLifespan = 20 + Math.floor(Math.random() * 20);
             spark.maxLifespan = sparkLifespan;
             spark.lifespan = sparkLifespan;
-            spark.gravity = 0.01; // Less gravity on sparks
+            spark.gravity = 0.01; 
             
             explosionParticles.push(spark);
         }
         
-        // Add shockwave effect
         for (let i = 0; i < 20; i++) {
             const angle = (i / 20) * Math.PI * 2;
             const shockwave = createExplosionParticle(
@@ -510,7 +624,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Handle collision effects with smoother transitions
     function handleCollision(event) {
         const pairs = event.pairs;
         
@@ -518,30 +631,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const bodyA = pairs[i].bodyA;
             const bodyB = pairs[i].bodyB;
             
-            // Calculate collision strength for proportional effects
             const relativeVelocity = {
                 x: bodyA.velocity.x - bodyB.velocity.x,
                 y: bodyA.velocity.y - bodyB.velocity.y
             };
             const collisionSpeed = Math.sqrt(relativeVelocity.x * relativeVelocity.x + relativeVelocity.y * relativeVelocity.y);
-            const impactThreshold = 2; // Minimum speed for effects
+            const impactThreshold = 2; 
             
-            // Skip if collision is too gentle or between boundaries
             if (collisionSpeed < impactThreshold || (boundaries.includes(bodyA) && boundaries.includes(bodyB))) {
                 continue;
             }
             
-            // Normalized impact force (0-1 range)
             const impactForce = Math.min(1, collisionSpeed / 10);
             
-            // Collision point
             const midX = (bodyA.position.x + bodyB.position.x) / 2;
             const midY = (bodyA.position.y + bodyB.position.y) / 2;
             
-            // Apply different collision effects based on selection
             switch(currentEffect) {
                 case 'bounce':
-                    // Enhanced bounce with smooth scaling
                     if (!boundaries.includes(bodyA)) {
                         const velocityA = Vector.mult(Vector.normalise(bodyA.velocity), bodyA.speed * (1 + impactForce * 0.3));
                         Body.setVelocity(bodyA, velocityA);
@@ -551,7 +658,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         Body.setVelocity(bodyB, velocityB);
                     }
                     
-                    // Add tiny spark at collision point for visual feedback
                     if (impactForce > 0.3) {
                         for (let j = 0; j < 3; j++) {
                             const sparkAngle = Math.random() * Math.PI * 2;
@@ -570,13 +676,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
                     
                 case 'explode':
-                    // Create smooth visual explosion effect
                     if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
-                        // Create visual explosion scaled by impact force
                         const intensity = 0.5 + impactForce * 2.5;
                         createExplosion(midX, midY, intensity);
                         
-                        // Create physical particles
                         const particleCount = Math.floor(impactForce * 4) + 1;
                         for (let j = 0; j < particleCount; j++) {
                             const particle = Bodies.circle(
@@ -584,9 +687,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 midY + Common.random(-5, 5),
                                 Common.random(2, 4 + impactForce * 2),
                                 {
-                                    restitution: 0.8,
-                                    friction: 0.05,
-                                    frictionAir: 0.005,
+                                    restitution: 0.3,       // Reduced from 0.8 for less bounce
+                                    friction: 0.15,         // Increased from 0.05
+                                    frictionAir: 0.008,     // Increased from 0.005
                                     render: {
                                         fillStyle: explosionColors[Math.floor(Math.random() * explosionColors.length)],
                                         opacity: 0.8
@@ -594,7 +697,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                             );
                             
-                            // Scale force by impact strength
                             const forceMagnitude = 0.01 + (impactForce * 0.03);
                             const angle = Math.random() * Math.PI * 2;
                             Body.applyForce(particle, particle.position, {
@@ -605,11 +707,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             activeBodies.push(particle);
                             Composite.add(world, particle);
                             
-                            // Remove particles with a slight delay variance
                             const removeDelay = 1500 + Math.random() * 1000;
                             setTimeout(() => {
                                 if (activeBodies.includes(particle)) {
-                                    // Fade out particles before removing them
                                     const fadeInterval = setInterval(() => {
                                         if (particle.render.opacity > 0.1) {
                                             particle.render.opacity -= 0.1;
@@ -626,9 +726,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
                     
                 case 'stick':
-                    // Make bodies stick together with smooth attraction
                     if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
-                        // Scale force by body mass and impact
                         const baseForce = 0.0005;
                         const forceMagnitude = baseForce * (1 + impactForce);
                         
@@ -638,14 +736,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (distance > 0) {
                             const normalizedDirection = Vector.normalise(direction);
                             
-                            // Apply scaled forces
                             Body.applyForce(bodyA, bodyA.position, 
                                 Vector.mult(normalizedDirection, forceMagnitude * bodyA.mass));
                             
                             Body.applyForce(bodyB, bodyB.position, 
                                 Vector.mult(normalizedDirection, -forceMagnitude * bodyB.mass));
                             
-                            // Add visual connection effect
                             if (Math.random() < 0.2) {
                                 const particlePos = Vector.add(
                                     bodyA.position,
@@ -672,29 +768,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
                     
                 case 'gravity':
-                    // Smoothly change gravity direction on collision
                     if (!boundaries.includes(bodyA) || !boundaries.includes(bodyB)) {
-                        // Generate random angle weighted by impact force
                         const startAngle = Math.atan2(world.gravity.y, world.gravity.x);
                         const angleChange = (Math.random() - 0.5) * Math.PI * impactForce * 2;
                         const newAngle = startAngle + angleChange;
                         
-                        // Store current gravity values
                         const oldGravityX = world.gravity.x;
                         const oldGravityY = world.gravity.y;
                         
-                        // Target gravity values
                         const targetGravityX = Math.sin(newAngle) * 0.001;
                         const targetGravityY = Math.cos(newAngle) * 0.001;
                         
-                        // Smoothly transition gravity
                         const transitionSteps = 20;
                         const transitionDelay = 50;
                         
                         for (let step = 0; step <= transitionSteps; step++) {
                             setTimeout(() => {
                                 const progress = step / transitionSteps;
-                                // Use easeInOutQuad for smooth transition
                                 const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                                 
                                 world.gravity.x = oldGravityX + (targetGravityX - oldGravityX) * easing;
@@ -702,7 +792,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             }, step * transitionDelay);
                         }
                         
-                        // Gravity wave visual effect
                         for (let i = 0; i < 24; i++) {
                             const angle = (i / 24) * Math.PI * 2;
                             const gravityWave = createExplosionParticle(
@@ -721,7 +810,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             explosionParticles.push(gravityWave);
                         }
                         
-                        // Reset gravity after a delay with smooth transition back
                         const resetDelay = 1500 + impactForce * 1000;
                         setTimeout(() => {
                             const finalGravityX = world.gravity.x;
@@ -730,7 +818,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             for (let step = 0; step <= transitionSteps; step++) {
                                 setTimeout(() => {
                                     const progress = step / transitionSteps;
-                                    // Use easeInOutQuad for smooth transition
                                     const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                                     
                                     world.gravity.x = finalGravityX * (1 - easing);
@@ -744,58 +831,48 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Custom render function with smoother animations
     Events.on(render, 'afterRender', function() {
         updateExplosionParticles();
         renderExplosionParticles(render);
     });
 
-    // Event listeners for smoother collision detection
     Events.on(engine, 'collisionStart', handleCollision);
 
-    // Smoother mouse controls
     const mouse = Mouse.create(render.canvas);
     const mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
         constraint: {
-            stiffness: 0.1,  // Softer constraint for smoother dragging
-            damping: 0.1,    // Add damping for smoother movement
+            stiffness: 0.1,  
+            damping: 0.1,    
             render: {
                 visible: false
             }
         }
     });
 
-    // Scale mouse position for retina displays
     mouse.pixelRatio = pixelRatio;
 
     Composite.add(world, mouseConstraint);
     render.mouse = mouse;
 
-    // Add a smooth grabbing animation when using mouse
     Events.on(mouseConstraint, 'startdrag', function(event) {
         const body = event.body;
         createRippleEffect(body.position.x, body.position.y);
     });
 
-    // Setup event listeners for buttons with smoother transitions
     document.querySelectorAll('.effect-btn').forEach(button => {
         button.addEventListener('click', () => {
-            // Update active effect with visual feedback
             document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             
             const newEffect = button.getAttribute('data-effect');
             
-            // Only add effect if changing
             if (newEffect !== currentEffect) {
                 currentEffect = newEffect;
                 
-                // Add visual ripple in canvas to indicate mode change
                 const x = canvas.width / (2 * pixelRatio);
                 const y = canvas.height / (2 * pixelRatio);
                 
-                // Different colors for different effects
                 let effectColor;
                 switch(currentEffect) {
                     case 'bounce': effectColor = '#3ddc84'; break;
@@ -805,7 +882,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     default: effectColor = '#ffffff';
                 }
                 
-                // Create mode change effect
                 for (let i = 0; i < 36; i++) {
                     const angle = (i / 36) * Math.PI * 2;
                     const modeParticle = createExplosionParticle(
@@ -826,7 +902,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Setup add shape buttons with smoother object creation
     document.getElementById('add-circle').addEventListener('click', () => {
         createBody(canvas.width / (2 * pixelRatio), 50, 'circle');
     });
@@ -839,27 +914,35 @@ document.addEventListener('DOMContentLoaded', function() {
         createBody(canvas.width / (2 * pixelRatio), 50, 'polygon');
     });
 
-    // Reset scene with smooth animation
+    // Smoother reset animation
     document.getElementById('reset-scene').addEventListener('click', () => {
-        // Animate removal of bodies for smoother effect
-        const removalDelay = 20;
+        const removalDelay = 15; // Reduced from 20 for faster animation
         
         activeBodies.forEach((body, index) => {
             setTimeout(() => {
-                // Create a small explosion where the body was
                 createExplosion(body.position.x, body.position.y, 0.5);
                 
-                // Remove the body
-                Composite.remove(world, body);
-                
-                // If this is the last body, clear the array
-                if (index === activeBodies.length - 1) {
-                    activeBodies = [];
+                // Add fade-out effect before removal
+                const fadeSteps = 10;
+                for (let i = 0; i < fadeSteps; i++) {
+                    setTimeout(() => {
+                        if (body.render && typeof body.render.opacity !== 'undefined') {
+                            body.render.opacity = 1 - (i / fadeSteps);
+                        }
+                    }, i * 20);
                 }
+                
+                setTimeout(() => {
+                    Composite.remove(world, body);
+                    
+                    if (index === activeBodies.length - 1) {
+                        activeBodies = [];
+                    }
+                }, fadeSteps * 20);
+                
             }, index * removalDelay);
         });
         
-        // Reset gravity with a smooth transition
         const steps = 20;
         const currentGravX = world.gravity.x;
         const currentGravY = world.gravity.y;
@@ -873,22 +956,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Toggle gravity with smooth transition
+    // Enhanced animation transitions for UI effects
     document.getElementById('toggle-gravity').addEventListener('click', () => {
         const targetY = world.gravity.y === 1 ? 0 : 1;
         const currentY = world.gravity.y;
-        const steps = 15;
+        const steps = 30; // Increased from 15 for smoother transition
         
         for (let i = 0; i <= steps; i++) {
             setTimeout(() => {
                 const progress = i / steps;
-                // Use easing function for smoother transition
-                const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                // Cubic easing for smoother gravity transition
+                const easing = progress < 0.5 
+                    ? 4 * progress * progress * progress 
+                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
                 world.gravity.y = currentY + (targetY - currentY) * easing;
-            }, i * 20);
+            }, i * 15); // Reduced from 20ms to 15ms for faster response
         }
         
-        // Visual feedback for gravity change
         const x = canvas.width / (2 * pixelRatio);
         const y = canvas.height / (2 * pixelRatio);
         
@@ -910,75 +994,75 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Handle resize with smoother transitions
     window.addEventListener('resize', () => {
-        // Remove old boundaries
         boundaries.forEach(boundary => {
             Composite.remove(world, boundary);
         });
         
-        // Update canvas dimensions
         canvas.width = canvasContainer.offsetWidth * pixelRatio;
         canvas.height = canvasContainer.offsetHeight * pixelRatio;
         canvas.style.width = `${canvasContainer.offsetWidth}px`;
         canvas.style.height = `${canvasContainer.offsetHeight}px`;
         
-        // Update renderer dimensions
         render.options.width = canvas.width;
         render.options.height = canvas.height;
         
-        // Create new boundaries
         createBoundaries();
     });
 
-    // Add click handler for canvas to create random shapes
+    // Enhanced click ripple effect
     canvas.addEventListener('click', (event) => {
-        // Prevent click from being captured if we're dragging an object
         if (mouseConstraint.body) {
             return;
         }
         
-        // Get click position relative to canvas, adjusted for pixelRatio
         const rect = canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) * pixelRatio;
         const y = (event.clientY - rect.top) * pixelRatio;
         
-        // Create a random shape at click position
         const shapeTypes = ['circle', 'square', 'polygon'];
         const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
         
-        // Create the body with a small animation
         createBody(x, y, randomType);
         
-        // Add a larger ripple effect for visual feedback
-        for (let i = 0; i < 8; i++) {
+        // Create more ripples with staggered timing for smoother effect
+        for (let i = 0; i < 12; i++) { // Increased from 8 to 12
             setTimeout(() => {
                 createRippleEffect(x, y);
-            }, i * 30);
+            }, i * 25); // Reduced from 30ms to 25ms for faster animation
         }
     });
 
-    // Initialize playground
     createBoundaries();
 
-    // Add initial bodies with staggered timing for smoother startup
-    for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-            const x = Common.random(100, canvas.width / pixelRatio - 100);
+    console.log("Creating initial shapes...");
+    setTimeout(() => {
+        for (let i = 0; i < 5; i++) {
+            const x = Common.random(100, canvas.width / pixelRatio - 200); // Adjusted to avoid right edge
             const y = Common.random(50, 100);
             const type = ['circle', 'square', 'polygon'][Math.floor(Math.random() * 3)];
+            console.log(`Creating shape ${i}: ${type} at (${x}, ${y})`);
             createBody(x, y, type);
-        }, i * 200);
-    }
+        }
+    }, 500); // Added delay to ensure canvas is ready
+
+    // Debug helper
+    window.debugPhysics = function() {
+        console.log("World bodies:", world.bodies.length);
+        console.log("Active bodies:", activeBodies.length);
+        console.log("Canvas dimensions:", canvas.width, canvas.height);
+        console.log("Gravity:", world.gravity);
+        
+        // Force create a shape at center
+        createBody(canvas.width / (2 * pixelRatio), 100, 'circle');
+    };
 });
 
-// Particle network background
 function initNetworkBackground() {
     const canvas = document.getElementById('network-background');
     const ctx = canvas.getContext('2d');
     const container = document.querySelector('.canvas-container');
     
-    // Set canvas size
     const resizeCanvas = () => {
         const pixelRatio = window.devicePixelRatio || 1;
         canvas.width = container.offsetWidth * pixelRatio;
@@ -991,79 +1075,58 @@ function initNetworkBackground() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    // Enhanced particle settings for better visibility and interactivity
-    const particleCount = 120;   // Increased from 80
-    const maxDistance = 180;     // Increased connection distance
-    const lineOpacity = 0.25;    // Increased from 0.15
-    const dotOpacity = 0.6;      // Increased from 0.4
-    const particleSpeed = 0.4;   // Slightly faster movement
-    const mouseRadius = 200;     // Larger mouse influence area
-    const mouseForce = 3.5;      // Stronger mouse influence
+    const particleCount = 120;   
+    const maxDistance = 180;     
+    const lineOpacity = 0.25;    
+    const dotOpacity = 0.6;      
+    const particleSpeed = 0.4;   
+    const mouseRadius = 200;     
+    const mouseForce = 3.5;      
     
-    // Brighter, more vibrant colors with higher opacity
     const colors = [
-        'rgba(120, 60, 220, 0.85)',  // Vibrant purple
-        'rgba(70, 240, 140, 0.85)',  // Bright green
-        'rgba(255, 140, 90, 0.85)',  // Bright orange
-        'rgba(65, 200, 255, 0.85)'   // Added bright blue
+        'rgba(120, 60, 220, 0.85)',  
+        'rgba(70, 240, 140, 0.85)',  
+        'rgba(255, 140, 90, 0.85)',  
+        'rgba(65, 200, 255, 0.85)'   
     ];
     
-    // Create particles
     const particles = [];
     
-    // Mouse position with enhanced tracking
     const mouse = {
         x: null,
         y: null,
         radius: mouseRadius,
-        active: false            // Track if mouse is being moved
+        active: false            
     };
     
-    // Add pulse effect when clicking
     canvas.addEventListener('click', (event) => {
         createPulseEffect(event.clientX - canvas.getBoundingClientRect().left, 
                          event.clientY - canvas.getBoundingClientRect().top);
     });
     
-    // Track mouse position with enhanced sensitivity
     canvas.addEventListener('mousemove', (event) => {
         const rect = canvas.getBoundingClientRect();
+        mouse.x = event.clientX - rect.left;
+        mouse.y = event.clientY - rect.top;
         
-        // Activate mouse influence with a fade-in effect
         if (!mouse.active) {
             mouse.active = true;
-            // Start with a small radius and expand
             let startRadius = 50;
             const expandInterval = setInterval(() => {
                 startRadius += 10;
-                if (startRadius >= mouseRadius) {
+                if (startRadius >= mouse.radius) {
                     clearInterval(expandInterval);
                 }
-                mouse.radius = startRadius;
-            }, 20);
-        }
-        
-        mouse.x = event.clientX - rect.left;
-        mouse.y = event.clientY - rect.top;
-    });
-    
-    // Reset mouse position when mouse leaves with fade-out effect
-    canvas.addEventListener('mouseleave', () => {
-        if (mouse.active) {
-            // Shrink radius before deactivating
-            const shrinkInterval = setInterval(() => {
-                mouse.radius -= 10;
-                if (mouse.radius <= 0) {
-                    clearInterval(shrinkInterval);
-                    mouse.x = null;
-                    mouse.y = null;
-                    mouse.active = false;
-                }
             }, 20);
         }
     });
     
-    // Create pulse effect when clicking
+    canvas.addEventListener('mouseout', () => {
+        mouse.x = null;
+        mouse.y = null;
+        mouse.active = false;
+    });
+    
     function createPulseEffect(x, y) {
         const pulseCount = 3;
         
@@ -1082,7 +1145,6 @@ function initNetworkBackground() {
                     pulse.size += 5;
                     pulse.opacity -= 0.01;
                     
-                    // Draw expanding circle
                     ctx.beginPath();
                     ctx.arc(pulse.x, pulse.y, pulse.size, 0, Math.PI * 2);
                     ctx.strokeStyle = pulse.color;
@@ -1091,7 +1153,6 @@ function initNetworkBackground() {
                     ctx.stroke();
                     ctx.globalAlpha = 1;
                     
-                    // Clear interval when pulse is complete
                     if (pulse.size >= pulse.maxSize || pulse.opacity <= 0) {
                         clearInterval(pulseInterval);
                     }
@@ -1099,7 +1160,6 @@ function initNetworkBackground() {
             }, i * 200);
         }
         
-        // Also create some new particles at click point
         for (let i = 0; i < 8; i++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = Math.random() * 20;
@@ -1107,9 +1167,8 @@ function initNetworkBackground() {
             
             newParticle.x = x + Math.cos(angle) * distance;
             newParticle.y = y + Math.sin(angle) * distance;
-            newParticle.size = Math.random() * 4 + 2; // Larger particles
+            newParticle.size = Math.random() * 4 + 2; 
             
-            // Give them an outward velocity
             newParticle.velocityX = Math.cos(angle) * (Math.random() * 2 + 1);
             newParticle.velocityY = Math.sin(angle) * (Math.random() * 2 + 1);
             
@@ -1117,30 +1176,27 @@ function initNetworkBackground() {
         }
     }
     
-    // Enhanced Particle class
     class Particle {
         constructor() {
             this.x = Math.random() * canvas.width / window.devicePixelRatio;
             this.y = Math.random() * canvas.height / window.devicePixelRatio;
             this.velocityX = Math.random() * particleSpeed * 2 - particleSpeed;
             this.velocityY = Math.random() * particleSpeed * 2 - particleSpeed;
-            this.size = Math.random() * 3 + 1.5; // Larger particles
-            this.baseSize = this.size; // Store original size for pulsing effect
+            this.size = Math.random() * 3 + 1.5; 
+            this.baseSize = this.size; 
             this.color = colors[Math.floor(Math.random() * colors.length)];
-            this.targetX = null; // Target coordinates for attraction effect
+            this.targetX = null; 
             this.targetY = null;
             this.wobble = {
                 speed: Math.random() * 0.02 + 0.01,
                 offset: Math.random() * Math.PI * 2,
-                amplitude: Math.random() * 0.7 + 0.6 // Increased wobble effect
+                amplitude: Math.random() * 0.7 + 0.6 
             };
-            // Add glow effect property
-            this.glow = Math.random() > 0.7; // 30% of particles will glow
+            this.glow = Math.random() > 0.7; 
             this.glowIntensity = Math.random() * 0.5 + 0.5;
         }
         
         update() {
-            // Wall detection with bounce
             if (this.x < 0 || this.x > canvas.width / window.devicePixelRatio) {
                 this.velocityX = -this.velocityX;
             }
@@ -1149,70 +1205,56 @@ function initNetworkBackground() {
                 this.velocityY = -this.velocityY;
             }
             
-            // Enhanced mouse interaction
             if (mouse.x !== null && mouse.y !== null) {
                 const dx = mouse.x - this.x;
                 const dy = mouse.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance < mouse.radius) {
-                    // Calculate force based on distance (closer = stronger)
                     const force = (mouse.radius - distance) / mouse.radius;
                     
-                    // Add wobble to make movement more organic
                     const wobbleX = Math.sin(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
                     const wobbleY = Math.cos(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
                     
-                    // Apply stronger repulsion force with wobble
                     this.velocityX += -dx * force * mouseForce * 0.015 + wobbleX * 0.15;
                     this.velocityY += -dy * force * mouseForce * 0.015 + wobbleY * 0.15;
                     
-                    // Increase size when affected by mouse (subtle swell effect)
                     this.size = this.baseSize * (1 + force * 0.5);
                     
-                    // Enhanced visual feedback - change color slightly when affected
                     if (Math.random() > 0.95) {
                         this.color = colors[Math.floor(Math.random() * colors.length)];
                     }
                 } else {
-                    // Gradually return to base size
                     if (this.size > this.baseSize) {
                         this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
                     }
                 }
             } else {
-                // Return to base size when mouse not present
                 if (this.size > this.baseSize) {
                     this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
                 }
             }
             
-            // Enhanced random movement with more pronounced wobble
             this.velocityX += Math.sin(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
             this.velocityY += Math.cos(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
             
-            // Limit speed to prevent particles from moving too fast
             const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-            if (speed > 2.5) { // Increased max speed
+            if (speed > 2.5) { 
                 this.velocityX = (this.velocityX / speed) * 2.5;
                 this.velocityY = (this.velocityY / speed) * 2.5;
             }
             
-            // Add some drag to slow particles gradually
             this.velocityX *= 0.98;
             this.velocityY *= 0.98;
             
-            // Update position
             this.x += this.velocityX;
             this.y += this.velocityY;
         }
         
         draw() {
-            // Enhanced drawing with glow effect
-            const pulseScale = 1 + Math.sin(Date.now() * 0.004 + this.wobble.offset) * 0.15; // Larger pulse
+            const pulseScale = 1 + Math.sin(Date.now() * 0.004 + this.wobble.offset) * 0.15; 
             const size = this.size * pulseScale;
             
-            // Draw glow for special particles
             if (this.glow) {
                 const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size * 2.5);
                 glow.addColorStop(0, this.color);
@@ -1226,14 +1268,12 @@ function initNetworkBackground() {
                 ctx.globalAlpha = 1;
             }
             
-            // Draw main particle with enhanced appearance
             ctx.beginPath();
             ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
             ctx.globalAlpha = dotOpacity;
             ctx.fill();
             
-            // Add a small white core to some particles for extra sparkle
             if (Math.random() > 0.7) {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, size * 0.4, 0, Math.PI * 2);
@@ -1245,14 +1285,12 @@ function initNetworkBackground() {
         }
     }
     
-    // Initialize particles with variety in positions
     function init() {
         for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle());
         }
     }
     
-    // Connect particles with enhanced lines
     function connect() {
         for (let i = 0; i < particles.length; i++) {
             for (let j = i + 1; j < particles.length; j++) {
@@ -1261,10 +1299,8 @@ function initNetworkBackground() {
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance < maxDistance) {
-                    // Make lines fade based on distance with enhanced opacity curve
                     const opacity = lineOpacity * Math.pow((1 - distance / maxDistance), 2);
                     
-                    // Enhanced gradient with more vibrant appearance
                     const gradient = ctx.createLinearGradient(
                         particles[i].x, particles[i].y,
                         particles[j].x, particles[j].y
@@ -1273,7 +1309,6 @@ function initNetworkBackground() {
                     gradient.addColorStop(0, particles[i].color);
                     gradient.addColorStop(1, particles[j].color);
                     
-                    // Draw thicker lines when closer
                     const lineWidth = Math.max(0.5, 1.5 * (1 - distance / maxDistance));
                     
                     ctx.beginPath();
@@ -1285,7 +1320,6 @@ function initNetworkBackground() {
                     ctx.stroke();
                     ctx.globalAlpha = 1;
                     
-                    // Add extra glow effect to lines near mouse
                     if (mouse.x !== null && mouse.y !== null) {
                         const midX = (particles[i].x + particles[j].x) / 2;
                         const midY = (particles[i].y + particles[j].y) / 2;
@@ -1309,20 +1343,16 @@ function initNetworkBackground() {
         }
     }
     
-    // Animation loop with performance optimization
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Update and draw particles
         for (let i = 0; i < particles.length; i++) {
             particles[i].update();
             particles[i].draw();
         }
         
-        // Connect particles with lines
         connect();
         
-        // Optional: Remove excess particles to maintain performance
         while (particles.length > particleCount + 20) {
             particles.shift();
         }
@@ -1330,7 +1360,15 @@ function initNetworkBackground() {
         requestAnimationFrame(animate);
     }
     
-    // Start the animation
     init();
     animate();
+}
+
+function updateBoundaries() {
+    boundaries.forEach(boundary => {
+        Composite.remove(world, boundary);
+    });
+    boundaries = [];
+    
+    createBoundaries();
 }

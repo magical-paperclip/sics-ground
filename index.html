@@ -3,100 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>sics-ground</title>
+    <title>Physics Playground</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://unpkg.com/@vercel/speed-insights"></script>
 </head>
 <body>
-    <div class="app-container">
-        <div class="sidebar">
-            <div class="logo">
-                <h1>sics-ground</h1>
-            </div>
-            
+    <canvas id="network-background"></canvas>
+    
+    <div class="sidebar">
+        <h1 class="title">sics-ground</h1>
+        <div class="menu-container">
             <div class="control-section">
                 <h2>Shapes</h2>
                 <div class="button-group">
-                    <button id="add-circle" class="control-btn">
-                        <span class="icon">●</span>
+                    <button id="add-circle">
+                        <i class="fas fa-circle"></i>
                         Circle
                     </button>
-                    <button id="add-square" class="control-btn">
-                        <span class="icon">■</span>
+                    <button id="add-square">
+                        <i class="fas fa-square"></i>
                         Square
                     </button>
-                    <button id="add-polygon" class="control-btn">
-                        <span class="icon">⬡</span>
+                    <button id="add-polygon">
+                        <i class="fas fa-shapes"></i>
                         Polygon
                     </button>
                 </div>
             </div>
 
             <div class="control-section">
-                <h2>Effects</h2>
+                <h2>Special Effects</h2>
                 <div class="button-group">
-                    <button class="effect-btn active" data-effect="bounce">
-                        <span class="icon">↻</span>
-                        Bounce
+                    <button class="effect-btn" data-effect="bounce">
+                        <i class="fas fa-bounce"></i>
+                        Bounce (B)
                     </button>
                     <button class="effect-btn" data-effect="explode">
-                        <span class="icon">✧</span>
-                        Explode
+                        <i class="fas fa-bomb"></i>
+                        Explode (E)
                     </button>
                     <button class="effect-btn" data-effect="stick">
-                        <span class="icon">⊞</span>
-                        Stick
+                        <i class="fas fa-magnet"></i>
+                        Stick (S)
                     </button>
                     <button class="effect-btn" data-effect="gravity">
-                        <span class="icon">↓</span>
-                        Gravity
+                        <i class="fas fa-gravity"></i>
+                        Gravity (G)
                     </button>
                 </div>
             </div>
 
             <div class="control-section">
-                <h2>Physics</h2>
+                <h2>Physics Controls</h2>
                 <div class="slider-group">
-                    <label>
-                        Gravity
+                    <div class="slider-container">
+                        <label for="gravity-slider">Gravity</label>
                         <input type="range" id="gravity-slider" min="0" max="2" step="0.1" value="1">
-                    </label>
-                    <label>
-                        Friction
-                        <input type="range" id="friction-slider" min="0" max="1" step="0.1" value="0.2">
-                    </label>
-                    <label>
-                        Restitution
-                        <input type="range" id="restitution-slider" min="0" max="1" step="0.1" value="0.5">
-                    </label>
+                    </div>
+                    <div class="slider-container">
+                        <label for="friction-slider">Friction</label>
+                        <input type="range" id="friction-slider" min="0" max="1" step="0.1" value="0.3">
+                    </div>
+                    <div class="slider-container">
+                        <label for="restitution-slider">Bounciness</label>
+                        <input type="range" id="restitution-slider" min="0" max="1" step="0.1" value="0.4">
+                    </div>
                 </div>
             </div>
 
             <div class="control-section">
                 <h2>Actions</h2>
                 <div class="button-group">
-                    <button id="reset-scene" class="control-btn danger">
-                        <span class="icon">↺</span>
-                        Reset
+                    <button id="reset-scene">
+                        <i class="fas fa-trash"></i>
+                        Reset Scene
                     </button>
-                    <button id="toggle-gravity" class="control-btn">
-                        <span class="icon">⇅</span>
+                    <button id="toggle-gravity">
+                        <i class="fas fa-gravity"></i>
                         Toggle Gravity
                     </button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="main-content">
-            <div class="canvas-container">
-                <canvas id="network-background"></canvas>
-                <div class="canvas-wrapper">
-                    <canvas id="physics-canvas"></canvas>
-                </div>
-            </div>
+    <div class="canvas-container">
+        <div class="canvas-wrapper">
+            <canvas id="physics-canvas"></canvas>
         </div>
     </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        window.si = window.si || function() {
+            (window.siq = window.siq || []).push(arguments);
+        };
+    </script>
 </body>
 </html>

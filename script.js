@@ -1,9 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize network background
     const networkCanvas = document.getElementById('network-background');
     const ctx = networkCanvas.getContext('2d');
     
-    // Set canvas size
     function resizeCanvas() {
         networkCanvas.width = window.innerWidth;
         networkCanvas.height = window.innerHeight;
@@ -12,10 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    // Particle system
     const particles = [];
-    const particleCount = 30; // Reduced number of particles
-    const particleColor = 'rgba(255, 107, 107, 0.1)'; // Cute pink color
+    const particleCount = 30;
+    const particleColor = 'rgba(255, 107, 107, 0.1)';
     
     class Particle {
         constructor() {
@@ -25,8 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
         reset() {
             this.x = Math.random() * networkCanvas.width;
             this.y = Math.random() * networkCanvas.height;
-            this.size = Math.random() * 2 + 1; // Smaller particles
-            this.speedX = Math.random() * 0.5 - 0.25; // Slower movement
+            this.size = Math.random() * 2 + 1;
+            this.speedX = Math.random() * 0.5 - 0.25;
             this.speedY = Math.random() * 0.5 - 0.25;
         }
         
@@ -46,12 +43,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Initialize particles
     for (let i = 0; i < particleCount; i++) {
         particles.push(new Particle());
     }
     
-    // Animation loop
     function animate() {
         ctx.clearRect(0, 0, networkCanvas.width, networkCanvas.height);
         
@@ -60,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
             particle.draw();
         });
         
-        // Draw connections
         particles.forEach((p1, i) => {
             particles.slice(i + 1).forEach(p2 => {
                 const dx = p1.x - p2.x;
@@ -83,9 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     animate();
 
-    // Physics engine setup
     const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
-
+    
     const engine = Engine.create({
         positionIterations: 8,
         velocityIterations: 6,
@@ -95,21 +88,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const world = engine.world;
     world.gravity.scale = 0.001;
-    world.gravity.y = 0.98; // More realistic gravity
-
+    world.gravity.y = 0.98;
+    
     const canvas = document.getElementById('physics-canvas');
     const canvasContainer = document.querySelector('.canvas-container');
     const canvasWrapper = document.querySelector('.canvas-wrapper');
     
-    if (!canvas || !canvasContainer) {
-        console.error('Canvas or container elements not found!');
-        return;
-    }
+    if (!canvas || !canvasContainer) return;
     
-    // Set canvas dimensions
-    const CANVAS_WIDTH = window.innerWidth - 320; // Adjusted for new sidebar width
+    const CANVAS_WIDTH = window.innerWidth - 320;
     const CANVAS_HEIGHT = window.innerHeight;
-    const SCROLL_HEIGHT = CANVAS_HEIGHT; // Remove scrolling, make it fit viewport
+    const SCROLL_HEIGHT = CANVAS_HEIGHT;
     const CONTAINER_HEIGHT = CANVAS_HEIGHT;
     
     const pixelRatio = window.devicePixelRatio || 1;
@@ -122,9 +111,8 @@ document.addEventListener('DOMContentLoaded', function() {
     canvasContainer.style.height = `${CONTAINER_HEIGHT}px`;
     canvasWrapper.style.width = `${CANVAS_WIDTH}px`;
     canvasWrapper.style.height = `${CONTAINER_HEIGHT}px`;
-    canvasWrapper.style.overflow = 'hidden'; // Remove scrolling
+    canvasWrapper.style.overflow = 'hidden';
 
-    // Physics controls
     const gravitySlider = document.getElementById('gravity-slider');
     const frictionSlider = document.getElementById('friction-slider');
     const restitutionSlider = document.getElementById('restitution-slider');
@@ -167,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hasBounds: true
         }
     });
-
+    
     const runner = Runner.create({
         isFixed: false,
         delta: 1000/120
@@ -185,10 +173,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const colors = ['#00ff00', '#00ffff'];
     const explosionColors = ['#ff7b54', '#ffb26b', '#ffd56b', '#939597', '#6c22bd'];
 
-    function createDecorativeElements() {
-        // Removed all decorative elements
-    }
-
     function createBoundaries() {
         const wallOptions = { 
             isStatic: true,
@@ -199,16 +183,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const wallWidth = 20;
         
-        // Create left wall
         const leftWall = Bodies.rectangle(
-            wallWidth/2,
+            wallWidth/2, 
             CANVAS_HEIGHT/2,
-            wallWidth,
+            wallWidth, 
             CANVAS_HEIGHT,
             wallOptions
         );
         
-        // Create right wall
         const rightWall = Bodies.rectangle(
             CANVAS_WIDTH - wallWidth/2,
             CANVAS_HEIGHT/2,
@@ -217,16 +199,14 @@ document.addEventListener('DOMContentLoaded', function() {
             wallOptions
         );
         
-        // Create ceiling
         const ceiling = Bodies.rectangle(
             CANVAS_WIDTH/2,
             wallWidth/2,
             CANVAS_WIDTH,
-            wallWidth,
+            wallWidth, 
             wallOptions
         );
         
-        // Create ground
         const ground = Bodies.rectangle(
             CANVAS_WIDTH/2,
             CANVAS_HEIGHT - wallWidth/2,
@@ -241,20 +221,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function createBody(x, y, type) {
         const colors = [
-            '#4285F4', // Google Blue
-            '#EA4335', // Google Red
-            '#FBBC05', // Google Yellow
-            '#34A853'  // Google Green
+            '#4285F4',
+            '#EA4335',
+            '#FBBC05',
+            '#34A853'
         ];
         
         const color = colors[Math.floor(Math.random() * colors.length)];
         
         const options = {
-            restitution: 0.4, // Less bouncy
-            friction: 0.3,    // More friction
+            restitution: 0.4,
+            friction: 0.3,
             frictionAir: 0.001,
             frictionStatic: 0.5,
-            density: 0.002,   // Slightly heavier
+            density: 0.002,
             render: {
                 fillStyle: color,
                 strokeStyle: 'rgba(255, 255, 255, 0.2)',
@@ -263,26 +243,22 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         let body;
-        
-        // Adjust size based on pixel ratio to prevent stretching
-        const baseSize = Common.random(15, 30);
-        const adjustedSize = baseSize / pixelRatio;
+        const baseSize = 20;
         
         switch(type) {
             case 'circle':
-                body = Bodies.circle(x, y, adjustedSize, options);
+                body = Bodies.circle(x, y, baseSize, options);
                 break;
             case 'square':
-                body = Bodies.rectangle(x, y, adjustedSize * 2, adjustedSize * 2, options);
+                body = Bodies.rectangle(x, y, baseSize * 2, baseSize * 2, options);
                 break;
             case 'polygon':
-                body = Bodies.polygon(x, y, Common.random(3, 6), adjustedSize, options);
+                body = Bodies.polygon(x, y, Common.random(3, 6), baseSize, options);
                 break;
             default:
-                body = Bodies.circle(x, y, adjustedSize, options);
+                body = Bodies.circle(x, y, baseSize, options);
         }
         
-        // Set initial velocity with slight randomness
         Body.setVelocity(body, { 
             x: Common.random(-0.5, 0.5),
             y: Common.random(-0.5, 0.5)
@@ -297,7 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createRippleEffect(x, y) {
-        // Create a single burst of particles
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
             const distance = 15;
@@ -336,7 +311,9 @@ document.addEventListener('DOMContentLoaded', function() {
             lifespan: 60,
             maxLifespan: 60,
             gravity: 0.02,
-            drag: 0.98
+            drag: 0.98,
+            strokeStyle: 'rgba(255, 255, 255, 0.2)',
+            lineWidth: 1
         };
     }
 
@@ -375,11 +352,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     context.arc(0, 0, particle.size, 0, Math.PI * 2);
                     context.fillStyle = glow;
                     context.fill();
+                    context.strokeStyle = particle.strokeStyle;
+                    context.lineWidth = particle.lineWidth;
+                    context.stroke();
                     break;
                     
                 case 1: 
                     context.fillStyle = glow;
                     context.fillRect(-particle.size/2, -particle.size/2, particle.size, particle.size);
+                    context.strokeStyle = particle.strokeStyle;
+                    context.lineWidth = particle.lineWidth;
+                    context.strokeRect(-particle.size/2, -particle.size/2, particle.size, particle.size);
                     break;
                     
                 case 2: 
@@ -390,6 +373,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     context.closePath();
                     context.fillStyle = glow;
                     context.fill();
+                    context.strokeStyle = particle.strokeStyle;
+                    context.lineWidth = particle.lineWidth;
+                    context.stroke();
                     break;
             }
             
@@ -405,6 +391,9 @@ document.addEventListener('DOMContentLoaded', function() {
             context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
             context.fillStyle = particle.color;
             context.fill();
+            context.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            context.lineWidth = 1;
+            context.stroke();
             
             context.restore();
         });
@@ -511,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const sparkLifespan = 20 + Math.floor(Math.random() * 20);
             spark.maxLifespan = sparkLifespan;
             spark.lifespan = sparkLifespan;
-            spark.gravity = 0.01; 
+            spark.gravity = 0.01;
             
             explosionParticles.push(spark);
         }
@@ -572,10 +561,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         for (let j = 0; j < 3; j++) {
                             const sparkAngle = Math.random() * Math.PI * 2;
                             const spark = createExplosionParticle(
-                                midX, midY,
-                                '#ffffff',
+                                midX, midY, 
+                                '#ffffff', 
                                 1 + impactForce * 2,
-                                1 + impactForce * 2,
+                                1 + impactForce * 2, 
                                 sparkAngle
                             );
                             spark.maxLifespan = 10;
@@ -603,10 +592,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (distance > 0) {
                             const normalizedDirection = Vector.normalise(direction);
                             
-                            Body.applyForce(bodyA, bodyA.position,
+                            Body.applyForce(bodyA, bodyA.position, 
                                 Vector.mult(normalizedDirection, forceMagnitude * bodyA.mass));
                             
-                            Body.applyForce(bodyB, bodyB.position,
+                            Body.applyForce(bodyB, bodyB.position, 
                                 Vector.mult(normalizedDirection, -forceMagnitude * bodyB.mass));
                         }
                     }
@@ -654,45 +643,40 @@ document.addEventListener('DOMContentLoaded', function() {
         createRippleEffect(body.position.x, body.position.y);
     });
 
-    // Remove old effect button handlers
-    document.querySelectorAll('.effect-btn').forEach(button => {
-        button.removeEventListener('click', () => {});
-    });
-
-    // Add keyboard controls
     document.addEventListener('keydown', (event) => {
-        switch(event.key.toLowerCase()) {
-            case 'b':
-                currentEffect = 'bounce';
-                isEffectActive = true;
-                break;
-            case 'e':
-                currentEffect = 'explode';
-                isEffectActive = true;
-                break;
-            case 's':
-                currentEffect = 'stick';
-                isEffectActive = true;
-                break;
-            case 'g':
-                currentEffect = 'gravity';
-                isEffectActive = true;
-                break;
+        const key = event.key.toLowerCase();
+        if (['b', 'e', 's', 'g'].includes(key)) {
+            currentEffect = {
+                'b': 'bounce',
+                'e': 'explode',
+                's': 'stick',
+                'g': 'gravity'
+            }[key];
+            isEffectActive = true;
+            
+            const button = document.querySelector(`[data-effect="${currentEffect}"]`);
+            if (button) {
+                button.classList.add('active');
+            }
         }
     });
 
     document.addEventListener('keyup', (event) => {
-        if (['b', 'e', 's', 'g'].includes(event.key.toLowerCase())) {
+        const key = event.key.toLowerCase();
+        if (['b', 'e', 's', 'g'].includes(key)) {
             isEffectActive = false;
+            
+            document.querySelectorAll('.effect-btn').forEach(button => {
+                button.classList.remove('active');
+            });
         }
     });
 
-    // Add mouse move effect handler
     Events.on(mouseConstraint, 'mousemove', function(event) {
         if (isEffectActive) {
             const mouseX = mouse.position.x;
             const mouseY = mouse.position.y;
-            
+                
             let effectColor;
             switch(currentEffect) {
                 case 'bounce': effectColor = '#3ddc84'; break;
@@ -701,8 +685,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'gravity': effectColor = '#ffb26b'; break;
                 default: effectColor = '#ffffff';
             }
-            
-            // Create effect particles at mouse position
+                
             for (let i = 0; i < 12; i++) {
                 const angle = (i / 12) * Math.PI * 2;
                 const modeParticle = createExplosionParticle(
@@ -712,15 +695,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     2,
                     angle
                 );
-                
+                    
                 modeParticle.maxLifespan = 20;
                 modeParticle.lifespan = 20;
                 modeParticle.gravity = 0;
-                
+                modeParticle.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                modeParticle.lineWidth = 1.5;
+                    
                 explosionParticles.push(modeParticle);
             }
             
-            // Apply effect to nearby bodies
             activeBodies.forEach(body => {
                 if (!boundaries.includes(body)) {
                     const dx = body.position.x - mouseX;
@@ -728,6 +712,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     
                     if (distance < 100) {
+                        body.render.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                        body.render.lineWidth = 1.5;
+                        
                         switch(currentEffect) {
                             case 'bounce':
                                 const velocity = Vector.normalise({ x: dx, y: dy });
@@ -749,6 +736,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 Body.applyForce(body, body.position, Vector.mult(gravityForce, 0.003));
                                 break;
                         }
+                    } else {
+                        body.render.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                        body.render.lineWidth = 1;
                     }
                 }
             });
@@ -843,7 +833,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Update window resize handler
     window.addEventListener('resize', () => {
         const newWidth = window.innerWidth - 320;
         const newHeight = window.innerHeight;
@@ -874,10 +863,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const rect = canvas.getBoundingClientRect();
-        const clickX = (event.clientX - rect.left) * pixelRatio;
-        const clickY = (event.clientY - rect.top) * pixelRatio;
+        const clickX = (event.clientX - rect.left);
+        const clickY = (event.clientY - rect.top);
         
-        // Check if click is within the valid canvas area
         if (clickX < 0 || clickX > CANVAS_WIDTH || clickY < 0 || clickY > CANVAS_HEIGHT) {
             return;
         }
@@ -898,15 +886,6 @@ document.addEventListener('DOMContentLoaded', function() {
             createBody(x, y, type);
         }
     }, 500);
-
-    window.debugPhysics = function() {
-        console.log("World bodies:", world.bodies.length);
-        console.log("Active bodies:", activeBodies.length);
-        console.log("Canvas dimensions:", CANVAS_WIDTH, SCROLL_HEIGHT);
-        console.log("Gravity:", world.gravity);
-        
-        createBody(CANVAS_WIDTH / (2 * pixelRatio), 100, 'circle');
-    };
 });
 
 function initNetworkBackground() {
@@ -1048,9 +1027,9 @@ function initNetworkBackground() {
         
         draw() {
             ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
-            ctx.beginPath();
+                ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fill();
+                ctx.fill();
         }
     }
     

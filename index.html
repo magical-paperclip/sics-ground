@@ -5,77 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>sics-ground</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-content">
-            <div class="logo">sics-ground</div>
-            <ul class="nav-links">
-                <li><a href="#home" class="active">Home</a></li>
-                <li><a href="#playground">Playground</a></li>
-                <li><a href="#about">About</a></li>
-            </ul>
-        </div>
-    </nav>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">
+                <h1>sics-ground</h1>
+            </div>
+            
+            <div class="control-section">
+                <h2>Shapes</h2>
+                <div class="button-group">
+                    <button id="add-circle" class="control-btn">
+                        <span class="icon">●</span>
+                        Circle
+                    </button>
+                    <button id="add-square" class="control-btn">
+                        <span class="icon">■</span>
+                        Square
+                    </button>
+                    <button id="add-polygon" class="control-btn">
+                        <span class="icon">⬡</span>
+                        Polygon
+                    </button>
+                </div>
+            </div>
 
-    <div class="app-layout">
-        <div class="left-sidebar">
-            <div class="controls">
-                <div class="collision-effects">
-                    <h2>Collision Effects</h2>
-                    <div class="effect-options">
-                        <button class="effect-btn active" data-effect="bounce">Bounce</button>
-                        <button class="effect-btn" data-effect="explode">Explode</button>
-                        <button class="effect-btn" data-effect="stick">Stick</button>
-                        <button class="effect-btn" data-effect="gravity">Gravity Shift</button>
-                    </div>
+            <div class="control-section">
+                <h2>Effects</h2>
+                <div class="button-group">
+                    <button class="effect-btn active" data-effect="bounce">
+                        <span class="icon">↻</span>
+                        Bounce
+                    </button>
+                    <button class="effect-btn" data-effect="explode">
+                        <span class="icon">✧</span>
+                        Explode
+                    </button>
+                    <button class="effect-btn" data-effect="stick">
+                        <span class="icon">⊞</span>
+                        Stick
+                    </button>
+                    <button class="effect-btn" data-effect="gravity">
+                        <span class="icon">↓</span>
+                        Gravity
+                    </button>
                 </div>
-                
-                <div class="shape-creator">
-                    <h2>Add Shapes</h2>
-                    <button id="add-circle">Circle</button>
-                    <button id="add-square">Square</button>
-                    <button id="add-polygon">Polygon</button>
-                    <p class="click-tip">Or click anywhere on the playground to add random shapes!</p>
+            </div>
+
+            <div class="control-section">
+                <h2>Physics</h2>
+                <div class="slider-group">
+                    <label>
+                        Gravity
+                        <input type="range" id="gravity-slider" min="0" max="2" step="0.1" value="1">
+                    </label>
+                    <label>
+                        Friction
+                        <input type="range" id="friction-slider" min="0" max="1" step="0.1" value="0.2">
+                    </label>
+                    <label>
+                        Restitution
+                        <input type="range" id="restitution-slider" min="0" max="1" step="0.1" value="0.5">
+                    </label>
                 </div>
-                
-                <div class="scene-controls">
-                    <h2>Scene</h2>
-                    <button id="reset-scene">Reset</button>
-                    <button id="toggle-gravity">Toggle Gravity</button>
+            </div>
+
+            <div class="control-section">
+                <h2>Actions</h2>
+                <div class="button-group">
+                    <button id="reset-scene" class="control-btn danger">
+                        <span class="icon">↺</span>
+                        Reset
+                    </button>
+                    <button id="toggle-gravity" class="control-btn">
+                        <span class="icon">⇅</span>
+                        Toggle Gravity
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <div class="canvas-wrapper">
+
+        <div class="main-content">
             <div class="canvas-container">
                 <canvas id="network-background"></canvas>
-                <canvas id="physics-canvas"></canvas>
+                <div class="canvas-wrapper">
+                    <canvas id="physics-canvas"></canvas>
+                </div>
             </div>
         </div>
     </div>
-    
-    <section id="about" class="about-section">
-        <div class="container">
-            <h2>About sics-ground</h2>
-            <div class="about-content">
-                <p>sics-ground is an interactive physics sandbox powered by Matter.js where you can play with realistic object physics.</p>
-                <p>Add circles, squares, and polygons to the playground, watch as they interact using one of four effects: Bounce, Explode, Stick, or Gravity Shift.</p>
-                <p>This was my first project that I've made using js so I truly hope sics-ground is fun!</p>
-                <p> - magical paperclip  </p>
-            </div>
-        </div>
-    </section>
-
-    <footer>
-        <div class="container">
-            <p>© 2025 magical paperclip - sics-ground</p>
-        </div>
-    </footer>
-    
-    <script src="lib/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="script.js"></script>
-    <script src="menu-controls.js"></script>
 </body>
 </html>

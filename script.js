@@ -1,40 +1,152 @@
 document.addEventListener('DOMContentLoaded', function() {
-    initNetworkBackground();
+    // Initialize network background
+    const networkCanvas = document.getElementById('network-background');
+    const ctx = networkCanvas.getContext('2d');
     
+    // Set canvas size
+    function resizeCanvas() {
+        networkCanvas.width = window.innerWidth;
+        networkCanvas.height = window.innerHeight;
+    }
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Particle system
+    const particles = [];
+    const particleCount = 30; // Reduced number of particles
+    const particleColor = 'rgba(255, 107, 107, 0.1)'; // Cute pink color
+    
+    class Particle {
+        constructor() {
+            this.reset();
+        }
+        
+        reset() {
+            this.x = Math.random() * networkCanvas.width;
+            this.y = Math.random() * networkCanvas.height;
+            this.size = Math.random() * 2 + 1; // Smaller particles
+            this.speedX = Math.random() * 0.5 - 0.25; // Slower movement
+            this.speedY = Math.random() * 0.5 - 0.25;
+        }
+        
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            
+            if (this.x < 0 || this.x > networkCanvas.width) this.speedX *= -1;
+            if (this.y < 0 || this.y > networkCanvas.height) this.speedY *= -1;
+        }
+        
+        draw() {
+            ctx.fillStyle = particleColor;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    // Initialize particles
+    for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+    }
+    
+    // Animation loop
+    function animate() {
+        ctx.clearRect(0, 0, networkCanvas.width, networkCanvas.height);
+        
+        particles.forEach(particle => {
+            particle.update();
+            particle.draw();
+        });
+        
+        // Draw connections
+        particles.forEach((p1, i) => {
+            particles.slice(i + 1).forEach(p2 => {
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 100) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(0, 255, 0, ${0.05 * (1 - distance/100)})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            });
+        });
+        
+        requestAnimationFrame(animate);
+    }
+    
+    animate();
+
+    // Physics engine setup
     const { Engine, Render, Runner, Body, Bodies, Composite, Events, Mouse, MouseConstraint, Common, Vector } = Matter;
 
-    
     const engine = Engine.create({
-        positionIterations: 12,    
-        velocityIterations: 12,    
-        constraintIterations: 6,   
-        enableSleeping: true      
+        positionIterations: 8,
+        velocityIterations: 6,
+        constraintIterations: 4,
+        enableSleeping: false
     });
-    const world = engine.world;
-
-    world.gravity.scale = 0.001;
-    world.gravity.y = 1;
-
     
+    const world = engine.world;
+    world.gravity.scale = 0.001;
+    world.gravity.y = 0.98; // More realistic gravity
+
     const canvas = document.getElementById('physics-canvas');
     const canvasContainer = document.querySelector('.canvas-container');
     const canvasWrapper = document.querySelector('.canvas-wrapper');
-    
-    
-    console.log('Canvas element:', canvas);
-    console.log('Canvas container:', canvasContainer);
-    console.log('Canvas wrapper:', canvasWrapper);
     
     if (!canvas || !canvasContainer) {
         console.error('Canvas or container elements not found!');
         return;
     }
     
+    // Set canvas dimensions
+    const CANVAS_WIDTH = window.innerWidth - 320; // Adjusted for new sidebar width
+    const CANVAS_HEIGHT = window.innerHeight;
+    const SCROLL_HEIGHT = CANVAS_HEIGHT; // Remove scrolling, make it fit viewport
+    const CONTAINER_HEIGHT = CANVAS_HEIGHT;
+    
     const pixelRatio = window.devicePixelRatio || 1;
-    canvas.width = canvasContainer.offsetWidth * pixelRatio;
-    canvas.height = canvasContainer.offsetHeight * pixelRatio;
-    canvas.style.width = `${canvasContainer.offsetWidth}px`;
-    canvas.style.height = `${canvasContainer.offsetHeight}px`;
+    canvas.width = CANVAS_WIDTH * pixelRatio;
+    canvas.height = SCROLL_HEIGHT * pixelRatio;
+    canvas.style.width = `${CANVAS_WIDTH}px`;
+    canvas.style.height = `${SCROLL_HEIGHT}px`;
+    
+    canvasContainer.style.width = `${CANVAS_WIDTH}px`;
+    canvasContainer.style.height = `${CONTAINER_HEIGHT}px`;
+    canvasWrapper.style.width = `${CANVAS_WIDTH}px`;
+    canvasWrapper.style.height = `${CONTAINER_HEIGHT}px`;
+    canvasWrapper.style.overflow = 'hidden'; // Remove scrolling
+
+    // Physics controls
+    const gravitySlider = document.getElementById('gravity-slider');
+    const frictionSlider = document.getElementById('friction-slider');
+    const restitutionSlider = document.getElementById('restitution-slider');
+
+    gravitySlider.addEventListener('input', (e) => {
+        world.gravity.y = parseFloat(e.target.value);
+    });
+
+    frictionSlider.addEventListener('input', (e) => {
+        const friction = parseFloat(e.target.value);
+        activeBodies.forEach(body => {
+            body.friction = friction;
+            body.frictionStatic = friction * 2;
+        });
+    });
+
+    restitutionSlider.addEventListener('input', (e) => {
+        const restitution = parseFloat(e.target.value);
+        activeBodies.forEach(body => {
+            body.restitution = restitution;
+        });
+    });
 
     let scrollY = 0;
     canvasWrapper.addEventListener('scroll', () => {
@@ -46,21 +158,21 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas: canvas,
         engine: engine,
         options: {
-            width: canvas.width,
-            height: canvas.height,
+            width: CANVAS_WIDTH * pixelRatio,
+            height: SCROLL_HEIGHT * pixelRatio,
             wireframes: false,
-            background: 'rgba(41, 40, 65, 0.7)',
+            background: 'transparent',
             showAngleIndicator: false,
             pixelRatio: pixelRatio,
             hasBounds: true
         }
     });
 
-    
     const runner = Runner.create({
-        isFixed: false,            // Changed to false to use requestAnimationFrame
-        delta: 1000/120            // Increased from 60 FPS to 120 FPS for smoother animation
+        isFixed: false,
+        delta: 1000/120
     });
+    
     Runner.run(runner, engine);
     Render.run(render);
 
@@ -69,303 +181,111 @@ document.addEventListener('DOMContentLoaded', function() {
     let explosionParticles = [];
     let trailParticles = [];
     let currentEffect = 'bounce';
-    const colors = ['#716040', '#8c7851', '#a88c64', '#d1c4b3', '#d0b49f'];
+    let isEffectActive = false;
+    const colors = ['#00ff00', '#00ffff'];
     const explosionColors = ['#ff7b54', '#ffb26b', '#ffd56b', '#939597', '#6c22bd'];
+
+    function createDecorativeElements() {
+        // Removed all decorative elements
+    }
 
     function createBoundaries() {
         const wallOptions = { 
             isStatic: true,
-            chamfer: { radius: 10 }, 
             render: { 
-                fillStyle: 'rgba(224, 214, 204, 0.8)',
-                strokeStyle: 'rgba(209, 196, 179, 0.5)',
-                lineWidth: 1
-            } 
-        };
-        
-        const groundHeight = 30;
-        const wallWidth = 30;
-        
-        // Create the base ground
-        const ground = Bodies.rectangle(
-            canvas.width / 2, 
-            canvas.height - groundHeight/2 + scrollY, 
-            canvas.width, 
-            groundHeight, 
-            {
-                ...wallOptions,
-                render: {
-                    fillStyle: '#34A853', 
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 2
-                },
-                friction: 0.3,
-                frictionStatic: 0.5,
-            }
-        );
-        
-        const basePlatformOptions = {
-            isStatic: true,
-            chamfer: { radius: 5 },
-            render: {
-                fillStyle: 'rgba(66, 133, 244, 0.9)', 
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 2
-            },
-            friction: 0.3,           
-            frictionStatic: 0.5,     
-            restitution: 0.2,        
-            slop: 0.1,               
-            collisionFilter: {       
-                category: 0x0001,
-                mask: 0xFFFFFFFF
+                visible: false
             }
         };
         
-        const basePlatform = Bodies.rectangle(
-            canvas.width / 2,
-            canvas.height - groundHeight - 30 + scrollY, 
-            canvas.width - 120,
-            20,
-            basePlatformOptions
-        );
+        const wallWidth = 20;
         
-        const leftSupport = Bodies.rectangle(
-            canvas.width / 2 - (canvas.width - 180) / 4,
-            canvas.height - groundHeight - 15 + scrollY, 
-            15,
-            30,
-            {
-                isStatic: true,
-                render: {
-                    fillStyle: '#EA4335', 
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                }
-            }
-        );
-        
-        const rightSupport = Bodies.rectangle(
-            canvas.width / 2 + (canvas.width - 180) / 4,
-            canvas.height - groundHeight - 15 + scrollY, 
-            15,
-            30,
-            {
-                isStatic: true,
-                render: {
-                    fillStyle: '#FBBC05', 
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                }
-            }
-        );
-        
-        const bottomFloor = Bodies.rectangle(
-            canvas.width / 2,
-            canvasContainer.offsetHeight - groundHeight/2,
-            canvas.width * 2, 
-            groundHeight * 2, 
-            {
-                isStatic: true,
-                render: {
-                    fillStyle: '#34A853', 
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                },
-                friction: 0.5,
-                frictionStatic: 0.7,
-            }
-        );
-        
-        // Left wall
+        // Create left wall
         const leftWall = Bodies.rectangle(
-            wallWidth/2, 
-            canvas.height / 2 + scrollY / 2, 
-            wallWidth, 
-            canvas.height + scrollY, 
+            wallWidth/2,
+            CANVAS_HEIGHT/2,
+            wallWidth,
+            CANVAS_HEIGHT,
             wallOptions
         );
         
-       
-        
-        const rightWallWidth = canvas.width * 0.3;
+        // Create right wall
         const rightWall = Bodies.rectangle(
-            canvas.width - rightWallWidth/2, 
-            canvas.height / 2 + scrollY / 2, 
-            rightWallWidth, 
-            canvas.height * 2, 
-            {
-                isStatic: true,
-                chamfer: { radius: 5 },
-                render: {
-                    fillStyle: 'rgba(66, 133, 244, 0.8)',
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 2
-                }
-            }
-        );
-        
-        // Additional right edge barrier to absolutely prevent shapes from passing the visible right edge
-        const rightEdgeBarrier = Bodies.rectangle(
-            canvas.width + wallWidth/2,
-            canvas.height / 2 + scrollY / 2,
-            wallWidth * 2,
-            canvas.height * 2,
-            {
-                isStatic: true,
-                render: {
-                    visible: false 
-                },
-                friction: 1,
-                frictionStatic: 1,
-                restitution: 0.1
-            }
-        );
-        
-        
-        const decorElement1 = Bodies.rectangle(
-            canvas.width - rightWallWidth/2,
-            canvas.height * 0.25 + scrollY,
-            rightWallWidth * 0.7,
-            30,
-            {
-                isStatic: true,
-                chamfer: { radius: 15 },
-                render: {
-                    fillStyle: '#EA4335',
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                }
-            }
-        );
-        
-        const decorElement2 = Bodies.rectangle(
-            canvas.width - rightWallWidth/2,
-            canvas.height * 0.5 + scrollY,
-            rightWallWidth * 0.5,
-            30,
-            {
-                isStatic: true,
-                chamfer: { radius: 15 },
-                render: {
-                    fillStyle: '#FBBC05',
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                }
-            }
-        );
-        
-        const decorElement3 = Bodies.rectangle(
-            canvas.width - rightWallWidth/2,
-            canvas.height * 0.75 + scrollY,
-            rightWallWidth * 0.7,
-            30,
-            {
-                isStatic: true,
-                chamfer: { radius: 15 },
-                render: {
-                    fillStyle: '#34A853',
-                    strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                    lineWidth: 1
-                }
-            }
-        );
-        
-        const ceiling = Bodies.rectangle(
-            canvas.width / 2, 
-            wallWidth/2 + scrollY, 
-            canvas.width, 
-            wallWidth, 
+            CANVAS_WIDTH - wallWidth/2,
+            CANVAS_HEIGHT/2,
+            wallWidth,
+            CANVAS_HEIGHT,
             wallOptions
         );
         
-        boundaries = [
-            ground, basePlatform, leftSupport, rightSupport, 
-            leftWall, rightWall, rightEdgeBarrier, ceiling, bottomFloor, 
-            decorElement1, decorElement2, decorElement3
-        ];
+        // Create ceiling
+        const ceiling = Bodies.rectangle(
+            CANVAS_WIDTH/2,
+            wallWidth/2,
+            CANVAS_WIDTH,
+            wallWidth,
+            wallOptions
+        );
+        
+        // Create ground
+        const ground = Bodies.rectangle(
+            CANVAS_WIDTH/2,
+            CANVAS_HEIGHT - wallWidth/2,
+            CANVAS_WIDTH,
+            wallWidth,
+            wallOptions
+        );
+        
+        boundaries = [leftWall, rightWall, ceiling, ground];
         Composite.add(world, boundaries);
-        
-        const rampOptions = {
-            isStatic: true,
-            chamfer: { radius: 2 },
-            render: {
-                fillStyle: 'rgba(66, 133, 244, 0.8)', 
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
-                lineWidth: 1
-            },
-            friction: 0.1,
-            restitution: 0.1
-        };
-        
-        const leftRamp = Bodies.rectangle(
-            basePlatform.position.x - (canvas.width - 120) / 2 - 30,
-            basePlatform.position.y + 15,
-            80,
-            10,
-            rampOptions
-        );
-        
-        Body.rotate(leftRamp, Math.PI / 8);
-        
-        const rightRamp = Bodies.rectangle(
-            basePlatform.position.x + (canvas.width - 120) / 2 + 30,
-            basePlatform.position.y + 15,
-            80,
-            10,
-            rampOptions
-        );
-        
-        Body.rotate(rightRamp, -Math.PI / 8);
-        
-        boundaries.push(leftRamp, rightRamp);
-        Composite.add(world, [leftRamp, rightRamp]);
     }
 
     function createBody(x, y, type) {
-        const googleColors = [
-            '#4285F4', 
-            '#EA4335', 
-            '#FBBC05', 
-            '#34A853'  
+        const colors = [
+            '#4285F4', // Google Blue
+            '#EA4335', // Google Red
+            '#FBBC05', // Google Yellow
+            '#34A853'  // Google Green
         ];
         
-        const color = googleColors[Math.floor(Math.random() * googleColors.length)];
+        const color = colors[Math.floor(Math.random() * colors.length)];
         
         const options = {
-            restitution: 0.3,         
-            friction: 0.15,           
-            frictionAir: 0.002,       
-            frictionStatic: 0.3,      
-            density: 0.0025,          
-            chamfer: { radius: 2 },   
+            restitution: 0.4, // Less bouncy
+            friction: 0.3,    // More friction
+            frictionAir: 0.001,
+            frictionStatic: 0.5,
+            density: 0.002,   // Slightly heavier
             render: {
                 fillStyle: color,
-                strokeStyle: 'rgba(255, 255, 255, 0.3)',
+                strokeStyle: 'rgba(255, 255, 255, 0.2)',
                 lineWidth: 1
             }
         };
         
         let body;
         
+        // Adjust size based on pixel ratio to prevent stretching
+        const baseSize = Common.random(15, 30);
+        const adjustedSize = baseSize / pixelRatio;
+        
         switch(type) {
             case 'circle':
-                body = Bodies.circle(x, y, Common.random(15, 30), options);
+                body = Bodies.circle(x, y, adjustedSize, options);
                 break;
             case 'square':
-                const size = Common.random(25, 50);
-                body = Bodies.rectangle(x, y, size, size, options);
+                body = Bodies.rectangle(x, y, adjustedSize * 2, adjustedSize * 2, options);
                 break;
             case 'polygon':
-                body = Bodies.polygon(x, y, Common.random(3, 6), Common.random(15, 30), options);
+                body = Bodies.polygon(x, y, Common.random(3, 6), adjustedSize, options);
                 break;
             default:
-                body = Bodies.circle(x, y, Common.random(15, 30), options);
+                body = Bodies.circle(x, y, adjustedSize, options);
         }
         
+        // Set initial velocity with slight randomness
         Body.setVelocity(body, { 
-            x: Common.random(-1, 1) * 2,
-            y: Common.random(-0.1, 0.1)
+            x: Common.random(-0.5, 0.5),
+            y: Common.random(-0.5, 0.5)
         });
         
         activeBodies.push(body);
@@ -377,6 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createRippleEffect(x, y) {
+        // Create a single burst of particles
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
             const distance = 15;
@@ -411,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             alpha: 1,
             rotation: Math.random() * Math.PI * 2,
-            rotationSpeed: (Math.random() - 0.5) * 0.1, 
+            rotationSpeed: (Math.random() - 0.5) * 0.1,
             lifespan: 60,
             maxLifespan: 60,
             gravity: 0.02,
@@ -493,26 +414,16 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = explosionParticles.length - 1; i >= 0; i--) {
             const particle = explosionParticles[i];
             
-            // Use smoother interpolation for particle movement
             particle.x += particle.velocity.x;
             particle.y += particle.velocity.y;
-            
-            // Add smoother gravity effect
             particle.velocity.y += particle.gravity;
-            
-            // Enhanced drag for smoother deceleration
             particle.velocity.x *= particle.drag;
             particle.velocity.y *= particle.drag;
-            
-            // Smoother rotation
             particle.rotation += particle.rotationSpeed;
+            particle.size *= 0.995;
             
-            // More gradual size reduction for smoother scaling
-            particle.size *= 0.995; // Changed from 0.99 for smoother scaling
-            
-            // Enhanced quadratic easing for alpha transition
             const progress = particle.lifespan / particle.maxLifespan;
-            particle.alpha = progress * progress; // Quadratic easing
+            particle.alpha = progress * progress;
             
             particle.lifespan--;
             
@@ -636,14 +547,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 y: bodyA.velocity.y - bodyB.velocity.y
             };
             const collisionSpeed = Math.sqrt(relativeVelocity.x * relativeVelocity.x + relativeVelocity.y * relativeVelocity.y);
-            const impactThreshold = 2; 
+            const impactThreshold = 2;
             
             if (collisionSpeed < impactThreshold || (boundaries.includes(bodyA) && boundaries.includes(bodyB))) {
                 continue;
             }
             
             const impactForce = Math.min(1, collisionSpeed / 10);
-            
             const midX = (bodyA.position.x + bodyB.position.x) / 2;
             const midY = (bodyA.position.y + bodyB.position.y) / 2;
             
@@ -662,10 +572,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         for (let j = 0; j < 3; j++) {
                             const sparkAngle = Math.random() * Math.PI * 2;
                             const spark = createExplosionParticle(
-                                midX, midY, 
-                                '#ffffff', 
+                                midX, midY,
+                                '#ffffff',
                                 1 + impactForce * 2,
-                                1 + impactForce * 2, 
+                                1 + impactForce * 2,
                                 sparkAngle
                             );
                             spark.maxLifespan = 10;
@@ -679,49 +589,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
                         const intensity = 0.5 + impactForce * 2.5;
                         createExplosion(midX, midY, intensity);
-                        
-                        const particleCount = Math.floor(impactForce * 4) + 1;
-                        for (let j = 0; j < particleCount; j++) {
-                            const particle = Bodies.circle(
-                                midX + Common.random(-5, 5),
-                                midY + Common.random(-5, 5),
-                                Common.random(2, 4 + impactForce * 2),
-                                {
-                                    restitution: 0.3,       // Reduced from 0.8 for less bounce
-                                    friction: 0.15,         // Increased from 0.05
-                                    frictionAir: 0.008,     // Increased from 0.005
-                                    render: {
-                                        fillStyle: explosionColors[Math.floor(Math.random() * explosionColors.length)],
-                                        opacity: 0.8
-                                    }
-                                }
-                            );
-                            
-                            const forceMagnitude = 0.01 + (impactForce * 0.03);
-                            const angle = Math.random() * Math.PI * 2;
-                            Body.applyForce(particle, particle.position, {
-                                x: forceMagnitude * Math.cos(angle),
-                                y: forceMagnitude * Math.sin(angle)
-                            });
-                            
-                            activeBodies.push(particle);
-                            Composite.add(world, particle);
-                            
-                            const removeDelay = 1500 + Math.random() * 1000;
-                            setTimeout(() => {
-                                if (activeBodies.includes(particle)) {
-                                    const fadeInterval = setInterval(() => {
-                                        if (particle.render.opacity > 0.1) {
-                                            particle.render.opacity -= 0.1;
-                                        } else {
-                                            clearInterval(fadeInterval);
-                                            Composite.remove(world, particle);
-                                            activeBodies = activeBodies.filter(body => body !== particle);
-                                        }
-                                    }, 50);
-                                }
-                            }, removeDelay);
-                        }
                     }
                     break;
                     
@@ -736,33 +603,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (distance > 0) {
                             const normalizedDirection = Vector.normalise(direction);
                             
-                            Body.applyForce(bodyA, bodyA.position, 
+                            Body.applyForce(bodyA, bodyA.position,
                                 Vector.mult(normalizedDirection, forceMagnitude * bodyA.mass));
                             
-                            Body.applyForce(bodyB, bodyB.position, 
+                            Body.applyForce(bodyB, bodyB.position,
                                 Vector.mult(normalizedDirection, -forceMagnitude * bodyB.mass));
-                            
-                            if (Math.random() < 0.2) {
-                                const particlePos = Vector.add(
-                                    bodyA.position,
-                                    Vector.mult(normalizedDirection, distance * 0.3)
-                                );
-                                
-                                const connectionParticle = createExplosionParticle(
-                                    particlePos.x, 
-                                    particlePos.y,
-                                    'rgba(61, 220, 132, 0.7)',
-                                    2 + Math.random() * 2,
-                                    0.2,
-                                    Math.random() * Math.PI * 2
-                                );
-                                
-                                connectionParticle.maxLifespan = 20;
-                                connectionParticle.lifespan = 20;
-                                connectionParticle.gravity = 0;
-                                
-                                explosionParticles.push(connectionParticle);
-                            }
                         }
                     }
                     break;
@@ -773,58 +618,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const angleChange = (Math.random() - 0.5) * Math.PI * impactForce * 2;
                         const newAngle = startAngle + angleChange;
                         
-                        const oldGravityX = world.gravity.x;
-                        const oldGravityY = world.gravity.y;
-                        
-                        const targetGravityX = Math.sin(newAngle) * 0.001;
-                        const targetGravityY = Math.cos(newAngle) * 0.001;
-                        
-                        const transitionSteps = 20;
-                        const transitionDelay = 50;
-                        
-                        for (let step = 0; step <= transitionSteps; step++) {
-                            setTimeout(() => {
-                                const progress = step / transitionSteps;
-                                const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                                
-                                world.gravity.x = oldGravityX + (targetGravityX - oldGravityX) * easing;
-                                world.gravity.y = oldGravityY + (targetGravityY - oldGravityY) * easing;
-                            }, step * transitionDelay);
-                        }
-                        
-                        for (let i = 0; i < 24; i++) {
-                            const angle = (i / 24) * Math.PI * 2;
-                            const gravityWave = createExplosionParticle(
-                                midX,
-                                midY,
-                                'rgba(108, 34, 189, 0.4)',
-                                5 + Math.random() * 5,
-                                0.5 + impactForce,
-                                angle
-                            );
-                            
-                            gravityWave.maxLifespan = 30;
-                            gravityWave.lifespan = 30;
-                            gravityWave.gravity = 0;
-                            
-                            explosionParticles.push(gravityWave);
-                        }
-                        
-                        const resetDelay = 1500 + impactForce * 1000;
-                        setTimeout(() => {
-                            const finalGravityX = world.gravity.x;
-                            const finalGravityY = world.gravity.y;
-                            
-                            for (let step = 0; step <= transitionSteps; step++) {
-                                setTimeout(() => {
-                                    const progress = step / transitionSteps;
-                                    const easing = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                                    
-                                    world.gravity.x = finalGravityX * (1 - easing);
-                                    world.gravity.y = 1 * easing + finalGravityY * (1 - easing);
-                                }, step * transitionDelay);
-                            }
-                        }, resetDelay);
+                        world.gravity.x = Math.sin(newAngle) * 0.001;
+                        world.gravity.y = Math.cos(newAngle) * 0.001;
                     }
                     break;
             }
@@ -842,8 +637,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
         constraint: {
-            stiffness: 0.1,  
-            damping: 0.1,    
+            stiffness: 0.1,
+            damping: 0.1,
             render: {
                 visible: false
             }
@@ -851,7 +646,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     mouse.pixelRatio = pixelRatio;
-
     Composite.add(world, mouseConstraint);
     render.mouse = mouse;
 
@@ -860,69 +654,126 @@ document.addEventListener('DOMContentLoaded', function() {
         createRippleEffect(body.position.x, body.position.y);
     });
 
+    // Remove old effect button handlers
     document.querySelectorAll('.effect-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
+        button.removeEventListener('click', () => {});
+    });
+
+    // Add keyboard controls
+    document.addEventListener('keydown', (event) => {
+        switch(event.key.toLowerCase()) {
+            case 'b':
+                currentEffect = 'bounce';
+                isEffectActive = true;
+                break;
+            case 'e':
+                currentEffect = 'explode';
+                isEffectActive = true;
+                break;
+            case 's':
+                currentEffect = 'stick';
+                isEffectActive = true;
+                break;
+            case 'g':
+                currentEffect = 'gravity';
+                isEffectActive = true;
+                break;
+        }
+    });
+
+    document.addEventListener('keyup', (event) => {
+        if (['b', 'e', 's', 'g'].includes(event.key.toLowerCase())) {
+            isEffectActive = false;
+        }
+    });
+
+    // Add mouse move effect handler
+    Events.on(mouseConstraint, 'mousemove', function(event) {
+        if (isEffectActive) {
+            const mouseX = mouse.position.x;
+            const mouseY = mouse.position.y;
             
-            const newEffect = button.getAttribute('data-effect');
-            
-            if (newEffect !== currentEffect) {
-                currentEffect = newEffect;
-                
-                const x = canvas.width / (2 * pixelRatio);
-                const y = canvas.height / (2 * pixelRatio);
-                
-                let effectColor;
-                switch(currentEffect) {
-                    case 'bounce': effectColor = '#3ddc84'; break;
-                    case 'explode': effectColor = '#ff7b54'; break;
-                    case 'stick': effectColor = '#6c22bd'; break;
-                    case 'gravity': effectColor = '#ffb26b'; break;
-                    default: effectColor = '#ffffff';
-                }
-                
-                for (let i = 0; i < 36; i++) {
-                    const angle = (i / 36) * Math.PI * 2;
-                    const modeParticle = createExplosionParticle(
-                        x, y,
-                        effectColor,
-                        8,
-                        3,
-                        angle
-                    );
-                    
-                    modeParticle.maxLifespan = 40;
-                    modeParticle.lifespan = 40;
-                    modeParticle.gravity = 0;
-                    
-                    explosionParticles.push(modeParticle);
-                }
+            let effectColor;
+            switch(currentEffect) {
+                case 'bounce': effectColor = '#3ddc84'; break;
+                case 'explode': effectColor = '#ff7b54'; break;
+                case 'stick': effectColor = '#6c22bd'; break;
+                case 'gravity': effectColor = '#ffb26b'; break;
+                default: effectColor = '#ffffff';
             }
-        });
+            
+            // Create effect particles at mouse position
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const modeParticle = createExplosionParticle(
+                    mouseX, mouseY,
+                    effectColor,
+                    4,
+                    2,
+                    angle
+                );
+                
+                modeParticle.maxLifespan = 20;
+                modeParticle.lifespan = 20;
+                modeParticle.gravity = 0;
+                
+                explosionParticles.push(modeParticle);
+            }
+            
+            // Apply effect to nearby bodies
+            activeBodies.forEach(body => {
+                if (!boundaries.includes(body)) {
+                    const dx = body.position.x - mouseX;
+                    const dy = body.position.y - mouseY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 100) {
+                        switch(currentEffect) {
+                            case 'bounce':
+                                const velocity = Vector.normalise({ x: dx, y: dy });
+                                Body.setVelocity(body, Vector.mult(velocity, 5));
+                                break;
+                                
+                            case 'explode':
+                                const force = Vector.normalise({ x: dx, y: dy });
+                                Body.applyForce(body, body.position, Vector.mult(force, 0.01));
+                                break;
+                                
+                            case 'stick':
+                                const stickForce = Vector.normalise({ x: -dx, y: -dy });
+                                Body.applyForce(body, body.position, Vector.mult(stickForce, 0.005));
+                                break;
+                                
+                            case 'gravity':
+                                const gravityForce = Vector.normalise({ x: dx, y: dy });
+                                Body.applyForce(body, body.position, Vector.mult(gravityForce, 0.003));
+                                break;
+                        }
+                    }
+                }
+            });
+        }
     });
 
     document.getElementById('add-circle').addEventListener('click', () => {
-        createBody(canvas.width / (2 * pixelRatio), 50, 'circle');
+        createBody(CANVAS_WIDTH / (2 * pixelRatio), 50, 'circle');
     });
 
     document.getElementById('add-square').addEventListener('click', () => {
-        createBody(canvas.width / (2 * pixelRatio), 50, 'square');
+        createBody(CANVAS_WIDTH / (2 * pixelRatio), 50, 'square');
     });
 
     document.getElementById('add-polygon').addEventListener('click', () => {
-        createBody(canvas.width / (2 * pixelRatio), 50, 'polygon');
+        createBody(CANVAS_WIDTH / (2 * pixelRatio), 50, 'polygon');
     });
 
-    // Smoother reset animation
     document.getElementById('reset-scene').addEventListener('click', () => {
-        const removalDelay = 15; // Reduced from 20 for faster animation
+        const removalDelay = 15;
         
         activeBodies.forEach((body, index) => {
             setTimeout(() => {
                 createExplosion(body.position.x, body.position.y, 0.5);
                 
-                // Add fade-out effect before removal
                 const fadeSteps = 10;
                 for (let i = 0; i < fadeSteps; i++) {
                     setTimeout(() => {
@@ -956,25 +807,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Enhanced animation transitions for UI effects
     document.getElementById('toggle-gravity').addEventListener('click', () => {
         const targetY = world.gravity.y === 1 ? 0 : 1;
         const currentY = world.gravity.y;
-        const steps = 30; // Increased from 15 for smoother transition
+        const steps = 30;
         
         for (let i = 0; i <= steps; i++) {
             setTimeout(() => {
                 const progress = i / steps;
-                // Cubic easing for smoother gravity transition
                 const easing = progress < 0.5 
                     ? 4 * progress * progress * progress 
                     : 1 - Math.pow(-2 * progress + 2, 3) / 2;
                 world.gravity.y = currentY + (targetY - currentY) * easing;
-            }, i * 15); // Reduced from 20ms to 15ms for faster response
+            }, i * 15);
         }
         
-        const x = canvas.width / (2 * pixelRatio);
-        const y = canvas.height / (2 * pixelRatio);
+        const x = CANVAS_WIDTH / (2 * pixelRatio);
+        const y = SCROLL_HEIGHT / (2 * pixelRatio);
         
         for (let i = 0; i < 24; i++) {
             const angle = (i / 24) * Math.PI * 2;
@@ -994,67 +843,69 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Update window resize handler
     window.addEventListener('resize', () => {
-        boundaries.forEach(boundary => {
-            Composite.remove(world, boundary);
-        });
+        const newWidth = window.innerWidth - 320;
+        const newHeight = window.innerHeight;
         
-        canvas.width = canvasContainer.offsetWidth * pixelRatio;
-        canvas.height = canvasContainer.offsetHeight * pixelRatio;
-        canvas.style.width = `${canvasContainer.offsetWidth}px`;
-        canvas.style.height = `${canvasContainer.offsetHeight}px`;
+        canvas.width = newWidth * pixelRatio;
+        canvas.height = newHeight * pixelRatio;
+        canvas.style.width = `${newWidth}px`;
+        canvas.style.height = `${newHeight}px`;
+        
+        canvasContainer.style.width = `${newWidth}px`;
+        canvasContainer.style.height = `${newHeight}px`;
+        canvasWrapper.style.width = `${newWidth}px`;
+        canvasWrapper.style.height = `${newHeight}px`;
         
         render.options.width = canvas.width;
         render.options.height = canvas.height;
         
+        boundaries.forEach(boundary => {
+            Composite.remove(world, boundary);
+        });
+        
         createBoundaries();
     });
 
-    // Enhanced click ripple effect
     canvas.addEventListener('click', (event) => {
         if (mouseConstraint.body) {
             return;
         }
         
         const rect = canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) * pixelRatio;
-        const y = (event.clientY - rect.top) * pixelRatio;
+        const clickX = (event.clientX - rect.left) * pixelRatio;
+        const clickY = (event.clientY - rect.top) * pixelRatio;
+        
+        // Check if click is within the valid canvas area
+        if (clickX < 0 || clickX > CANVAS_WIDTH || clickY < 0 || clickY > CANVAS_HEIGHT) {
+            return;
+        }
         
         const shapeTypes = ['circle', 'square', 'polygon'];
         const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
         
-        createBody(x, y, randomType);
-        
-        // Create more ripples with staggered timing for smoother effect
-        for (let i = 0; i < 12; i++) { // Increased from 8 to 12
-            setTimeout(() => {
-                createRippleEffect(x, y);
-            }, i * 25); // Reduced from 30ms to 25ms for faster animation
-        }
+        createBody(clickX, clickY, randomType);
     });
 
     createBoundaries();
 
-    console.log("Creating initial shapes...");
     setTimeout(() => {
         for (let i = 0; i < 5; i++) {
-            const x = Common.random(100, canvas.width / pixelRatio - 200); // Adjusted to avoid right edge
+            const x = Common.random(100, CANVAS_WIDTH / pixelRatio - 200);
             const y = Common.random(50, 100);
             const type = ['circle', 'square', 'polygon'][Math.floor(Math.random() * 3)];
-            console.log(`Creating shape ${i}: ${type} at (${x}, ${y})`);
             createBody(x, y, type);
         }
-    }, 500); // Added delay to ensure canvas is ready
+    }, 500);
 
-    // Debug helper
     window.debugPhysics = function() {
         console.log("World bodies:", world.bodies.length);
         console.log("Active bodies:", activeBodies.length);
-        console.log("Canvas dimensions:", canvas.width, canvas.height);
+        console.log("Canvas dimensions:", CANVAS_WIDTH, SCROLL_HEIGHT);
         console.log("Gravity:", world.gravity);
         
-        // Force create a shape at center
-        createBody(canvas.width / (2 * pixelRatio), 100, 'circle');
+        createBody(CANVAS_WIDTH / (2 * pixelRatio), 100, 'circle');
     };
 });
 
@@ -1067,8 +918,6 @@ function initNetworkBackground() {
         const pixelRatio = window.devicePixelRatio || 1;
         canvas.width = container.offsetWidth * pixelRatio;
         canvas.height = container.offsetHeight * pixelRatio;
-        canvas.style.width = `${container.offsetWidth}px`;
-        canvas.style.height = `${container.offsetHeight}px`;
         ctx.scale(pixelRatio, pixelRatio);
     };
     
@@ -1178,110 +1027,30 @@ function initNetworkBackground() {
     
     class Particle {
         constructor() {
-            this.x = Math.random() * canvas.width / window.devicePixelRatio;
-            this.y = Math.random() * canvas.height / window.devicePixelRatio;
-            this.velocityX = Math.random() * particleSpeed * 2 - particleSpeed;
-            this.velocityY = Math.random() * particleSpeed * 2 - particleSpeed;
-            this.size = Math.random() * 3 + 1.5; 
-            this.baseSize = this.size; 
-            this.color = colors[Math.floor(Math.random() * colors.length)];
-            this.targetX = null; 
-            this.targetY = null;
-            this.wobble = {
-                speed: Math.random() * 0.02 + 0.01,
-                offset: Math.random() * Math.PI * 2,
-                amplitude: Math.random() * 0.7 + 0.6 
-            };
-            this.glow = Math.random() > 0.7; 
-            this.glowIntensity = Math.random() * 0.5 + 0.5;
+            this.reset();
+        }
+        
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 2 + 1;
+            this.speedX = Math.random() * 2 - 1;
+            this.speedY = Math.random() * 2 - 1;
         }
         
         update() {
-            if (this.x < 0 || this.x > canvas.width / window.devicePixelRatio) {
-                this.velocityX = -this.velocityX;
-            }
+            this.x += this.speedX;
+            this.y += this.speedY;
             
-            if (this.y < 0 || this.y > canvas.height / window.devicePixelRatio) {
-                this.velocityY = -this.velocityY;
-            }
-            
-            if (mouse.x !== null && mouse.y !== null) {
-                const dx = mouse.x - this.x;
-                const dy = mouse.y - this.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < mouse.radius) {
-                    const force = (mouse.radius - distance) / mouse.radius;
-                    
-                    const wobbleX = Math.sin(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
-                    const wobbleY = Math.cos(Date.now() * this.wobble.speed + this.wobble.offset) * this.wobble.amplitude;
-                    
-                    this.velocityX += -dx * force * mouseForce * 0.015 + wobbleX * 0.15;
-                    this.velocityY += -dy * force * mouseForce * 0.015 + wobbleY * 0.15;
-                    
-                    this.size = this.baseSize * (1 + force * 0.5);
-                    
-                    if (Math.random() > 0.95) {
-                        this.color = colors[Math.floor(Math.random() * colors.length)];
-                    }
-                } else {
-                    if (this.size > this.baseSize) {
-                        this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
-                    }
-                }
-            } else {
-                if (this.size > this.baseSize) {
-                    this.size = this.baseSize + (this.size - this.baseSize) * 0.9;
-                }
-            }
-            
-            this.velocityX += Math.sin(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
-            this.velocityY += Math.cos(Date.now() * this.wobble.speed * 0.3 + this.wobble.offset) * 0.015 * this.wobble.amplitude;
-            
-            const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-            if (speed > 2.5) { 
-                this.velocityX = (this.velocityX / speed) * 2.5;
-                this.velocityY = (this.velocityY / speed) * 2.5;
-            }
-            
-            this.velocityX *= 0.98;
-            this.velocityY *= 0.98;
-            
-            this.x += this.velocityX;
-            this.y += this.velocityY;
+            if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
         }
         
         draw() {
-            const pulseScale = 1 + Math.sin(Date.now() * 0.004 + this.wobble.offset) * 0.15; 
-            const size = this.size * pulseScale;
-            
-            if (this.glow) {
-                const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size * 2.5);
-                glow.addColorStop(0, this.color);
-                glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, size * 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = glow;
-                ctx.globalAlpha = 0.2 * this.glowIntensity * pulseScale;
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-            
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
             ctx.beginPath();
-            ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.globalAlpha = dotOpacity;
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fill();
-            
-            if (Math.random() > 0.7) {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, size * 0.4, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.fill();
-            }
-            
-            ctx.globalAlpha = 1;
         }
     }
     
@@ -1346,10 +1115,10 @@ function initNetworkBackground() {
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        for (let i = 0; i < particles.length; i++) {
-            particles[i].update();
-            particles[i].draw();
-        }
+        particles.forEach(particle => {
+            particle.update();
+            particle.draw();
+        });
         
         connect();
         

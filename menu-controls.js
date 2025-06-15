@@ -1,19 +1,18 @@
-// Wait for the DOM to fully load
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the navbar active state updater
+ 
     initNavbarActiveState();
     
-    // Initialize scroll reveal animations
+  
     initScrollReveal();
     
-    // Update navbar on scroll
+    
     document.addEventListener('scroll', function() {
         updateNavbar();
         updateNavbarActiveState();
     });
 });
 
-// Update the navbar appearance on scroll
+
 function updateNavbar() {
     const navbar = document.querySelector('.navbar');
     if (window.scrollY > 50) {
@@ -23,15 +22,15 @@ function updateNavbar() {
     }
 }
 
-// Update active state in navbar based on scroll position
+// updat active state in navbar based on scroll position
 function initNavbarActiveState() {
     const sections = document.querySelectorAll('section');
     const navLinks = document.querySelectorAll('.nav-links a');
     
-    // Set initial active state
+    
     updateNavbarActiveState();
     
-    // Add click event listeners to nav links for smooth scrolling
+    
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -39,10 +38,10 @@ function initNavbarActiveState() {
             const targetSection = document.querySelector(targetId);
             
             if (targetSection) {
-                // Smooth scroll to the section
+                
                 targetSection.scrollIntoView({ behavior: 'smooth' });
                 
-                // Update active class
+                
                 navLinks.forEach(navLink => navLink.classList.remove('active'));
                 link.classList.add('active');
             }
@@ -50,15 +49,13 @@ function initNavbarActiveState() {
     });
 }
 
-// Update which nav link is active based on scroll position
 function updateNavbarActiveState() {
     const sections = document.querySelectorAll('section');
     const navLinks = document.querySelectorAll('.nav-links a');
-    
-    // Get current scroll position
+
     let scrollPosition = window.scrollY + 100; // Offset for better accuracy
     
-    // Find the current section
+
     sections.forEach(section => {
         const sectionTop = section.offsetTop;
         const sectionHeight = section.offsetHeight;
@@ -98,12 +95,11 @@ function initScrollReveal() {
     
     // Observe each paragraph
     aboutParagraphs.forEach((paragraph, index) => {
-        // Add staggered delay
         paragraph.style.transitionDelay = `${0.2 * index}s`;
         observer.observe(paragraph);
     });
     
-    // General reveal animations
+
     const revealElements = document.querySelectorAll('.reveal');
     
     const revealObserver = new IntersectionObserver((entries, observer) => {

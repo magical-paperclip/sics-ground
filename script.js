@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const gravitySlider = document.getElementById('gravity-slider');
     const frictionSlider = document.getElementById('friction-slider');
     const restitutionSlider = document.getElementById('restitution-slider');
+    const interactionStrengthSlider = document.getElementById('interaction-strength-slider');
 
     gravitySlider.addEventListener('input', (e) => {
         world.gravity.y = parseFloat(e.target.value);
@@ -134,6 +135,10 @@ document.addEventListener('DOMContentLoaded', function() {
         activeBodies.forEach(body => {
             body.restitution = restitution;
         });
+    });
+    interactionStrengthSlider.addEventListener('input', (e) => {
+        interactionStrength = parseFloat(e.target.value);
+        console.log(interactionStrength)
     });
 
     let scrollY = 0;
@@ -169,6 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let explosionParticles = [];
     let trailParticles = [];
     let currentEffect = 'bounce';
+    let interactionStrength = 1.0;
     let isEffectActive = false;
     const colors = ['#00ff00', '#00ffff'];
     const explosionColors = ['#ff7b54', '#ffb26b', '#ffd56b', '#939597', '#6c22bd'];
@@ -549,11 +555,11 @@ document.addEventListener('DOMContentLoaded', function() {
             switch(currentEffect) {
                 case 'bounce':
                     if (!boundaries.includes(bodyA)) {
-                        const velocityA = Vector.mult(Vector.normalise(bodyA.velocity), bodyA.speed * (1 + impactForce * 0.3));
+                        const velocityA = Vector.mult(Vector.normalise(bodyA.velocity), bodyA.speed * (1 + impactForce * 0.3) * interactionStrength);
                         Body.setVelocity(bodyA, velocityA);
                     }
                     if (!boundaries.includes(bodyB)) {
-                        const velocityB = Vector.mult(Vector.normalise(bodyB.velocity), bodyB.speed * (1 + impactForce * 0.3));
+                        const velocityB = Vector.mult(Vector.normalise(bodyB.velocity), bodyB.speed * (1 + impactForce * 0.3) * interactionStrength);
                         Body.setVelocity(bodyB, velocityB);
                     }
                     
@@ -576,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                 case 'explode':
                     if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
-                        const intensity = 0.5 + impactForce * 2.5;
+                        const intensity = (0.5 + impactForce * 2.5) * interactionStrength;
                         createExplosion(midX, midY, intensity);
                     }
                     break;
@@ -584,7 +590,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'stick':
                     if (!boundaries.includes(bodyA) && !boundaries.includes(bodyB)) {
                         const baseForce = 0.0005;
-                        const forceMagnitude = baseForce * (1 + impactForce);
+                        const forceMagnitude = baseForce * (1 + impactForce) * interactionStrength;
                         
                         const direction = Vector.sub(bodyB.position, bodyA.position);
                         const distance = Vector.magnitude(direction);
@@ -607,8 +613,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const angleChange = (Math.random() - 0.5) * Math.PI * impactForce * 2;
                         const newAngle = startAngle + angleChange;
                         
-                        world.gravity.x = Math.sin(newAngle) * 0.001;
-                        world.gravity.y = Math.cos(newAngle) * 0.001;
+                        world.gravity.x = Math.sin(newAngle) * 0.001 * interactionStrength;
+                        world.gravity.y = Math.cos(newAngle) * 0.001 * interactionStrength;
                     }
                     break;
             }
@@ -660,7 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-
+    /*
     document.addEventListener('keyup', (event) => {
         const key = event.key.toLowerCase();
         if (['b', 'e', 's', 'g'].includes(key)) {
@@ -671,6 +677,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+     */
 
     Events.on(mouseConstraint, 'mousemove', function(event) {
         if (isEffectActive) {
